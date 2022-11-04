@@ -6389,6 +6389,10 @@ static void rna_def_userdef_experimental(BlenderRNA *brna)
   RNA_def_property_boolean_sdna(prop, NULL, "enable_eevee_next", 1);
   RNA_def_property_ui_text(prop, "EEVEE Next", "Enable the new EEVEE codebase, requires restart");
 
+  prop = RNA_def_property(srna, "enable_gpencil_next", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "enable_gpencil_next", 1);
+  RNA_def_property_ui_text(prop, "GPENCIL Next", "Enable the new GPencil codebase");
+
   prop = RNA_def_property(srna, "use_viewport_debug", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "use_viewport_debug", 1);
   RNA_def_property_ui_text(prop,

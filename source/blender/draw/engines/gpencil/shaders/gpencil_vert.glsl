@@ -27,12 +27,14 @@ void gpencil_color_output(vec4 stroke_col, vec4 vert_col, float vert_strength, f
 
 void main()
 {
+  PASS_RESOURCE_ID
+
   float vert_strength;
   vec4 vert_color;
   vec3 vert_N;
 
   ivec4 ma1 = floatBitsToInt(texelFetch(gp_pos_tx, gpencil_stroke_point_id() * 3 + 1));
-  gpMaterial gp_mat = materials[ma1.x + gpMaterialOffset];
+  gpMaterial gp_mat = gp_materials[ma1.x + gpMaterialOffset];
   gpMaterialFlag gp_flag = floatBitsToUint(gp_mat._flag);
 
   gl_Position = gpencil_vertex(vec4(viewportSize, 1.0 / viewportSize),

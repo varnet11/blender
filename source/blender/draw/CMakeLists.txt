@@ -172,9 +172,11 @@ set(SRC
   engines/gpencil/gpencil_cache_utils.c
   engines/gpencil/gpencil_draw_data.c
   engines/gpencil/gpencil_engine.c
+  engines/gpencil/gpencil_engine.cc
   engines/gpencil/gpencil_engine.h
   engines/gpencil/gpencil_render.c
   engines/gpencil/gpencil_shader.c
+  engines/gpencil/gpencil_shader.cc
   engines/gpencil/gpencil_shader_fx.c
   engines/select/select_draw_utils.c
   engines/select/select_engine.c
@@ -772,4 +774,3 @@ if(WITH_GTESTS)
     blender_add_test_lib(bf_draw_tests "${TEST_SRC}" "${INC};${TEST_INC}" "${INC_SYS}" "${LIB};${TEST_LIB}")
   endif()
 endif()
-
