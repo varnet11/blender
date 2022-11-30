@@ -54,7 +54,7 @@ static void node_geo_exec(GeoNodeExecParams params)
       params.set_output("Delta Time", scene_ctime - data->time);
     }
     if (params.lazy_output_is_required("Elapsed Time")) {
-      params.set_output("Delta Time", scene_ctime - cache->geometry_per_frame.first().time);
+      params.set_output("Elapsed Time", scene_ctime - cache->geometry_per_frame.first().time);
     }
     return;
   }
