@@ -26,13 +26,13 @@ static void node_declare(NodeDeclarationBuilder &b)
 
 static void node_layout(uiLayout *layout, bContext * /*C*/, PointerRNA *ptr)
 {
-  uiItemR(layout, ptr, "use_cache", 0, nullptr, ICON_NONE);
+  uiItemR(layout, ptr, "use_cache", 0, IFACE_("Persistent Cache"), ICON_NONE);
 }
 
 static void node_init(bNodeTree * /*tree*/, bNode *node)
 {
   NodeGeometrySimulationOutput *data = MEM_cnew<NodeGeometrySimulationOutput>(__func__);
-  data->use_cache = false;
+  data->use_persistent_cache = false;
   node->storage = data;
 }
 
@@ -95,7 +95,7 @@ static void node_geo_exec(GeoNodeExecParams params)
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
   geometry_set.ensure_owns_direct_data();
   /* TODO: The "Use cache" input should probably become a "Persistent Cache" option. */
-  if (storage.use_cache || cache.geometry_per_frame.is_empty()) {
+  if (storage.use_persistent_cache || cache.geometry_per_frame.is_empty()) {
     /* If using the cache or there is no cached data yet, write the input in a new cache value. */
     cache.insert(geometry_set, scene_frame, scene_ctime);
   }

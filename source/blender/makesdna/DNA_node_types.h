@@ -1555,7 +1555,7 @@ typedef struct NodeGeometrySimulationInput {
 } NodeGeometrySimulationInput;
 
 typedef struct NodeGeometrySimulationOutput {
-  int8_t use_cache;
+  int8_t use_persistent_cache;
 } NodeGeometrySimulationOutput;
 
 typedef struct NodeGeometryDistributePointsInVolume {

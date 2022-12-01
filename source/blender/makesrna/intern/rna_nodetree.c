@@ -9696,8 +9696,8 @@ static void def_geo_simulation_output(StructRNA *srna)
 
   RNA_def_struct_sdna_from(srna, "NodeGeometrySimulationOutput", "storage");
 
-  prop = RNA_def_property(srna, "use_cache", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_ui_text(prop, "Use Cache", "");
+  prop = RNA_def_property(srna, "use_persistent_cache", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_ui_text(prop, "Persistent Cache", "");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 }
 
