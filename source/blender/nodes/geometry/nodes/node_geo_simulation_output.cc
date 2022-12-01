@@ -16,7 +16,7 @@ NODE_STORAGE_FUNCS(NodeGeometrySimulationOutput);
 
 static void node_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Bool>(N_("Run"));
+  b.add_input<decl::Bool>(N_("Run")).default_value(true);
   b.add_input<decl::Geometry>(N_("Geometry"));
   b.add_output<decl::Bool>(N_("Started"));
   b.add_output<decl::Bool>(N_("Ended"));
