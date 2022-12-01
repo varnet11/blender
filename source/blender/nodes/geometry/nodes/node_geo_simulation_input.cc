@@ -13,7 +13,6 @@ NODE_STORAGE_FUNCS(NodeGeometrySimulationInput);
 
 static void node_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Bool>(N_("Run"));
   b.add_input<decl::Geometry>(N_("Geometry"));
 
   b.add_output<decl::Float>(N_("Delta Time"));
@@ -34,9 +33,6 @@ static void node_geo_exec(GeoNodeExecParams params)
   const Scene *scene = DEG_get_input_scene(params.depsgraph());
   const float scene_ctime = BKE_scene_ctime_get(scene);
   const int scene_frame = int(scene_ctime);
-
-  /* TODO: Somehow use "Run" input. We also need to pass through the simulation state directly to
-   * the output node on the first frame the "Run" input is true. */
 
   const GeoNodesLFUserData &lf_data = *params.user_data();
   bke::ComputeCaches &all_caches = *lf_data.modifier_data->cache_per_frame;

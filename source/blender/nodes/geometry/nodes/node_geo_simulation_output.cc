@@ -16,7 +16,7 @@ NODE_STORAGE_FUNCS(NodeGeometrySimulationOutput);
 
 static void node_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Bool>(N_("Stop"));
+  b.add_input<decl::Bool>(N_("Run"));
   b.add_input<decl::Geometry>(N_("Geometry"));
   b.add_output<decl::Bool>(N_("Started"));
   b.add_output<decl::Bool>(N_("Ended"));
@@ -38,7 +38,7 @@ static void node_init(bNodeTree * /*tree*/, bNode *node)
 
 static void node_geo_exec(GeoNodeExecParams params)
 {
-  if (params.lazy_require_input("Stop")) {
+  if (params.lazy_require_input("Run")) {
     return;
   }
 
@@ -51,7 +51,6 @@ static void node_geo_exec(GeoNodeExecParams params)
   bke::ComputeCaches &all_caches = *lf_data.modifier_data->cache_per_frame;
   bke::SimulationCache &cache = all_caches.ensure_for_context(lf_data.compute_context->hash());
 
-  /* TODO: Retrieve "started" from "run" socket on simulation input node? */
   if (cache.geometry_per_frame.is_empty()) {
     if (params.lazy_output_is_required("Started")) {
       params.set_output("Started", false);
@@ -66,8 +65,13 @@ static void node_geo_exec(GeoNodeExecParams params)
     }
   }
 
-  const bool stop = params.get_input<bool>("Stop");
-  if (stop) {
+  const bool run = params.get_input<bool>("Run");
+  if (run) {
+    if (params.lazy_output_is_required("Ended")) {
+      params.set_output("Ended", false);
+    }
+  }
+  else {
     if (params.lazy_output_is_required("Ended")) {
       params.set_output("Ended", true);
     }
@@ -75,11 +79,6 @@ static void node_geo_exec(GeoNodeExecParams params)
       params.set_output("Geometry", data->geometry_set);
       params.set_input_unused("Geometry");
       return;
-    }
-  }
-  else {
-    if (params.lazy_output_is_required("Ended")) {
-      params.set_output("Ended", false);
     }
   }
 
