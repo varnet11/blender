@@ -131,10 +131,6 @@ struct ComputeCaches {
     return cache_per_context.lookup_ptr(context_hash);
   }
 
-  /* TODO: Do we need to use the same context for multiple simulation inputs and outputs in the
-   * same node group? If so this won't work at all-- we would need some way to link the two nodes,
-   * which might be necessary for the "Run" socket anyway, since it needs to know whether the
-   * simulation is running in order to know whether to use the last cache or request a new one. */
   SimulationCache &ensure_for_context(const ComputeContextHash &context_hash)
   {
     std::scoped_lock lock{mutex};

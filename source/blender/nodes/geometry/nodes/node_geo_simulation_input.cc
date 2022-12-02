@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "BKE_compute_cache.hh"
+#include "BKE_compute_contexts.hh"
 #include "BKE_scene.h"
 
 #include "DEG_depsgraph_query.h"
@@ -66,14 +67,18 @@ static void node_init(bNodeTree *tree, bNode *node)
 
 static void node_geo_exec(GeoNodeExecParams params)
 {
-  // const NodeGeometrySimulationInput &storage = node_storage(params.node());
+  const NodeGeometrySimulationInput &storage = node_storage(params.node());
+  const int32_t sim_output_node_id = storage.output_node_id;
+
   const Scene *scene = DEG_get_input_scene(params.depsgraph());
   const float scene_ctime = BKE_scene_ctime_get(scene);
   const int scene_frame = int(scene_ctime);
 
   const GeoNodesLFUserData &lf_data = *params.user_data();
   bke::ComputeCaches &all_caches = *lf_data.modifier_data->cache_per_frame;
-  const bke::SimulationCache *cache = all_caches.lookup_context(lf_data.compute_context->hash());
+
+  const bke::NodeGroupComputeContext cache_context(lf_data.compute_context, sim_output_node_id);
+  const bke::SimulationCache *cache = all_caches.lookup_context(cache_context.hash());
   if (!cache) {
     params.set_output("Geometry", params.extract_input<GeometrySet>("Geometry"));
     return;

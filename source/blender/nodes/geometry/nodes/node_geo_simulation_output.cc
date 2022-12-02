@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "BKE_compute_cache.hh"
+#include "BKE_compute_contexts.hh"
 #include "BKE_scene.h"
 
 #include "DEG_depsgraph_query.h"
@@ -42,14 +43,17 @@ static void node_geo_exec(GeoNodeExecParams params)
     return;
   }
 
-  const NodeGeometrySimulationOutput &storage = node_storage(params.node());
+  const bNode &node = params.node();
+  const NodeGeometrySimulationOutput &storage = node_storage(node);
   const Scene *scene = DEG_get_input_scene(params.depsgraph());
   const float scene_ctime = BKE_scene_ctime_get(scene);
   const int scene_frame = int(scene_ctime);
 
   const GeoNodesLFUserData &lf_data = *params.user_data();
   bke::ComputeCaches &all_caches = *lf_data.modifier_data->cache_per_frame;
-  bke::SimulationCache &cache = all_caches.ensure_for_context(lf_data.compute_context->hash());
+
+  const bke::NodeGroupComputeContext cache_context(lf_data.compute_context, node.identifier);
+  bke::SimulationCache &cache = all_caches.ensure_for_context(cache_context.hash());
 
   if (cache.geometry_per_frame.is_empty()) {
     if (params.lazy_output_is_required("Started")) {
