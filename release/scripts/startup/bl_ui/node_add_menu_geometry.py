@@ -298,7 +298,7 @@ class NODE_MT_category_simulation(Menu):
     def draw(self, _context):
         layout = self.layout
         node_add_menu.add_node_type(layout, "GeometryNodeSimulationInput")
-        node_add_menu.add_node_type(layout, "GeometryNodeSimulationOutput")
+        node_add_menu.add_node_type(layout, "GeometryNodeSimulationOutput", label="Simulation Output (Add this first)")
         node_add_menu.draw_assets_for_catalog(layout, self.bl_label)
 
 
