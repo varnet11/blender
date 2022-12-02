@@ -26,7 +26,7 @@ static void node_declare(NodeDeclarationBuilder &b)
 
 static void node_layout(uiLayout *layout, bContext * /*C*/, PointerRNA *ptr)
 {
-  uiItemR(layout, ptr, "use_cache", 0, IFACE_("Persistent Cache"), ICON_NONE);
+  uiItemR(layout, ptr, "use_persistent_cache", 0, IFACE_("Persistent Cache"), ICON_NONE);
 }
 
 static void node_init(bNodeTree * /*tree*/, bNode *node)
