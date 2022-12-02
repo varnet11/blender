@@ -41,7 +41,8 @@ static void node_init(bNodeTree *tree, bNode *node)
   VectorSet<int32_t> sim_output_ids;
   Set<int32_t> sim_input_output_ids;
   for (bNode *other_node : tree->all_nodes()) {
-    if (other_node->type == GEO_NODE_SIMULATION_INPUT && other_node != node) {
+    if (other_node->type == GEO_NODE_SIMULATION_INPUT && other_node != node &&
+        other_node->storage) {
       const NodeGeometrySimulationInput &storage = node_storage(*other_node);
       sim_input_output_ids.add_new(storage.output_node_id);
     }
