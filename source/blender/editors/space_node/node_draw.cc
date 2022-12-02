@@ -3037,13 +3037,16 @@ static void node_draw_sub_context_frames(TreeDrawContext &tree_draw_ctx,
 {
   const Span<const bNode *> all_simulation_inputs = ntree.nodes_by_type(
       "GeometryNodeSimulationInput");
-  const Span<const bNode *> all_simulation_outputs = ntree.nodes_by_type(
-      "GeometryNodeSimulationOutput");
-  if (all_simulation_inputs.is_empty() || all_simulation_outputs.is_empty()) {
+  if (all_simulation_inputs.is_empty()) {
     return;
   }
   Vector<SubContext> sub_contexts;
-  sub_contexts.append({float3(0.0f, 0.0f, 0.0f), all_simulation_inputs, all_simulation_outputs});
+  for (const bNode *sim_input : all_simulation_inputs) {
+    const auto &storage = *static_cast<const NodeGeometrySimulationInput *>(sim_input->storage);
+    if (const bNode *sim_output = ntree.node_by_id(storage.output_node_id)) {
+      sub_contexts.append({float3(0.0f, 0.0f, 0.0f), {sim_input}, {sim_output}});
+    }
+  }
 
   for (SubContext &sub_context : sub_contexts) {
     const Span<const bNode *> context_inputs = sub_context.input_nodes;

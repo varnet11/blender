@@ -1551,7 +1551,7 @@ typedef struct NodeGeometryUVUnwrap {
 } NodeGeometryUVUnwrap;
 
 typedef struct NodeGeometrySimulationInput {
-  int8_t dummy;
+  int32_t output_node_id;
 } NodeGeometrySimulationInput;
 
 typedef struct NodeGeometrySimulationOutput {
