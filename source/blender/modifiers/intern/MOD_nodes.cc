@@ -1095,7 +1095,7 @@ static GeometrySet compute_geometry(
     const blender::nodes::GeometryNodesLazyFunctionGraphInfo &lf_graph_info,
     const bNode &output_node,
     GeometrySet input_geometry_set,
-    blender::bke::ComputeCaches &compute_caches,
+    blender::bke::sim::ComputeCaches &compute_caches,
     NodesModifierData *nmd,
     const ModifierEvalContext *ctx)
 {
@@ -1295,7 +1295,7 @@ static void modifyGeometry(ModifierData *md,
   NodesModifierData *orig_nmd = reinterpret_cast<NodesModifierData *>(
       BKE_modifier_get_original(ctx->object, md));
   if (!orig_nmd->simulation_caches) {
-    orig_nmd->simulation_caches = new blender::bke::ComputeCaches();
+    orig_nmd->simulation_caches = new blender::bke::sim::ComputeCaches();
   }
 
   geometry_set = compute_geometry(tree,
@@ -1861,9 +1861,9 @@ static void copyData(const ModifierData *md, ModifierData *target, const int fla
 
   tnmd->runtime_eval_log = nullptr;
   if (nmd->simulation_caches) {
-    const blender::bke::ComputeCaches &src_caches = *static_cast<blender::bke::ComputeCaches *>(
-        nmd->simulation_caches);
-    tnmd->simulation_caches = new blender::bke::ComputeCaches(src_caches);
+    const blender::bke::sim::ComputeCaches &src_caches =
+        *static_cast<blender::bke::sim::ComputeCaches *>(nmd->simulation_caches);
+    tnmd->simulation_caches = new blender::bke::sim::ComputeCaches(src_caches);
   }
 
   if (nmd->settings.properties != nullptr) {
@@ -1879,7 +1879,7 @@ static void freeData(ModifierData *md)
     nmd->settings.properties = nullptr;
   }
 
-  delete static_cast<blender::bke::ComputeCaches *>(nmd->simulation_caches);
+  delete static_cast<blender::bke::sim::ComputeCaches *>(nmd->simulation_caches);
 
   clear_runtime_data(nmd);
 }

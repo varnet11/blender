@@ -47,47 +47,39 @@ static void node_geo_exec(GeoNodeExecParams params)
   const NodeGeometrySimulationOutput &storage = node_storage(node);
   const Scene *scene = DEG_get_input_scene(params.depsgraph());
   const float scene_ctime = BKE_scene_ctime_get(scene);
-  const int scene_frame = int(scene_ctime);
+  const bke::sim::TimePoint time{int(scene_ctime), scene_ctime};
 
   const GeoNodesLFUserData &lf_data = *params.user_data();
-  bke::ComputeCaches &all_caches = *lf_data.modifier_data->cache_per_frame;
+  bke::sim::ComputeCaches &all_caches = *lf_data.modifier_data->cache_per_frame;
 
   const bke::NodeGroupComputeContext cache_context(lf_data.compute_context, node.identifier);
-  bke::SimulationCache &cache = all_caches.ensure_for_context(cache_context.hash());
+  bke::sim::SimulationCache &cache = all_caches.ensure_for_context(cache_context.hash());
 
-  if (cache.geometry_per_frame.is_empty()) {
-    if (params.lazy_output_is_required("Started")) {
-      params.set_output("Started", false);
-    }
-  }
-  else {
-    if (params.lazy_output_is_required("Elapsed Time")) {
-      params.set_output("Elapsed Time", scene_ctime - cache.geometry_per_frame.first().time);
-    }
-    if (params.lazy_output_is_required("Started")) {
-      params.set_output("Started", true);
-    }
-  }
-
+  const float elapsed_time = cache.is_empty() ? 0.0f : scene_ctime - cache.start_time()->time;
   const bool run = params.get_input<bool>("Run");
-  if (run) {
-    if (params.lazy_output_is_required("Ended")) {
-      params.set_output("Ended", false);
-    }
+  const bool started = !cache.is_empty();
+  const bool ended = !cache.is_empty() && !run;
+
+  if (params.lazy_output_is_required("Elapsed Time")) {
+    params.set_output("Elapsed Time", elapsed_time);
   }
-  else {
-    if (params.lazy_output_is_required("Ended")) {
-      params.set_output("Ended", true);
-    }
-    if (const bke::GeometryCacheValue *data = cache.value_at_or_before_time(scene_frame)) {
-      params.set_output("Geometry", data->geometry_set);
+  if (params.lazy_output_is_required("Started")) {
+    params.set_output("Started", started);
+  }
+  if (params.lazy_output_is_required("Ended")) {
+    params.set_output("Ended", ended);
+  }
+
+  if (!run) {
+    if (std::optional<GeometrySet> value = cache.value_at_or_before_time("Geometry", time)) {
+      params.set_output("Geometry", std::move(*value));
       params.set_input_unused("Geometry");
       return;
     }
   }
 
-  if (const bke::GeometryCacheValue *data = cache.value_at_time(scene_frame)) {
-    params.set_output("Geometry", data->geometry_set);
+  if (std::optional<GeometrySet> value = cache.value_at_time("Geometry", time)) {
+    params.set_output("Geometry", std::move(*value));
     params.set_input_unused("Geometry");
     return;
   }
@@ -98,19 +90,15 @@ static void node_geo_exec(GeoNodeExecParams params)
 
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
   geometry_set.ensure_owns_direct_data();
-  /* TODO: The "Use cache" input should probably become a "Persistent Cache" option. */
-  if (storage.use_persistent_cache || cache.geometry_per_frame.is_empty()) {
+  if (storage.use_persistent_cache) {
     /* If using the cache or there is no cached data yet, write the input in a new cache value. */
-    cache.insert(geometry_set, scene_frame, scene_ctime);
+    cache.store_persistent("Geometry", time, geometry_set);
   }
   else {
-    /* If we aren't using the cache, overrite the cache to only store the last frame. */
-    /* TODO: This breaks the elapsed time. */
-    /* TODO: Should we allow turning on and off caching procedurally? In that case we wouldn't be
-     * able to clear the whole cache, we would have to check if persistent caching was enabled for
-     * the *last* frame and then decide to replace it or not. */
-    cache.geometry_per_frame.clear();
-    cache.insert(geometry_set, scene_frame, scene_ctime);
+    /* TODO: Maybe don't clear the whole cache here. */
+    /* TODO: Move the geometry set here if the output isn't needed. */
+    cache.clear();
+    cache.store_temporary("Geometry", time, geometry_set);
   }
 
   params.set_output("Geometry", std::move(geometry_set));

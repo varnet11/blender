@@ -11,10 +11,10 @@
 #include "DNA_session_uuid_types.h"
 
 #ifdef __cplusplus
-namespace blender::bke {
+namespace blender::bke::sim {
 struct ComputeCaches;
 }
-using ComputeCachesHandle = blender::bke::ComputeCaches;
+using ComputeCachesHandle = blender::bke::sim::ComputeCaches;
 #else
 typedef struct ComputeCachesHandle ComputeCachesHandle;
 #endif

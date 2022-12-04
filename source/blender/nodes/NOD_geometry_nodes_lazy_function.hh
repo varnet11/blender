@@ -47,7 +47,7 @@ struct GeoNodesModifierData {
   /** Optional logger. */
   geo_eval_log::GeoModifierLog *eval_log = nullptr;
 
-  bke::ComputeCaches *cache_per_frame;
+  bke::sim::ComputeCaches *cache_per_frame;
 
   /**
    * Some nodes should be executed even when their output is not used (e.g. active viewer nodes and
