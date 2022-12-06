@@ -102,6 +102,7 @@ set(SRC_OSL
   node_wireframe.osl
   node_hair_bsdf.osl
   node_principled_hair_bsdf.osl
+  node_microfacet_hair_bsdf.osl
   node_uv_map.osl
   node_principled_bsdf.osl
   node_rgb_to_bw.osl

@@ -660,6 +660,21 @@ static ShaderNode *add_node(Scene *scene,
                                                     NODE_PRINCIPLED_HAIR_REFLECTANCE));
     node = principled_hair;
   }
+  else if (b_node.is_a(&RNA_ShaderNodeBsdfHairMicrofacet)) {
+    BL::ShaderNodeBsdfHairMicrofacet b_microfacet_hair_node(b_node);
+    MicrofacetHairBsdfNode *microfacet_hair = graph->create_node<MicrofacetHairBsdfNode>();
+    microfacet_hair->set_parametrization(
+        (NodeMicrofacetHairParametrization)get_enum(b_microfacet_hair_node.ptr,
+                                                    "parametrization",
+                                                    NODE_MICROFACET_HAIR_NUM,
+                                                    NODE_MICROFACET_HAIR_REFLECTANCE));
+    microfacet_hair->set_model_type(
+        (NodeMicrofacetHairModelType)get_enum(b_microfacet_hair_node.ptr,
+                                              "model_type",
+                                              NODE_MICROFACET_HAIR_MODEL_TYPE_NUM,
+                                              NODE_MICROFACET_HAIR_CIRCULAR_GGX));
+    node = microfacet_hair;
+  }
   else if (b_node.is_a(&RNA_ShaderNodeBsdfPrincipled)) {
     BL::ShaderNodeBsdfPrincipled b_principled_node(b_node);
     PrincipledBsdfNode *principled = graph->create_node<PrincipledBsdfNode>();

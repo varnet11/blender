@@ -3629,6 +3629,201 @@ void PrincipledHairBsdfNode::compile(OSLCompiler &compiler)
   compiler.add(this, "node_principled_hair_bsdf");
 }
 
+/* Microfacet Hair BSDF Closure */
+
+NODE_DEFINE(MicrofacetHairBsdfNode)
+{
+  NodeType *type = NodeType::add("microfacet_hair_bsdf", create, NodeType::SHADER);
+
+  /* Color parametrization specified as enum. */
+  static NodeEnum parametrization_enum;
+  parametrization_enum.insert("Direct coloring", NODE_MICROFACET_HAIR_REFLECTANCE);
+  parametrization_enum.insert("Melanin concentration", NODE_MICROFACET_HAIR_PIGMENT_CONCENTRATION);
+  parametrization_enum.insert("Absorption coefficient", NODE_MICROFACET_HAIR_DIRECT_ABSORPTION);
+  SOCKET_ENUM(
+      parametrization, "Parametrization", parametrization_enum, NODE_MICROFACET_HAIR_REFLECTANCE);
+
+  /* Hair integration mode specified as enum. */
+  static NodeEnum model_type_enum;
+  model_type_enum.insert("Microfacet Circular GGX", NODE_MICROFACET_HAIR_CIRCULAR_GGX);
+  model_type_enum.insert("Microfacet Circular GGX Analytical",
+                         NODE_MICROFACET_HAIR_CIRCULAR_GGX_ANALYTIC);
+  model_type_enum.insert("Microfacet Circular Beckmann", NODE_MICROFACET_HAIR_CIRCULAR_BECKMANN);
+  model_type_enum.insert("Microfacet Elliptical GGX", NODE_MICROFACET_HAIR_ELLIPTIC_GGX);
+  model_type_enum.insert("Microfacet Elliptical Beckmann", NODE_MICROFACET_HAIR_ELLIPTIC_BECKMANN);
+
+  SOCKET_ENUM(model_type, "model_type", model_type_enum, NODE_MICROFACET_HAIR_CIRCULAR_GGX);
+
+  /* Initialize sockets to their default values. */
+  SOCKET_IN_COLOR(color, "Color", make_float3(0.017513f, 0.005763f, 0.002059f));
+  SOCKET_IN_FLOAT(melanin, "Melanin", 0.8f);
+  SOCKET_IN_FLOAT(melanin_redness, "Melanin Redness", 1.0f);
+  SOCKET_IN_COLOR(tint, "Tint", make_float3(1.f, 1.f, 1.f));
+  SOCKET_IN_VECTOR(absorption_coefficient,
+                   "Absorption Coefficient",
+                   make_float3(0.245531f, 0.52f, 1.365f),
+                   SocketType::VECTOR);
+
+  SOCKET_IN_FLOAT(eccentricity, "Eccentricity", 0.85f);
+  SOCKET_IN_FLOAT(random_axis, "Random Axis", 0.0f);
+  SOCKET_IN_FLOAT(twist_rate, "Twist Rate", 0.0f);
+
+  SOCKET_IN_FLOAT(offset, "Offset", 2.f * M_PI_F / 180.f);
+  SOCKET_IN_FLOAT(roughness, "Roughness", 0.3f);
+  SOCKET_IN_FLOAT(ior, "IOR", 1.55f);
+
+  SOCKET_IN_FLOAT(R, "R lobe", 1.0f);
+  SOCKET_IN_FLOAT(TT, "TT lobe", 1.0f);
+  SOCKET_IN_FLOAT(TRT, "TRT lobe", 1.0f);
+
+  SOCKET_IN_FLOAT(Blur, "Blur", 1.0f);
+
+  SOCKET_IN_FLOAT(random_roughness, "Random Roughness", 0.0f);
+  SOCKET_IN_FLOAT(random_color, "Random Color", 0.0f);
+  SOCKET_IN_FLOAT(random, "Random", 0.0f);
+
+  SOCKET_IN_NORMAL(normal, "Normal", zero_float3(), SocketType::LINK_NORMAL);
+  SOCKET_IN_FLOAT(surface_mix_weight, "SurfaceMixWeight", 0.0f, SocketType::SVM_INTERNAL);
+
+  SOCKET_OUT_CLOSURE(BSDF, "BSDF");
+
+  return type;
+}
+
+MicrofacetHairBsdfNode::MicrofacetHairBsdfNode() : BsdfBaseNode(get_node_type())
+{
+  closure = CLOSURE_BSDF_HAIR_MICROFACET_ID;
+}
+
+/* Enable retrieving Hair Info -> Random if Random isn't linked. */
+void MicrofacetHairBsdfNode::attributes(Shader *shader, AttributeRequestSet *attributes)
+{
+  /* Make sure we have these 2 for elliptical cross section tracking */
+  attributes->add(ATTR_STD_CURVE_INTERCEPT);
+  attributes->add(ATTR_STD_CURVE_LENGTH);
+
+  if (!input("Random")->link) {
+    attributes->add(ATTR_STD_CURVE_RANDOM);
+  }
+  ShaderNode::attributes(shader, attributes);
+}
+
+/* Prepares the input data for the SVM shader. */
+void MicrofacetHairBsdfNode::compile(SVMCompiler &compiler)
+{
+  compiler.add_node(NODE_CLOSURE_SET_WEIGHT, one_float3());
+
+  ShaderInput *roughness_in = input("Roughness");
+  ShaderInput *random_roughness_in = input("Random Roughness");
+  ShaderInput *offset_in = input("Offset");
+  ShaderInput *ior_in = input("IOR");
+
+  ShaderInput *melanin_in = input("Melanin");
+  ShaderInput *melanin_redness_in = input("Melanin Redness");
+  ShaderInput *random_color_in = input("Random Color");
+
+  ShaderInput *R_in = input("R lobe");
+  ShaderInput *TT_in = input("TT lobe");
+  ShaderInput *TRT_in = input("TRT lobe");
+  ShaderInput *Blur_in = input("Blur");
+
+  ShaderInput *eccentricity_in = input("Eccentricity");
+  ShaderInput *random_axis_in = input("Random Axis");
+  ShaderInput *twist_rate_in = input("Twist Rate");
+
+  int color_ofs = compiler.stack_assign(input("Color"));
+  int tint_ofs = compiler.stack_assign(input("Tint"));
+  int absorption_coefficient_ofs = compiler.stack_assign(input("Absorption Coefficient"));
+
+  int roughness_ofs = compiler.stack_assign_if_linked(roughness_in);
+
+  int normal_ofs = compiler.stack_assign_if_linked(input("Normal"));
+  int offset_ofs = compiler.stack_assign_if_linked(offset_in);
+  int ior_ofs = compiler.stack_assign_if_linked(ior_in);
+
+  int melanin_ofs = compiler.stack_assign_if_linked(melanin_in);
+  int melanin_redness_ofs = compiler.stack_assign_if_linked(melanin_redness_in);
+
+  ShaderInput *random_in = input("Random");
+  int attr_random = random_in->link ? SVM_STACK_INVALID :
+                                      compiler.attribute(ATTR_STD_CURVE_RANDOM);
+  int random_in_ofs = compiler.stack_assign_if_linked(random_in);
+  int random_color_ofs = compiler.stack_assign_if_linked(random_color_in);
+  int random_roughness_ofs = compiler.stack_assign_if_linked(random_roughness_in);
+
+  /* Encode all parameters into data nodes. */
+  /* node */
+  compiler.add_node(
+      NODE_CLOSURE_BSDF,
+      /* Socket IDs can be packed 4 at a time into a single data packet */
+      compiler.encode_uchar4(closure, roughness_ofs, 0, compiler.closure_mix_weight_offset()),
+      /* The rest are stored as unsigned integers */
+      __float_as_uint(roughness),
+      0);
+  /* data node */
+  compiler.add_node(normal_ofs,
+                    compiler.encode_uchar4(offset_ofs, ior_ofs, color_ofs, parametrization),
+                    __float_as_uint(offset),
+                    __float_as_uint(ior));
+  /* data node 2 */
+  compiler.add_node(
+      compiler.encode_uchar4(0, melanin_ofs, melanin_redness_ofs, absorption_coefficient_ofs),
+      0,
+      __float_as_uint(melanin),
+      __float_as_uint(melanin_redness));
+
+  /* data node 3 */
+  compiler.add_node(
+      compiler.encode_uchar4(tint_ofs, random_in_ofs, random_color_ofs, random_roughness_ofs),
+      __float_as_uint(random),
+      __float_as_uint(random_color),
+      __float_as_uint(random_roughness));
+
+  int attr_intercept = compiler.attribute(ATTR_STD_CURVE_INTERCEPT);
+  int attr_length = compiler.attribute(ATTR_STD_CURVE_LENGTH);
+
+  /* data node 4 */
+  compiler.add_node(
+      compiler.encode_uchar4(
+          SVM_STACK_INVALID, SVM_STACK_INVALID, SVM_STACK_INVALID, SVM_STACK_INVALID),
+      attr_random,
+      attr_intercept,
+      attr_length);
+
+  /* data node 5 */
+  compiler.add_node(compiler.encode_uchar4(compiler.stack_assign_if_linked(R_in),
+                                           compiler.stack_assign_if_linked(TT_in),
+                                           compiler.stack_assign_if_linked(TRT_in),
+                                           SVM_STACK_INVALID),
+                    __float_as_uint(R),
+                    __float_as_uint(TT),
+                    __float_as_uint(TRT));
+
+  /* data node 6 */
+  compiler.add_node(
+      compiler.encode_uchar4(0, compiler.stack_assign_if_linked(Blur_in), 0, model_type),
+      0,
+      __float_as_uint(Blur),
+      0);
+
+  /* data node 7 */
+  compiler.add_node(compiler.encode_uchar4(compiler.stack_assign_if_linked(eccentricity_in),
+                                           compiler.stack_assign_if_linked(twist_rate_in),
+                                           compiler.stack_assign_if_linked(random_axis_in),
+                                           SVM_STACK_INVALID),
+                    __float_as_uint(eccentricity),
+                    __float_as_uint(twist_rate),
+                    __float_as_uint(random_axis));
+}
+
+/* Prepares the input data for the OSL shader. */
+void MicrofacetHairBsdfNode::compile(OSLCompiler &compiler)
+{
+  compiler.parameter(this, "parametrization");
+  compiler.parameter(this, "model_type");
+  compiler.add(this, "node_microfacet_hair_bsdf");
+}
+
 /* Hair BSDF Closure */
 
 NODE_DEFINE(HairBsdfNode)

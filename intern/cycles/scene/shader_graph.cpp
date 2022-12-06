@@ -1140,7 +1140,8 @@ int ShaderGraph::get_num_closures()
        * for the volume steps. */
       num_closures += MAX_VOLUME_STACK_SIZE;
     }
-    else if (closure_type == CLOSURE_BSDF_HAIR_PRINCIPLED_ID) {
+    else if (closure_type == CLOSURE_BSDF_HAIR_PRINCIPLED_ID ||
+             closure_type == CLOSURE_BSDF_HAIR_MICROFACET_ID) {
       num_closures += 4;
     }
     else {

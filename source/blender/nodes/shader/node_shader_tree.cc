@@ -881,6 +881,7 @@ static void ntree_shader_weight_tree_invert(bNodeTree *ntree, bNode *output_node
             case SH_NODE_BSDF_GLASS:
             case SH_NODE_BSDF_GLOSSY:
             case SH_NODE_BSDF_HAIR_PRINCIPLED:
+            case SH_NODE_BSDF_HAIR_MICROFACET:
             case SH_NODE_BSDF_HAIR:
             case SH_NODE_BSDF_PRINCIPLED:
             case SH_NODE_BSDF_REFRACTION:
@@ -939,6 +940,7 @@ static bool closure_node_filter(const bNode *node)
     case SH_NODE_BSDF_GLASS:
     case SH_NODE_BSDF_GLOSSY:
     case SH_NODE_BSDF_HAIR_PRINCIPLED:
+    case SH_NODE_BSDF_HAIR_MICROFACET:
     case SH_NODE_BSDF_HAIR:
     case SH_NODE_BSDF_PRINCIPLED:
     case SH_NODE_BSDF_REFRACTION:

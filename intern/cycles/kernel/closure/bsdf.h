@@ -18,6 +18,7 @@
 #include "kernel/closure/bsdf_toon.h"
 #include "kernel/closure/bsdf_hair.h"
 #include "kernel/closure/bsdf_hair_principled.h"
+#include "kernel/closure/bsdf_hair_microfacet.h"
 #include "kernel/closure/bsdf_principled_diffuse.h"
 #include "kernel/closure/bsdf_principled_sheen.h"
 #include "kernel/closure/bssrdf.h"
@@ -243,6 +244,10 @@ ccl_device_inline int bsdf_sample(KernelGlobals kg,
       label = bsdf_principled_hair_sample(
           kg, sc, sd, randu, randv, eval, omega_in, pdf, sampled_roughness, eta);
       break;
+    case CLOSURE_BSDF_HAIR_MICROFACET_ID:
+      label = bsdf_microfacet_hair_sample(
+          kg, sc, sd, randu, randv, eval, omega_in, pdf, sampled_roughness, eta);
+      break;
     case CLOSURE_BSDF_PRINCIPLED_DIFFUSE_ID:
       label = bsdf_principled_diffuse_sample(sc, Ng, sd->I, randu, randv, eval, omega_in, pdf);
       *sampled_roughness = one_float2();
@@ -408,6 +413,11 @@ ccl_device_inline void bsdf_roughness_eta(const KernelGlobals kg,
       *roughness = make_float2(alpha, alpha);
       *eta = ((ccl_private PrincipledHairBSDF *)sc)->eta;
       break;
+    case CLOSURE_BSDF_HAIR_MICROFACET_ID:
+      alpha = ((ccl_private MicrofacetHairBSDF *)sc)->roughness;
+      *roughness = make_float2(alpha, alpha);
+      *eta = ((ccl_private MicrofacetHairBSDF *)sc)->eta;
+      break;
     case CLOSURE_BSDF_PRINCIPLED_DIFFUSE_ID:
       *roughness = one_float2();
       *eta = 1.0f;
@@ -504,6 +514,7 @@ ccl_device_inline int bsdf_label(const KernelGlobals kg,
       label = LABEL_TRANSMIT | LABEL_GLOSSY;
       break;
     case CLOSURE_BSDF_HAIR_PRINCIPLED_ID:
+    case CLOSURE_BSDF_HAIR_MICROFACET_ID:
       if (bsdf_is_transmission(sc, omega_in))
         label = LABEL_TRANSMIT | LABEL_GLOSSY;
       else
@@ -609,6 +620,9 @@ ccl_device_inline
     case CLOSURE_BSDF_HAIR_PRINCIPLED_ID:
       eval = bsdf_principled_hair_eval(kg, sd, sc, omega_in, pdf);
       break;
+    case CLOSURE_BSDF_HAIR_MICROFACET_ID:
+      eval = bsdf_microfacet_hair_eval(kg, sd, sc, omega_in, pdf);
+      break;
     case CLOSURE_BSDF_HAIR_REFLECTION_ID:
       eval = bsdf_hair_reflection_eval(sc, sd->I, omega_in, pdf);
       break;
@@ -675,6 +689,9 @@ ccl_device void bsdf_blur(KernelGlobals kg, ccl_private ShaderClosure *sc, float
       break;
     case CLOSURE_BSDF_HAIR_PRINCIPLED_ID:
       bsdf_principled_hair_blur(sc, roughness);
+      break;
+    case CLOSURE_BSDF_HAIR_MICROFACET_ID:
+      bsdf_microfacet_hair_blur(sc, roughness);
       break;
     default:
       break;

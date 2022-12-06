@@ -4632,6 +4632,62 @@ static const EnumPropertyItem node_principled_hair_items[] = {
     {0, NULL, 0, NULL, NULL},
 };
 
+static const EnumPropertyItem node_microfacet_hair_parametrization_items[] = {
+    {SHD_MICROFACET_HAIR_DIRECT_ABSORPTION,
+     "ABSORPTION",
+     0,
+     "Absorption Coefficient",
+     "Directly set the absorption coefficient \"sigma_a\" (this is not the most intuitive way to "
+     "color hair)"},
+    {SHD_MICROFACET_HAIR_PIGMENT_CONCENTRATION,
+     "MELANIN",
+     0,
+     "Melanin Concentration",
+     "Define the melanin concentrations below to get the most realistic-looking hair "
+     "(you can get the concentrations for different types of hair online)"},
+    {SHD_MICROFACET_HAIR_REFLECTANCE,
+     "COLOR",
+     0,
+     "Direct Coloring",
+     "Choose the color of your preference, and the shader will approximate the absorption "
+     "coefficient to render lookalike hair"},
+    {0, NULL, 0, NULL, NULL},
+};
+
+static const EnumPropertyItem node_microfacet_hair_mode_items[] = {
+    {SHD_MICROFACET_HAIR_CIRCULAR_GGX,
+     "HAIR_MICROFACET_CIRCULAR_GGX",
+     0,
+     "Microfacet Circular GGX",
+     "GGX microfacet-based hair scattering model with circular cross section fiber, numerically "
+     "integrated across the width"},
+    {SHD_MICROFACET_HAIR_CIRCULAR_GGX_ANALYTIC,
+     "HAIR_MICROFACET_CIRCULAR_GGX_ANALYTIC",
+     0,
+     "Microfacet Circular GGX Analytic",
+     "GGX microfacet-based hair scattering model with circular cross section fiber, analytically "
+     "integrated across the width with no masking term"},
+    {SHD_MICROFACET_HAIR_CIRCULAR_BECKMANN,
+     "HAIR_MICROFACET_CIRCULAR_BECKMANN",
+     0,
+     "Microfacet Circular Beckmann",
+     "Beckmann microfacet-based hair scattering model with circular cross section fiber, "
+     "numerically integrated across the width"},
+    {SHD_MICROFACET_HAIR_ELLIPTIC_GGX,
+     "HAIR_MICROFACET_ELLIPTIC_GGX",
+     0,
+     "Microfacet Elliptical GGX",
+     "GGX microfacet-based hair scattering model with elliptical cross section fiber, numerically "
+     "integrated across the width"},
+    {SHD_MICROFACET_HAIR_ELLIPTIC_BECKMANN,
+     "HAIR_MICROFACET_ELLIPTIC_BECKMANN",
+     0,
+     "Microfacet Elliptical Beckmann",
+     "Beckmann microfacet-based hair scattering model with elliptical cross section fiber, "
+     "numerically integrated across the width"},
+    {0, NULL, 0, NULL, NULL},
+};
+
 static const EnumPropertyItem node_script_mode_items[] = {
     {NODE_SCRIPT_INTERNAL, "INTERNAL", 0, "Internal", "Use internal text data-block"},
     {NODE_SCRIPT_EXTERNAL, "EXTERNAL", 0, "External", "Use external .osl or .oso file"},
@@ -6161,6 +6217,31 @@ static void def_hair_principled(StructRNA *srna)
       prop, "Color Parametrization", "Select the shader's color parametrization");
   RNA_def_property_enum_items(prop, node_principled_hair_items);
   RNA_def_property_enum_default(prop, SHD_PRINCIPLED_HAIR_REFLECTANCE);
+  /* Upon editing, update both the node data AND the UI representation */
+  /* (This effectively shows/hides the relevant sockets) */
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_ShaderNode_socket_update");
+}
+
+/* RNA initialization for the custom property. */
+static void def_hair_microfacet(StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  prop = RNA_def_property(srna, "parametrization", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "custom1");
+  RNA_def_property_ui_text(
+      prop, "Color parametrization", "Select the shader's color parametrization");
+  RNA_def_property_enum_items(prop, node_microfacet_hair_parametrization_items);
+  RNA_def_property_enum_default(prop, SHD_MICROFACET_HAIR_REFLECTANCE);
+  /* Upon editing, update both the node data AND the UI representation */
+  /* (This effectively shows/hides the relevant sockets) */
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_ShaderNode_socket_update");
+
+  prop = RNA_def_property(srna, "model_type", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "custom2");
+  RNA_def_property_ui_text(prop, "Mode", "Select the shader's mode");
+  RNA_def_property_enum_items(prop, node_microfacet_hair_mode_items);
+  RNA_def_property_enum_default(prop, SHD_MICROFACET_HAIR_CIRCULAR_GGX);
   /* Upon editing, update both the node data AND the UI representation */
   /* (This effectively shows/hides the relevant sockets) */
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_ShaderNode_socket_update");

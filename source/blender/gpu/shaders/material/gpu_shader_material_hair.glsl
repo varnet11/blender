@@ -44,3 +44,36 @@ void node_bsdf_hair_principled(vec4 color,
 
   result = closure_eval(hair_data);
 }
+
+void node_bsdf_hair_microfacet(vec4 color,
+                               float melanin,
+                               float melanin_redness,
+                               vec4 tint,
+                               vec3 absorption_coefficient,
+                               float roughness,
+                               float R,
+                               float TT,
+                               float TRT,
+                               float ior,
+                               float offset,
+                               float eccentricity,
+                               float random_axis,
+                               float twist_rate,
+                               float Blur,
+                               float random_color,
+                               float random_roughness,
+                               float random,
+                               float weight,
+                               out Closure result)
+{
+  /* Placeholder closure.
+   * Some computation will have to happen here just like the Principled BSDF. */
+  ClosureHair hair_data;
+  hair_data.weight = weight;
+  hair_data.color = color.rgb;
+  hair_data.offset = offset;
+  hair_data.roughness = vec2(0.0);
+  hair_data.T = g_data.curve_B;
+
+  result = closure_eval(hair_data);
+}
