@@ -88,116 +88,57 @@ ccl_device int bsdf_microfacet_hair_setup(ccl_private ShaderData *sd,
 
 #endif /* __HAIR__ */
 
-ccl_device_inline float3 make_float3_from_float(const float f)
-{
-  return make_float3(f, f, f);
-}
+/* -------------------------------------------------------------------- */
+/** \name Hair coordinate system utils.
+ * \{ */
 
-ccl_device_inline float3 reflect_vector(const float3 w, const float3 n)
-{
-  return 2.f * dot(w, n) * n - w;
-}
-
-ccl_device float3 refract_vector(const float3 w,
-                                 const float3 n,
-                                 const float cos_theta_t,
-                                 const float eta_ti)
-{
-  return n * (dot(w, n) * eta_ti + cos_theta_t) - w * eta_ti;
-}
-
-ccl_device_inline float3 microfacet_visible_normal_sample(KernelGlobals kg,
-                                                          const bool beckmann,
-                                                          const float roughness,
-                                                          const float3 wi,
-                                                          const float randu,
-                                                          const float randv,
-                                                          ccl_private float *G1i)
-{
-  /* Step 1 : stretch wi */
-  float3 omega_i_ = normalize(make_float3(roughness * wi.x, roughness * wi.y, wi.z));
-
-  /* get polar coordinates of omega_i_ */
-  float costheta_ = 1.f;
-  float sintheta_ = 0.f;
-  float cosphi_ = 1.f;
-  float sinphi_ = 0.f;
-
-  if (omega_i_.z < 0.99999f) {
-    costheta_ = omega_i_.z;
-    sintheta_ = safe_sqrtf(1.f - costheta_ * costheta_);
-
-    float invlen = 1.f / sintheta_;
-    cosphi_ = omega_i_.x * invlen;
-    sinphi_ = omega_i_.y * invlen;
-  }
-
-  /* 2. sample P22_{omega_i}(x_slope, y_slope, 1, 1) */
-  float slope_x, slope_y;
-
-  if (beckmann) {
-    microfacet_beckmann_sample_slopes(
-        kg, costheta_, sintheta_, randu, randv, &slope_x, &slope_y, G1i);
-  }
-  else {
-    microfacet_ggx_sample_slopes(costheta_, sintheta_, randu, randv, &slope_x, &slope_y, G1i);
-  }
-
-  /* 3. rotate */
-  float tmp = cosphi_ * slope_x - sinphi_ * slope_y;
-  slope_y = sinphi_ * slope_x + cosphi_ * slope_y;
-  slope_x = tmp;
-
-  /* 4. unstretch */
-  slope_x = roughness * slope_x;
-  slope_y = roughness * slope_y;
-
-  /* 5. compute normal */
-  return normalize(make_float3(-slope_x, -slope_y, 1.f));
-}
-
-/* returns sin_theta */
-ccl_device_inline float sintheta(const float3 w)
+/* Returns sin(theta) of the given direction. */
+ccl_device_inline float sin_theta(const float3 w)
 {
   return w.y;
 }
 
-/* returns cos_theta */
-ccl_device_inline float costheta(const float3 w)
+/* Returns cos(theta) of the given direction. */
+ccl_device_inline float cos_theta(const float3 w)
 {
   return safe_sqrtf(sqr(w.x) + sqr(w.z));
 }
 
-/* returns tan_theta */
-ccl_device_inline float tantheta(const float3 w)
+/* Returns tan(theta) of the given direction. */
+ccl_device_inline float tan_theta(const float3 w)
 {
-  return sintheta(w) / costheta(w);
+  return sin_theta(w) / cos_theta(w);
 }
 
-/* extract theta coordinate from 3D direction
+/* Returns sin(phi) and cos(phi) of the given direction. */
+ccl_device float2 sincos_phi(const float3 w)
+{
+  float c = cos_theta(w);
+  return make_float2(w.x / c, w.z / c);
+}
+
+/* Extract the theta coordinate from the given direction.
  * -pi < theta < pi */
 ccl_device_inline float dir_theta(const float3 w)
 {
-  return atan2f(sintheta(w), costheta(w));
+  return atan2f(sin_theta(w), cos_theta(w));
 }
 
-/* extract phi coordinate from 3D direction.
- * -pi < phi < pi
- * Assuming phi(wi) = 0 */
+/* Extract the phi coordinate from the given direction, assuming phi(wi) = 0.
+ * -pi < phi < pi */
 ccl_device_inline float dir_phi(const float3 w)
 {
   return atan2f(w.x, w.z);
 }
 
-/* extract theta and phi coordinate from 3D direction
- * -pi/2 < theta < pi/2, -pi < phi < pi
- * Assuming phi(wi) = 0 */
+/* Extract theta and phi coordinates from the given direction, assuming phi(wi) = 0.
+ * -pi/2 < theta < pi/2, -pi < phi < pi */
 ccl_device_inline float2 dir_sph(const float3 w)
 {
   return make_float2(dir_theta(w), dir_phi(w));
 }
 
-/* compute the vector direction given spherical coordinates */
+/* Compute the vector direction given spherical coordinates */
 ccl_device_inline float3 sph_dir(float theta, float gamma)
 {
   float sin_theta = sinf(theta);
@@ -206,6 +147,49 @@ ccl_device_inline float3 sph_dir(float theta, float gamma)
   float cos_gamma = cosf(gamma);
   return make_float3(sin_gamma * cos_theta, sin_theta, cos_gamma * cos_theta);
 }
+
+/* Utility functions for elliptical cross-sections. */
+
+/* Conversion between gamma and phi. Notations see Figure 5 in the paper. */
+ccl_device float to_phi(float gamma, float a, float b)
+{
+  float sin_gamma = sinf(gamma);
+  float cos_gamma = cosf(gamma);
+  return atan2f(b * sin_gamma, a * cos_gamma);
+}
+
+ccl_device float to_gamma(float phi, float a, float b)
+{
+  float sin_phi = sinf(phi);
+  float cos_phi = cosf(phi);
+  return atan2f(a * sin_phi, b * cos_phi);
+}
+
+/* Compute the coordinate on the ellipse, given gamma, the semi-major and semi-minor axes. */
+ccl_device float2 to_point(float gamma, float a, float b)
+{
+  float sin_gamma = sinf(gamma);
+  float cos_gamma = cosf(gamma);
+  return make_float2(a * sin_gamma, b * cos_gamma);
+}
+
+/* Compute the vector direction given by theta and gamma. */
+ccl_device float3 sphg_dir(float theta, float gamma, float a, float b)
+{
+  float sin_theta = sinf(theta);
+  float cos_theta = cosf(theta);
+  float sin_gamma = sinf(gamma);
+  float cos_gamma = cosf(gamma);
+  float tan_gamma = sin_gamma / cos_gamma;
+  float tan_phi = b / a * tan_gamma;
+  float cos_phi = 1.f / sqrtf(sqr(tan_phi) + 1.f);
+  if (cos_gamma < 0.f)
+    cos_phi = -cos_phi;
+  float sin_phi = cos_phi * tan_phi;
+  return make_float3(sin_phi * cos_theta, sin_theta, cos_phi * cos_theta);
+}
+
+/** \} */
 
 /* sample microfacets from a tilted mesonormal */
 ccl_device_inline float3 sample_wh(KernelGlobals kg,
@@ -224,8 +208,8 @@ ccl_device_inline float3 sample_wh(KernelGlobals kg,
   const float3 wi_wm = make_float3(dot(wi, s), dot(wi, t), dot(wi, n));
 
   float G1o;
-  const float3 wh_wm = microfacet_visible_normal_sample(
-      kg, beckmann, roughness, wi_wm, randu, randv, &G1o);
+  const float3 wh_wm = microfacet_sample_stretched(
+      kg, wi_wm, roughness, roughness, randu, randv, beckmann, &G1o);
 
   const float3 wh = wh_wm.x * s + wh_wm.y * t + wh_wm.z * n;
   return wh;
@@ -305,14 +289,14 @@ ccl_device float D(const bool beckmann, const float roughness, const float3 m, c
 }
 
 /* Fresnel */
+/* TODO: cleanup or refer to mitsuba */
 ccl_device float fresnel(float cos_theta_i,
                          float eta,
                          ccl_private float &cos_theta_t,
-                         ccl_private float &eta_it,
                          ccl_private float &eta_ti)
 {
   const float rcp_eta = 1.f / eta;
-  float cos_theta_i_abs;
+  float cos_theta_i_abs, eta_it;
   if (cos_theta_i >= 0.f) {
     eta_it = eta;
     eta_ti = rcp_eta;
@@ -348,42 +332,6 @@ ccl_device float fresnel(float cos_theta_i,
   return r;
 }
 
-ccl_device float fresnel0(float cos_theta_i, float eta)
-{
-  if (eta == 1.f)
-    return 0.f;
-  if (cos_theta_i == 0.f)
-    return 1.f;
-
-  const float rcp_eta = 1.f / eta;
-  float eta_it, eta_ti, cos_theta_i_abs;
-  if (cos_theta_i >= 0.f) {
-    eta_it = eta;
-    eta_ti = rcp_eta;
-    cos_theta_i_abs = cos_theta_i;
-  }
-  else {
-    eta_it = rcp_eta;
-    eta_ti = eta;
-    cos_theta_i_abs = -cos_theta_i;
-  }
-
-  /* Using Snell's law, calculate the squared sine of the angle between the surface normal and the
-   * transmitted ray */
-  float cos_theta_t_sqr = 1.f - eta_ti * eta_ti * (1.f - cos_theta_i * cos_theta_i);
-  float cos_theta_t_abs = safe_sqrtf(cos_theta_t_sqr);
-
-  /* Amplitudes of reflected waves */
-  float a_s = (cos_theta_i_abs - eta_it * cos_theta_t_abs) /
-              (cos_theta_i_abs + eta_it * cos_theta_t_abs);
-
-  float a_p = (cos_theta_t_abs - eta_it * cos_theta_i_abs) /
-              (cos_theta_t_abs + eta_it * cos_theta_i_abs);
-
-  float r = .5f * (sqr(a_s) + sqr(a_p));
-  return r;
-}
-
 ccl_device float3 bsdf_microfacet_hair_eval_r_circular(ccl_private const ShaderClosure *sc,
                                                        const float3 wi,
                                                        const float3 wo)
@@ -404,13 +352,13 @@ ccl_device float3 bsdf_microfacet_hair_eval_r_circular(ccl_private const ShaderC
 
   /* dot(wi, wmi) > 0 */
   const float tan_tilt = tanf(tilt);
-  float phi_m_max1 = acosf(fmaxf(-tan_tilt * tantheta(wi), 0.f));
+  float phi_m_max1 = acosf(fmaxf(-tan_tilt * tan_theta(wi), 0.f));
   if (isnan_safe(phi_m_max1))
     return R;
   const float phi_m_min1 = -phi_m_max1;
 
   /* dot(wo, wmi) > 0 */
-  const float phi_m_max2 = acosf(fmaxf(-tan_tilt * tantheta(wo), 0.f)) + phi_o;
+  const float phi_m_max2 = acosf(fmaxf(-tan_tilt * tan_theta(wo), 0.f)) + phi_o;
   if (isnan_safe(phi_m_max2))
     return R;
   const float phi_m_min2 = -phi_m_max2 + 2.f * phi_o;
@@ -434,8 +382,8 @@ ccl_device float3 bsdf_microfacet_hair_eval_r_circular(ccl_private const ShaderC
     const float cm = cosf(tilt);
 
     const float C = sqrtf(1.f - roughness_squared);
-    const float A = cm * costheta(wh) * C;
-    const float B = sm * sintheta(wh) * C;
+    const float A = cm * cos_theta(wh) * C;
+    const float B = sm * sin_theta(wh) * C;
     const float A2 = sqr(A);
     const float B2 = sqr(B);
     const float tmp1 = 1.f / sqrtf(sqr(B - 1.f) - A2);
@@ -488,9 +436,9 @@ ccl_device float3 bsdf_microfacet_hair_eval_r_circular(ccl_private const ShaderC
     integral *= (2.f / 3.f * res);
   }
 
-  const float F = fresnel0(dot(wi, wh), eta);
+  const float F = fresnel_dielectric_cos(dot(wi, wh), eta);
 
-  R = make_float3_from_float(bsdf->extra->R * 0.125f * F * fmaxf(0.f, integral));
+  R = make_float3(bsdf->extra->R * 0.125f * F * fmaxf(0.f, integral));
   return R;
 }
 
@@ -511,13 +459,13 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_circular(KernelGlobals kg,
 
   /* dot(wi, wmi) > 0 */
   const float tan_tilt = tanf(tilt);
-  float phi_m_max = acosf(fmaxf(-tan_tilt * tantheta(wi), 0.f));
+  float phi_m_max = acosf(fmaxf(-tan_tilt * tan_theta(wi), 0.f));
   if (isnan_safe(phi_m_max))
     return zero_float3();
   float phi_m_min = -phi_m_max;
 
   /* dot(wo, wmo) < 0 */
-  float tmp1 = acosf(fminf(tan_tilt * tantheta(wo), 0.f));
+  float tmp1 = acosf(fminf(tan_tilt * tan_theta(wo), 0.f));
   if (isnan_safe(tmp1))
     return zero_float3();
 
@@ -548,11 +496,11 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_circular(KernelGlobals kg,
     if (dot_wi_wh1 <= 1e-5f)
       continue;
 
-    float cos_theta_t1, eta_it1, eta_ti1;
-    const float T1 = 1.f - fresnel(dot_wi_wh1, eta, cos_theta_t1, eta_it1, eta_ti1);
+    float cos_theta_t1, eta_ti1;
+    const float T1 = 1.f - fresnel(dot_wi_wh1, eta, cos_theta_t1, eta_ti1);
 
     /* refraction at the first interface */
-    const float3 wt = refract_vector(wi, wh1, cos_theta_t1, eta_ti1);
+    const float3 wt = -refract(wi, wh1, cos_theta_t1, eta_ti1);
     const float phi_t = dir_phi(wt);
     const float phi_mt = 2.f * phi_t - phi_mi;
     const float3 wmt = sph_dir(-tilt, phi_mt);
@@ -564,7 +512,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_circular(KernelGlobals kg,
     /* Simpson's rule weight */
     float weight = (i == 0 || i == intervals - 1) ? 0.5f : (i % 2 + 1);
 
-    float3 A_t = exp(mu_a * 2.f * cosf(phi_t - phi_mi) / costheta(wt));
+    float3 A_t = exp(mu_a * 2.f * cosf(phi_t - phi_mi) / cos_theta(wt));
 
     /* TT */
     if (bsdf->extra->TT > 0.f) {
@@ -581,7 +529,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_circular(KernelGlobals kg,
 
           float dot_wt_wh2 = dot(-wt, wh2);
 
-          const float T2 = 1.f - fresnel0(dot_wt_wh2, inv_eta);
+          const float T2 = 1.f - fresnel_dielectric_cos(dot_wt_wh2, inv_eta);
           float D2 = D(beckmann, roughness, wh2, wmt) * G(beckmann, roughness, -wt, -wo, wmt, wh2);
 
           const float3 result = T1 * T2 * D2 * A_t * dot_wt_wh2 * dot(wo, wh2) *
@@ -607,8 +555,8 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_circular(KernelGlobals kg,
       if (cos_th2 <= 1e-5f)
         continue;
 
-      const float R2 = fresnel0(cos_th2, inv_eta);
-      float3 wtr = reflect_vector(wt, wh2);
+      const float R2 = fresnel_dielectric_cos(cos_th2, inv_eta);
+      float3 wtr = -reflect(wt, wh2);
 
       float G2 = G(beckmann, roughness, -wt, -wtr, wmt, wh2);
       if (G2 == 0.f || G_(-wt, -wtr, make_float3(wmt.x, 0.f, wmt.z), wh2) == 0.f)
@@ -632,10 +580,10 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_circular(KernelGlobals kg,
       wh3 *= rcp_norm_wh3;
       const float cos_trh3 = dot(wh3, wtr);
 
-      const float T3 = 1.f - fresnel0(cos_trh3, inv_eta);
+      const float T3 = 1.f - fresnel_dielectric_cos(cos_trh3, inv_eta);
       const float D3 = D(beckmann, roughness, wh3, wmtr) * G3;
 
-      const float3 A_tr = exp(mu_a * 2.f * cosf(phi_tr - phi_mt) / costheta(wtr));
+      const float3 A_tr = exp(mu_a * 2.f * cosf(phi_tr - phi_mt) / cos_theta(wtr));
 
       const float3 result = T1 * R2 * T3 * D3 * cos_trh3 * dot(wh3, wo) * sqr(rcp_norm_wh3) * A_t *
                             A_tr * weight / (dot(wt, wmi) * dot(wtr, wmt)) *
@@ -678,12 +626,12 @@ ccl_device Spectrum bsdf_microfacet_hair_eval_circular(KernelGlobals kg,
   *pdf = 1.f;
 
   // original from Huang's EGSR 2022
-  // return rgb_to_spectrum(R / costheta(wi));
+  // return rgb_to_spectrum(R / cos_theta(wi));
 
-  // correction: the extra costheta(wo) corresponds to the lack of consideration of Zinke's
+  // correction: the extra cos_theta(wo) corresponds to the lack of consideration of Zinke's
   // cos_theta_i^2 in the BCSDF; for instance eq[2] in Huang's should include an extra cos_theta_i
   // (plus here remember wi and wo meanings are flipped)
-  return rgb_to_spectrum(R / (costheta(wi) * costheta(wo)));
+  return rgb_to_spectrum(R / (cos_theta(wi) * cos_theta(wo)));
 }
 
 ccl_device int bsdf_microfacet_hair_sample_circular(const KernelGlobals kg,
@@ -750,7 +698,7 @@ ccl_device int bsdf_microfacet_hair_sample_circular(const KernelGlobals kg,
 
   /* sample R lobe */
   const float3 wh1 = sample_wh(kg, beckmann, roughness, wi, wmi, sample_h1.x, sample_h1.y);
-  const float3 wr = reflect_vector(wi, wh1);
+  const float3 wr = -reflect(wi, wh1);
 
   /* ensure that this is a valid sample */
   if (dot(wr, wh1) <= 0.f || dot(wr, wmi) <= 0.f || !G_(wi, wr, wmi_, wh1)) {
@@ -761,12 +709,12 @@ ccl_device int bsdf_microfacet_hair_sample_circular(const KernelGlobals kg,
   float3 TT = zero_float3();
   float3 TRT = zero_float3();
 
-  float cos_theta_t1, eta_it1, eta_ti1;
-  float R1 = fresnel(dot(wi, wh1), *eta, cos_theta_t1, eta_it1, eta_ti1);
-  float3 R = make_float3_from_float(bsdf->extra->R * R1);
+  float cos_theta_t1, eta_ti1;
+  float R1 = fresnel(dot(wi, wh1), *eta, cos_theta_t1, eta_ti1);
+  float3 R = make_float3(bsdf->extra->R * R1);
 
   /* sample TT lobe */
-  const float3 wt = refract_vector(wi, wh1, cos_theta_t1, eta_ti1);
+  const float3 wt = -refract(wi, wh1, cos_theta_t1, eta_ti1);
   const float phi_t = dir_phi(wt);
 
   float phi_mi = atan2f(sin_phi_mi, cos_phi_mi);
@@ -776,7 +724,7 @@ ccl_device int bsdf_microfacet_hair_sample_circular(const KernelGlobals kg,
   const float3 wmt_ = sph_dir(0.f, phi_mt);
 
   const float3 wh2 = sample_wh(kg, beckmann, roughness, -wt, wmt, sample_h2.x, sample_h2.y);
-  const float3 wtr = reflect_vector(wt, wh2);
+  const float3 wtr = -reflect(wt, wh2);
 
   float3 wh3;
   float3 wtt, wtrt;
@@ -791,12 +739,12 @@ ccl_device int bsdf_microfacet_hair_sample_circular(const KernelGlobals kg,
     const float3 A_t = exp(-mu_a * (2.f * cos_gamma_t / cos_theta_wt));
 
     const float inv_eta = 1.f / *eta;
-    float cos_theta_t2, eta_it2, eta_ti2;
-    const float R2 = fresnel(dot(-wt, wh2), inv_eta, cos_theta_t2, eta_it2, eta_ti2);
-    const float3 T1 = make_float3_from_float(1.f - R1);
-    const float3 T2 = make_float3_from_float(1.f - R2);
+    float cos_theta_t2, eta_ti2;
+    const float R2 = fresnel(dot(-wt, wh2), inv_eta, cos_theta_t2, eta_ti2);
+    const float3 T1 = make_float3(1.f - R1);
+    const float3 T2 = make_float3(1.f - R2);
 
-    wtt = refract_vector(-wt, wh2, cos_theta_t2, eta_ti2);
+    wtt = -refract(-wt, wh2, cos_theta_t2, eta_ti2);
 
     if (dot(wtt, wmt) < 0.f && cos_theta_t2 != 0.f) /* total internal reflection */
       TT = bsdf->extra->TT * T1 * A_t * T2;
@@ -809,15 +757,15 @@ ccl_device int bsdf_microfacet_hair_sample_circular(const KernelGlobals kg,
 
     wh3 = sample_wh(kg, beckmann, roughness, wtr, wmtr, sample_h3.x, sample_h3.y);
 
-    float cos_theta_t3, eta_it3, eta_ti3;
-    const float R3 = fresnel(dot(wtr, wh3), inv_eta, cos_theta_t3, eta_it3, eta_ti3);
+    float cos_theta_t3, eta_ti3;
+    const float R3 = fresnel(dot(wtr, wh3), inv_eta, cos_theta_t3, eta_ti3);
 
-    wtrt = refract_vector(wtr, wh3, cos_theta_t3, eta_ti3);
+    wtrt = -refract(wtr, wh3, cos_theta_t3, eta_ti3);
 
     if (cos_theta_t3 != 0.f && dot(wtr, wh3) > 0.f && dot(wmtr, wtr) > 0.f &&
         dot(wtrt, wmtr) < 0.f && G_(wtr, -wtrt, make_float3(wmtr.x, 0.f, wmtr.z), wh3)) {
 
-      const float3 T3 = make_float3_from_float(1.f - R3);
+      const float3 T3 = make_float3(1.f - R3);
       const float cos_gamma_t2 = -cos(phi_tr - phi_mt);
       const float cos_theta_wtr = sqrtf(1.f - sqr(wtr.y));
       const float3 A_tr = exp(-mu_a * (2.f * cos_gamma_t2 / cos_theta_wtr));
@@ -876,10 +824,10 @@ ccl_device int bsdf_microfacet_hair_sample_circular(const KernelGlobals kg,
   // original from Huang's EGSR 2022
   //*eval *= visibility;
 
-  // correction: the extra costheta(wo) corresponds to the lack of consideration of Zinke's
+  // correction: the extra cos_theta(wo) corresponds to the lack of consideration of Zinke's
   // cos_theta_i^2 in the BCSDF; for instance eq[2] in Huang's should include an extra cos_theta_i
   // (plus here remember wi and wo meanings are flipped)
-  *eval *= visibility / costheta(wo);
+  *eval *= visibility / cos_theta(wo);
 
   *omega_in = wo.x * X + wo.y * Y + wo.z * Z;
 
@@ -894,60 +842,6 @@ ccl_device int bsdf_microfacet_hair_sample_circular(const KernelGlobals kg,
 }
 
 /* Elliptic specific */
-
-ccl_device float sinphi(const float3 w)
-{
-  return w.x / costheta(w);
-}
-
-ccl_device float cosphi(const float3 w)
-{
-  return w.z / costheta(w);
-}
-
-ccl_device float2 sincosphi(const float3 w)
-{
-  float cos_theta = costheta(w);
-  return make_float2(w.x / cos_theta, w.z / cos_theta);
-}
-
-/* convert between gamma and phi */
-ccl_device float to_phi(float gamma, float a, float b)
-{
-  float sin_gamma = sinf(gamma);
-  float cos_gamma = cosf(gamma);
-  return atan2f(b * sin_gamma, a * cos_gamma);
-}
-
-ccl_device float to_gamma(float phi, float a, float b)
-{
-  float sin_phi = sinf(phi);
-  float cos_phi = cosf(phi);
-  return atan2f(a * sin_phi, b * cos_phi);
-}
-
-ccl_device float2 to_point(float gamma, float a, float b)
-{
-  float sin_gamma = sinf(gamma);
-  float cos_gamma = cosf(gamma);
-  return make_float2(a * sin_gamma, b * cos_gamma);
-}
-
-/* given theta and gamma, convert to vector */
-ccl_device float3 sphg_dir(float theta, float gamma, float a, float b)
-{
-  float sin_theta = sinf(theta);
-  float cos_theta = cosf(theta);
-  float sin_gamma = sinf(gamma);
-  float cos_gamma = cosf(gamma);
-  float tan_gamma = sin_gamma / cos_gamma;
-  float tan_phi = b / a * tan_gamma;
-  float cos_phi = 1.f / sqrtf(sqr(tan_phi) + 1.f);
-  if (cos_gamma < 0.f)
-    cos_phi = -cos_phi;
-  float sin_phi = cos_phi * tan_phi;
-  return make_float3(sin_phi * cos_theta, sin_theta, cos_phi * cos_theta);
-}
 
 ccl_device float3 bsdf_microfacet_hair_eval_r_elliptic(ccl_private const ShaderClosure *sc,
                                                        const float3 wi_,
@@ -978,13 +872,13 @@ ccl_device float3 bsdf_microfacet_hair_eval_r_elliptic(ccl_private const ShaderC
 
   /* dot(wi, wmi) > 0 */
   const float tan_tilt = tanf(tilt);
-  float phi_m_max1 = acosf(fmaxf(-tan_tilt * tantheta(wi), 0.f)) + phi_i;
+  float phi_m_max1 = acosf(fmaxf(-tan_tilt * tan_theta(wi), 0.f)) + phi_i;
   if (isnan_safe(phi_m_max1))
     return R;
   float phi_m_min1 = -phi_m_max1 + 2.f * phi_i;
 
   /* dot(wo, wmi) > 0 */
-  float phi_m_max2 = acosf(fmaxf(-tan_tilt * tantheta(wo), 0.f)) + phi_o;
+  float phi_m_max2 = acosf(fmaxf(-tan_tilt * tan_theta(wo), 0.f)) + phi_o;
   if (isnan_safe(phi_m_max2))
     return R;
   float phi_m_min2 = -phi_m_max2 + 2.f * phi_o;
@@ -1038,10 +932,10 @@ ccl_device float3 bsdf_microfacet_hair_eval_r_elliptic(ccl_private const ShaderC
 
   integral *= (2.f / 3.f * res);
 
-  const float F = fresnel0(dot(wi, wh), eta);
+  const float F = fresnel_dielectric_cos(dot(wi, wh), eta);
   const float d_o_inv = 1.f / sqrtf(1.f - e2 * sqr(sinf(phi_o)));
 
-  R = make_float3_from_float(bsdf->extra->R * 0.125f * F * integral * d_o_inv);
+  R = make_float3(bsdf->extra->R * 0.125f * F * integral * d_o_inv);
   return R;
 }
 
@@ -1069,13 +963,13 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_elliptic(KernelGlobals kg,
 
   /* dot(wi, wmi) > 0 */
   const float tan_tilt = tanf(tilt);
-  float phi_m_max = acosf(fmaxf(-tan_tilt * tantheta(wi), 0.f)) + phi_i;
+  float phi_m_max = acosf(fmaxf(-tan_tilt * tan_theta(wi), 0.f)) + phi_i;
   if (isnan_safe(phi_m_max))
     return zero_float3();
   float phi_m_min = -phi_m_max + 2.f * phi_i;
 
   /* dot(wo, wmo) < 0 */
-  float tmp1 = acosf(fminf(tan_tilt * tantheta(wo), 0.f));
+  float tmp1 = acosf(fminf(tan_tilt * tan_theta(wo), 0.f));
   if (isnan_safe(tmp1))
     return zero_float3();
 
@@ -1118,11 +1012,11 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_elliptic(KernelGlobals kg,
     if (dot_wi_wh1 <= 1e-5f)
       continue;
 
-    float cos_theta_t1, eta_it1, eta_ti1;
-    const float T1 = 1.f - fresnel(dot_wi_wh1, eta, cos_theta_t1, eta_it1, eta_ti1);
+    float cos_theta_t1, eta_ti1;
+    const float T1 = 1.f - fresnel(dot_wi_wh1, eta, cos_theta_t1, eta_ti1);
 
     /* refraction at the first interface */
-    const float3 wt = refract_vector(wi, wh1, cos_theta_t1, eta_ti1);
+    const float3 wt = -refract(wi, wh1, cos_theta_t1, eta_ti1);
     const float phi_t = dir_phi(wt);
     const float gamma_mt = 2.f * to_phi(phi_t, a, b) - gamma_mi;
     const float3 wmt = sphg_dir(-tilt, gamma_mt, a, b);
@@ -1137,7 +1031,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_elliptic(KernelGlobals kg,
 
     const float2 pi = to_point(gamma_mi, a, b);
     const float2 pt = to_point(gamma_mt + M_PI_F, a, b);
-    const float3 A_t = exp(-mu_a * len(pi - pt) / costheta(wt));
+    const float3 A_t = exp(-mu_a * len(pi - pt) / cos_theta(wt));
 
     /* TT */
     if (bsdf->extra->TT > 0.f) {
@@ -1154,7 +1048,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_elliptic(KernelGlobals kg,
 
           const float dot_wt_wh2 = dot(-wt, wh2);
 
-          const float T2 = 1.f - fresnel0(dot_wt_wh2, inv_eta);
+          const float T2 = 1.f - fresnel_dielectric_cos(dot_wt_wh2, inv_eta);
           const float D2 = D(beckmann, roughness, wh2, wmt) *
                            G(beckmann, roughness, -wt, -wo, wmt, wh2);
 
@@ -1183,8 +1077,8 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_elliptic(KernelGlobals kg,
       if (cos_th2 <= 1e-5f)
         continue;
 
-      const float R2 = fresnel0(cos_th2, inv_eta);
-      const float3 wtr = reflect_vector(wt, wh2);
+      const float R2 = fresnel_dielectric_cos(cos_th2, inv_eta);
+      const float3 wtr = -reflect(wt, wh2);
 
       const float G2 = G(beckmann, roughness, -wt, -wtr, wmt, wh2);
       if (G2 == 0.f || !G_(-wt, -wtr, wmt_, wh2))
@@ -1210,12 +1104,12 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_elliptic(KernelGlobals kg,
 
       const float cos_trh3 = dot(wh3, wtr);
 
-      const float T3 = 1.f - fresnel0(cos_trh3, inv_eta);
+      const float T3 = 1.f - fresnel_dielectric_cos(cos_trh3, inv_eta);
 
       const float D3 = D(beckmann, roughness, wh3, wmtr) * G3;
 
       const float2 ptr = to_point(gamma_mtr + M_PI_F, a, b);
-      const float3 A_tr = exp(-mu_a * len(pt - ptr) / costheta(wtr));
+      const float3 A_tr = exp(-mu_a * len(pt - ptr) / cos_theta(wtr));
 
       const float3 result = T1 * R2 * T3 * D3 * cos_trh3 * dot(wh3, wo) * sqr(rcp_norm_wh3) * A_t *
                             A_tr * weight / (dot(wt, wmi) * dot(wtr, wmt)) *
@@ -1269,9 +1163,9 @@ ccl_device Spectrum bsdf_microfacet_hair_eval_elliptic(KernelGlobals kg,
 
   *pdf = 1.f;
 
-  // return rgb_to_spectrum(R / costheta(wi)); // original from Huang's EGSR 2022
-  return rgb_to_spectrum(R / (costheta(wi) * costheta(wo)));
-  // correction: the extra costheta(wo) corresponds to the lack of consideration of Zinke's
+  // return rgb_to_spectrum(R / cos_theta(wi)); // original from Huang's EGSR 2022
+  return rgb_to_spectrum(R / (cos_theta(wi) * cos_theta(wo)));
+  // correction: the extra cos_theta(wo) corresponds to the lack of consideration of Zinke's
   // cos_theta_i^2 in the BCSDF; for instance eq[2] in Huang's should include an extra cos_theta_i
   // (plus here remember wi and wo meanings are flipped)
 }
@@ -1338,9 +1232,9 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
   const float e2 = 1.f - sqr(b / a);
 
   /* macronormal */
-  const float2 sin_cos_phi_i = sincosphi(wi);
-  const float sin_phi_i = sin_cos_phi_i.x;
-  const float cos_phi_i = sin_cos_phi_i.y;
+  const float2 sincos_phi_i = sincos_phi(wi);
+  const float sin_phi_i = sincos_phi_i.x;
+  const float cos_phi_i = sincos_phi_i.y;
   const float d_i = sqrtf(1.f - e2 * sqr(sin_phi_i));
   const float h = d_i * (sample_h * 2.f - 1.f);
   const float gamma_mi = atan2f(cos_phi_i, -b / a * sin_phi_i) -
@@ -1363,7 +1257,7 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
   /* sample R lobe */
   const float3 wh1 = sample_wh(kg, beckmann, roughness, wi, wmi, sample_h1.x, sample_h1.y);
 
-  const float3 wr = reflect_vector(wi, wh1);
+  const float3 wr = -reflect(wi, wh1);
 
   /* ensure that this is a valid sample */
   if (dot(wr, wh1) <= 0.f || dot(wr, wmi) <= 0.f || !G_(wi, wr, wmi_, wh1)) {
@@ -1374,12 +1268,12 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
   float3 TT = zero_float3();
   float3 TRT = zero_float3();
 
-  float cos_theta_t1, eta_it1, eta_ti1;
-  const float R1 = fresnel(dot(wi, wh1), *eta, cos_theta_t1, eta_it1, eta_ti1);
-  float3 R = make_float3_from_float(bsdf->extra->R * R1);
+  float cos_theta_t1, eta_ti1;
+  const float R1 = fresnel(dot(wi, wh1), *eta, cos_theta_t1, eta_ti1);
+  float3 R = make_float3(bsdf->extra->R * R1);
 
   /* sample TT lobe */
-  const float3 wt = refract_vector(wi, wh1, cos_theta_t1, eta_ti1);
+  const float3 wt = -refract(wi, wh1, cos_theta_t1, eta_ti1);
   const float phi_t = dir_phi(wt);
 
   const float gamma_mt = 2.f * to_phi(phi_t, a, b) - gamma_mi;
@@ -1388,7 +1282,7 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
 
   const float3 wh2 = sample_wh(kg, beckmann, roughness, -wt, wmt, sample_h2.x, sample_h2.y);
 
-  const float3 wtr = reflect_vector(wt, wh2);
+  const float3 wtr = -reflect(wt, wh2);
 
   float3 wh3;
   float3 wtt, wtrt;
@@ -1400,15 +1294,15 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
     const float3 mu_a = bsdf->sigma;
     const float2 pi = to_point(gamma_mi, a, b);
     const float2 pt = to_point(gamma_mt + M_PI_F, a, b);
-    const float3 A_t = exp(-mu_a * len(pi - pt) / costheta(wt));
+    const float3 A_t = exp(-mu_a * len(pi - pt) / cos_theta(wt));
 
     const float inv_eta = 1.f / *eta;
-    float cos_theta_t2, eta_it2, eta_ti2;
-    const float R2 = fresnel(dot(-wt, wh2), inv_eta, cos_theta_t2, eta_it2, eta_ti2);
-    const float3 T1 = make_float3_from_float(1.f - R1);
-    const float3 T2 = make_float3_from_float(1.f - R2);
+    float cos_theta_t2, eta_ti2;
+    const float R2 = fresnel(dot(-wt, wh2), inv_eta, cos_theta_t2, eta_ti2);
+    const float3 T1 = make_float3(1.f - R1);
+    const float3 T2 = make_float3(1.f - R2);
 
-    wtt = refract_vector(-wt, wh2, cos_theta_t2, eta_ti2);
+    wtt = -refract(-wt, wh2, cos_theta_t2, eta_ti2);
 
     if (dot(wtt, wmt) < 0.f && cos_theta_t2 != 0.f) /* total internal reflection */
       TT = bsdf->extra->TT * T1 * A_t * T2;
@@ -1421,18 +1315,18 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
 
     wh3 = sample_wh(kg, beckmann, roughness, wtr, wmtr, sample_h3.x, sample_h3.y);
 
-    float cos_theta_t3, eta_it3, eta_ti3;
-    const float R3 = fresnel(dot(wtr, wh3), inv_eta, cos_theta_t3, eta_it3, eta_ti3);
+    float cos_theta_t3, eta_ti3;
+    const float R3 = fresnel(dot(wtr, wh3), inv_eta, cos_theta_t3, eta_ti3);
 
-    wtrt = refract_vector(wtr, wh3, cos_theta_t3, eta_ti3);
+    wtrt = -refract(wtr, wh3, cos_theta_t3, eta_ti3);
 
     if (cos_theta_t3 != 0.f && dot(wtr, wh3) > 0.f && dot(wmtr, wtr) > 0.f &&
         dot(wtrt, wmtr) < 0.f && G_(wtr, -wtrt, make_float3(wmtr.x, 0.f, wmtr.z), wh3)) {
 
-      const float3 T3 = make_float3_from_float(1.f - R3);
+      const float3 T3 = make_float3(1.f - R3);
 
       const float2 ptr = to_point(gamma_mtr + M_PI_F, a, b);
-      const float3 A_tr = exp(-mu_a * len(pt - ptr) / costheta(wtr));
+      const float3 A_tr = exp(-mu_a * len(pt - ptr) / cos_theta(wtr));
 
       TRT = bsdf->extra->TRT * T1 * R2 * T3 * A_t * A_tr;
     }
@@ -1486,8 +1380,8 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
   }
 
   //*eval *= visibility; // original from Huang's EGSR 2022
-  *eval *= visibility / costheta(wo);
-  // correction: the extra costheta(wo) corresponds to the lack of consideration of Zinke's
+  *eval *= visibility / cos_theta(wo);
+  // correction: the extra cos_theta(wo) corresponds to the lack of consideration of Zinke's
   // cos_theta_i^2 in the BCSDF; for instance eq[2] in Huang's should include an extra cos_theta_i
   // (plus here remember wi and wo meanings are flipped)
   *omega_in = wo.x * X + wo.y * Y + wo.z * Z;
