@@ -370,14 +370,6 @@ ccl_device_inline float3 reflect(const float3 incident, const float3 normal)
   return incident - 2.0f * unit_normal * dot(incident, unit_normal);
 }
 
-ccl_device_inline float3 refract(const float3 incident,
-                                 const float3 normal,
-                                 const float cos_theta_t,
-                                 const float eta)
-{
-  return eta * incident - (eta * dot(normal, incident) + cos_theta_t) * normal;
-}
-
 ccl_device_inline float3 refract(const float3 incident, const float3 normal, const float eta)
 {
   float k = 1.0f - eta * eta * (1.0f - dot(normal, incident) * dot(normal, incident));
