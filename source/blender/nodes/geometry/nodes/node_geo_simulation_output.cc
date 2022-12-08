@@ -91,6 +91,11 @@ static void node_geo_exec(GeoNodeExecParams params)
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
   geometry_set.ensure_owns_direct_data();
   if (storage.use_persistent_cache) {
+    if (!cache.is_empty()) {
+      if (time.time < cache.start_time()->time) {
+        cache.clear();
+      }
+    }
     /* If using the cache or there is no cached data yet, write the input in a new cache value. */
     cache.store_persistent("Geometry", time, geometry_set);
   }

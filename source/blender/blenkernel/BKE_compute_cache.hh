@@ -4,6 +4,7 @@
 
 #include <map>
 
+#include "BLI_bit_vector.hh"
 #include "BLI_compute_context.hh"
 #include "BLI_map.hh"
 
@@ -30,27 +31,22 @@ struct TimePoint {
 /* TODO: Clear cache when editing nodes? Only sometimes, when persistent caching is turned off. */
 class SimulationCache {
 
+  /* TODO: These will need to be a generic value at some point. */
   struct CacheValues {
-    /* TODO: This will need to be a generic value at some point. */
-    /* Map from simulation time index (see #SimulationCache::times) to value. */
     Vector<GeometrySet> persistent_cache;
+    BitVector<> persistent_caches_filled;
 
     std::optional<GeometrySet> non_persistent_value;
 
-    GeometrySet lookup_index(const int index) const
+    void ensure_size(const int size)
     {
-      if (!persistent_cache.index_range().contains(index)) {
-        return persistent_cache[index];
-      }
-      return {};
+      persistent_cache.resize(size);
+      persistent_caches_filled.resize(size);
     }
   };
 
   /* Map from cache data identifier (socket name) to values at stored times. */
   Map<std::string, CacheValues> caches_;
-
-  /* Ordered list of cached simulation frames. */
-  Vector<TimePoint> persistent_times_;
 
   std::optional<TimePoint> start_time_;
 
@@ -68,20 +64,13 @@ class SimulationCache {
 
   std::optional<GeometrySet> value_at_or_before_time(StringRef data_name, TimePoint time)
   {
-    const CacheValues *values = caches_.lookup_ptr(data_name);
-    if (!values) {
-      return std::nullopt;
+    if (std::optional<GeometrySet> value = this->value_at_time(data_name, time)) {
+      return value;
     }
-    if (last_run_time_->time < time.time) {
-      if (values->non_persistent_value) {
-        return std::move(values->non_persistent_value);
-      }
+    if (std::optional<GeometrySet> value = this->value_before_time(data_name, time)) {
+      return value;
     }
-    const int index = this->index_at_or_before_time(time);
-    if (!values->persistent_cache.index_range().contains(index)) {
-      return std::nullopt;
-    }
-    return values->persistent_cache[index];
+    return std::nullopt;
   }
 
   std::optional<GeometrySet> value_before_time(StringRef data_name, TimePoint time)
@@ -95,9 +84,21 @@ class SimulationCache {
         return std::move(values->non_persistent_value);
       }
     }
-    const int index = this->index_before_time(time);
-    if (!values->persistent_cache.index_range().contains(index)) {
+    /* TODO: Maybe separate retrieval of persistent and temprary cache values? Though that doesn't
+     * really provide a benefit right now. */
+    if (values->persistent_cache.is_empty()) {
       return std::nullopt;
+    }
+    int index = std::min<int>(values->persistent_cache.index_range().last(),
+                              time.frame - start_time_->frame);
+    if (index < 0) {
+      return std::nullopt;
+    }
+    while (!values->persistent_caches_filled[index]) {
+      index--;
+      if (index < 0) {
+        return std::nullopt;
+      }
     }
     return values->persistent_cache[index];
   }
@@ -108,11 +109,14 @@ class SimulationCache {
     if (!values) {
       return std::nullopt;
     }
-    const std::optional<int> index = this->index_at_time(time);
-    if (!index) {
+    const int index = time.frame - start_time_->frame;
+    if (!values->persistent_cache.index_range().contains(index)) {
       return std::nullopt;
     }
-    return values->persistent_cache[*index];
+    if (!values->persistent_caches_filled[index]) {
+      return std::nullopt;
+    }
+    return values->persistent_cache[index];
   }
 
   void store_temporary(const StringRef data_name, const TimePoint time, GeometrySet value)
@@ -131,62 +135,31 @@ class SimulationCache {
     if (!start_time_) {
       start_time_.emplace(time);
     }
-    const int index = this->index_before_time(time);
-    persistent_times_.resize(index);
-    persistent_times_[index] = time;
     CacheValues &values = caches_.lookup_or_add_default_as(data_name);
-    values.persistent_cache.resize(index);
+    const int index = time.frame - start_time_->frame;
+    values.ensure_size(index + 1);
     values.persistent_cache[index] = std::move(value);
+    values.persistent_caches_filled[index].set();
   }
 
   void clear()
   {
-    persistent_times_.clear();
     caches_.clear();
+    start_time_.reset();
+    last_run_time_.reset();
   }
 
   bool is_empty() const
   {
-    return persistent_times_.is_empty();
-  }
-
- private:
-  int index_at_or_before_time(const TimePoint time) const
-  {
-    if (persistent_times_.is_empty()) {
-      return 0;
-    }
-    int insert_index = 0;
-    for (const int i : persistent_times_.index_range()) {
-      if (persistent_times_[i].frame <= time.frame) {
-        break;
+    for (const CacheValues &values : caches_.values()) {
+      if (values.non_persistent_value) {
+        return false;
       }
-      insert_index++;
-    }
-    return insert_index;
-  }
-  int index_before_time(const TimePoint time) const
-  {
-    if (persistent_times_.is_empty()) {
-      return 0;
-    }
-    int insert_index = 0;
-    for (const int i : persistent_times_.index_range()) {
-      if (persistent_times_[i].frame < time.frame) {
-        break;
-      }
-      insert_index++;
-    }
-    return insert_index;
-  }
-  std::optional<int> index_at_time(const TimePoint time) const
-  {
-    for (const int i : persistent_times_.index_range()) {
-      if (persistent_times_[i].frame == time.frame) {
-        return i;
+      if (!values.persistent_cache.is_empty()) {
+        return false;
       }
     }
-    return std::nullopt;
+    return true;
   }
 };
 

@@ -345,6 +345,7 @@ set(SRC
   BKE_colorband.h
   BKE_colortools.h
   BKE_compute_contexts.hh
+  BKE_compute_cache.hh
   BKE_constraint.h
   BKE_context.h
   BKE_cpp_types.h
