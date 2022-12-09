@@ -19,8 +19,6 @@ static void node_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Bool>(N_("Run")).default_value(true);
   b.add_input<decl::Geometry>(N_("Geometry"));
-  b.add_output<decl::Bool>(N_("Started"));
-  b.add_output<decl::Bool>(N_("Ended"));
   b.add_output<decl::Geometry>(N_("Geometry"));
 }
 
@@ -51,15 +49,6 @@ static void node_geo_exec(GeoNodeExecParams params)
 
   const float elapsed_time = cache.is_empty() ? 0.0f : scene_ctime - cache.start_time()->time;
   const bool run = params.get_input<bool>("Run");
-  const bool started = !cache.is_empty();
-  const bool ended = !cache.is_empty() && !run;
-
-  if (params.lazy_output_is_required("Started")) {
-    params.set_output("Started", started);
-  }
-  if (params.lazy_output_is_required("Ended")) {
-    params.set_output("Ended", ended);
-  }
 
   if (!run) {
     if (std::optional<GeometrySet> value = cache.value_at_or_before_time("Geometry", time)) {
