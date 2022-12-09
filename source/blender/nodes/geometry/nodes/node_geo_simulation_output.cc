@@ -24,11 +24,6 @@ static void node_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Geometry>(N_("Geometry"));
 }
 
-static void node_layout(uiLayout *layout, bContext * /*C*/, PointerRNA *ptr)
-{
-  uiItemR(layout, ptr, "use_persistent_cache", 0, IFACE_("Persistent Cache"), ICON_NONE);
-}
-
 static void node_init(bNodeTree * /*tree*/, bNode *node)
 {
   NodeGeometrySimulationOutput *data = MEM_cnew<NodeGeometrySimulationOutput>(__func__);
@@ -118,7 +113,6 @@ void register_node_type_geo_simulation_output()
   ntype.initfunc = file_ns::node_init;
   ntype.geometry_node_execute = file_ns::node_geo_exec;
   ntype.declare = file_ns::node_declare;
-  ntype.draw_buttons = file_ns::node_layout;
   node_type_storage(&ntype,
                     "NodeGeometrySimulationOutput",
                     node_free_standard_storage,
