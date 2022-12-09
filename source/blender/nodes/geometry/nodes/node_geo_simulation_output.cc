@@ -21,7 +21,6 @@ static void node_declare(NodeDeclarationBuilder &b)
   b.add_input<decl::Geometry>(N_("Geometry"));
   b.add_output<decl::Bool>(N_("Started"));
   b.add_output<decl::Bool>(N_("Ended"));
-  b.add_output<decl::Float>(N_("Elapsed Time"));
   b.add_output<decl::Geometry>(N_("Geometry"));
 }
 
@@ -60,9 +59,6 @@ static void node_geo_exec(GeoNodeExecParams params)
   const bool started = !cache.is_empty();
   const bool ended = !cache.is_empty() && !run;
 
-  if (params.lazy_output_is_required("Elapsed Time")) {
-    params.set_output("Elapsed Time", elapsed_time);
-  }
   if (params.lazy_output_is_required("Started")) {
     params.set_output("Started", started);
   }

@@ -20,7 +20,6 @@ static void node_declare(NodeDeclarationBuilder &b)
   b.add_input<decl::Geometry>(N_("Geometry"));
 
   b.add_output<decl::Float>(N_("Delta Time"));
-  b.add_output<decl::Float>(N_("Elapsed Time"));
   b.add_output<decl::Geometry>(N_("Geometry"));
 }
 
@@ -84,14 +83,9 @@ static void node_geo_exec(GeoNodeExecParams params)
     return;
   }
 
-  const float elapsed_time = cache->is_empty() ? 0.0f : scene_ctime - cache->start_time()->time;
-  const float delta_time = cache->is_empty() ? 0.0f : scene_ctime - cache->last_run_time()->time;
-
   if (params.lazy_output_is_required("Delta Time")) {
+    const float delta_time = cache->is_empty() ? 0.0f : scene_ctime - cache->last_run_time()->time;
     params.set_output("Delta Time", delta_time);
-  }
-  if (params.lazy_output_is_required("Elapsed Time")) {
-    params.set_output("Elapsed Time", elapsed_time);
   }
 
   if (std::optional<GeometrySet> cached_value = cache->value_before_time("Geometry", time)) {
