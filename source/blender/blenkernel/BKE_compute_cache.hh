@@ -79,13 +79,13 @@ class SimulationCache {
     if (!values) {
       return std::nullopt;
     }
-    if (last_run_time_->time < time.time) {
-      if (values->non_persistent_value) {
+    if (values->non_persistent_value) {
+      if (last_run_time_->time < time.time) {
         return std::move(values->non_persistent_value);
       }
     }
-    /* TODO: Maybe separate retrieval of persistent and temprary cache values? Though that doesn't
-     * really provide a benefit right now. */
+    /* TODO: Maybe separate retrieval of persistent and temporary cache values?
+     * Though that doesn't really provide a benefit right now. */
     if (values->persistent_cache.is_empty()) {
       return std::nullopt;
     }
@@ -108,6 +108,11 @@ class SimulationCache {
     const CacheValues *values = caches_.lookup_ptr(data_name);
     if (!values) {
       return std::nullopt;
+    }
+    if (values->non_persistent_value) {
+      if (last_run_time_->frame == time.frame) {
+        return std::move(values->non_persistent_value);
+      }
     }
     const int index = time.frame - start_time_->frame;
     if (!values->persistent_cache.index_range().contains(index)) {
