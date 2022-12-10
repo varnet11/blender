@@ -17,7 +17,6 @@ NODE_STORAGE_FUNCS(NodeGeometrySimulationOutput);
 
 static void node_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Bool>(N_("Run")).default_value(true);
   b.add_input<decl::Geometry>(N_("Geometry"));
   b.add_output<decl::Geometry>(N_("Geometry"));
 }
@@ -31,10 +30,6 @@ static void node_init(bNodeTree * /*tree*/, bNode *node)
 
 static void node_geo_exec(GeoNodeExecParams params)
 {
-  if (params.lazy_require_input("Run")) {
-    return;
-  }
-
   const bNode &node = params.node();
   const NodeGeometrySimulationOutput &storage = node_storage(node);
   const Scene *scene = DEG_get_input_scene(params.depsgraph());
@@ -46,17 +41,6 @@ static void node_geo_exec(GeoNodeExecParams params)
 
   const bke::NodeGroupComputeContext cache_context(lf_data.compute_context, node.identifier);
   bke::sim::SimulationCache &cache = all_caches.ensure_for_context(cache_context.hash());
-
-  const float elapsed_time = cache.is_empty() ? 0.0f : scene_ctime - cache.start_time()->time;
-  const bool run = params.get_input<bool>("Run");
-
-  if (!run) {
-    if (std::optional<GeometrySet> value = cache.value_at_or_before_time("Geometry", time)) {
-      params.set_output("Geometry", std::move(*value));
-      params.set_input_unused("Geometry");
-      return;
-    }
-  }
 
   if (std::optional<GeometrySet> value = cache.value_at_time("Geometry", time)) {
     params.set_output("Geometry", std::move(*value));

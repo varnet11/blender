@@ -839,6 +839,12 @@ static const lf::FunctionNode &find_group_lf_node(const bNode &group_bnode)
               ->mapping.group_node_map.lookup(&group_bnode);
 }
 
+static const lf::FunctionNode &find_sim_output_lf_node(const bNode &node)
+{
+  return *blender::nodes::ensure_geometry_nodes_lazy_function_graph(node.owner_tree())
+              ->mapping.sim_output_node_map.lookup(&node);
+}
+
 static void find_side_effect_nodes_for_viewer_path(
     const ViewerPath &viewer_path,
     const NodesModifierData &nmd,
@@ -895,6 +901,28 @@ static void find_side_effect_nodes_for_viewer_path(
   }
 }
 
+static void add_simulation_output_side_effect_nodes(
+    blender::ComputeContextBuilder &compute_context_builder,
+    const bNodeTree &group,
+    MultiValueMap<blender::ComputeContextHash, const lf::FunctionNode *> &r_side_effect_nodes)
+{
+  group.ensure_topology_cache();
+
+  const blender::ComputeContextHash hash = compute_context_builder.hash();
+  for (const bNode *sim_output_node : group.nodes_by_type("GeometryNodeSimulationOutput")) {
+    r_side_effect_nodes.add(hash, &find_sim_output_lf_node(*sim_output_node));
+  }
+
+  for (const bNode *group_node : group.group_nodes()) {
+    if (group_node->id) {
+      compute_context_builder.push<blender::bke::NodeGroupComputeContext>(*group_node);
+      add_simulation_output_side_effect_nodes(compute_context_builder,
+                                              *reinterpret_cast<const bNodeTree *>(group_node->id),
+                                              r_side_effect_nodes);
+    }
+  }
+}
+
 static void find_side_effect_nodes(
     const NodesModifierData &nmd,
     const ModifierEvalContext &ctx,
@@ -921,6 +949,15 @@ static void find_side_effect_nodes(
         find_side_effect_nodes_for_viewer_path(v3d.viewer_path, nmd, ctx, r_side_effect_nodes);
       }
     }
+  }
+
+  {
+    /* Simulation output nodes are treated as side effect nodes because they always execute,
+     * even when their output is not needed, and because they potentially store caches. */
+    blender::ComputeContextBuilder compute_context_builder;
+    compute_context_builder.push<blender::bke::ModifierComputeContext>(nmd.modifier.name);
+    add_simulation_output_side_effect_nodes(
+        compute_context_builder, *nmd.node_group, r_side_effect_nodes);
   }
 }
 

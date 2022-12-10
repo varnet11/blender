@@ -95,6 +95,7 @@ struct GeometryNodeLazyFunctionGraphMapping {
    */
   Map<const bNode *, const lf::FunctionNode *> group_node_map;
   Map<const bNode *, const lf::FunctionNode *> viewer_node_map;
+  Map<const bNode *, const lf::FunctionNode *> sim_output_node_map;
 };
 
 /**

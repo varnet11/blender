@@ -197,6 +197,10 @@ class GeoNodeExecParams {
   bool lazy_output_is_required(StringRef identifier)
   {
     const int index = this->get_output_index(identifier);
+    /* TODO: Why was this necessary to make the Delta Time socket not crash? */
+    // if (params_.output_was_set(index)) {
+    //   return false;
+    // }
     return params_.get_output_usage(index) == lf::ValueUsage::Used;
   }
 
