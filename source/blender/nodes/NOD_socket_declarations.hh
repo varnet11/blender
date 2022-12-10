@@ -223,6 +223,24 @@ class Shader : public SocketDeclaration {
 class ShaderBuilder : public SocketDeclarationBuilder<Shader> {
 };
 
+class ExtendBuilder;
+
+class Extend : public SocketDeclaration {
+ private:
+  friend ExtendBuilder;
+
+ public:
+  using Builder = ExtendBuilder;
+
+  bNodeSocket &build(bNodeTree &ntree, bNode &node) const override;
+  bool matches(const bNodeSocket &socket) const override;
+  bNodeSocket &update_or_build(bNodeTree &ntree, bNode &node, bNodeSocket &socket) const override;
+  bool can_connect(const bNodeSocket &socket) const override;
+};
+
+class ExtendBuilder : public SocketDeclarationBuilder<Extend> {
+};
+
 /* -------------------------------------------------------------------- */
 /** \name #FloatBuilder Inline Methods
  * \{ */

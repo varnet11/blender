@@ -18,9 +18,11 @@ NODE_STORAGE_FUNCS(NodeGeometrySimulationInput);
 static void node_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>(N_("Geometry"));
+  b.add_input<decl::Extend>("", N_("__extend__"));
 
   b.add_output<decl::Float>(N_("Delta Time"));
   b.add_output<decl::Geometry>(N_("Geometry"));
+  b.add_output<decl::Extend>("", N_("__extend__"));
 }
 
 static void node_layout(uiLayout * /*layout*/, bContext * /*C*/, PointerRNA * /*ptr*/)
