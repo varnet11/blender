@@ -84,7 +84,9 @@ static void node_geo_exec(GeoNodeExecParams params)
   }
 
   if (params.lazy_output_is_required("Delta Time")) {
-    const float delta_time = cache->is_empty() ? 0.0f : scene_ctime - cache->last_run_time()->time;
+    const float time_diff = cache->is_empty() ? 0.0f : scene_ctime - cache->last_run_time()->time;
+    const double frame_rate = (double(scene->r.frs_sec) / double(scene->r.frs_sec_base));
+    const float delta_time = float(std::max(0.0f, time_diff) / frame_rate);
     params.set_output("Delta Time", delta_time);
   }
 
