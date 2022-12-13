@@ -92,7 +92,8 @@ using blender::Vector;
 
 namespace blender::ed::space_node {
 struct SubContext {
-  float3 color;
+  float4 background_color;
+  float4 outline_color;
   Vector<const bNode *> input_nodes;
   Vector<const bNode *> output_nodes;
 };
@@ -2370,7 +2371,7 @@ static void node_draw_basis(const bContext &C,
         UI_GetThemeColor4fv(TH_REDALERT, color_outline);
       }
       else {
-        copy_v3_v3(color_outline, context->color);
+        copy_v3_v3(color_outline, context->outline_color);
         color_outline[3] = 1.0f;
       }
     }
@@ -3045,7 +3046,11 @@ static void node_draw_sub_context_frames(TreeDrawContext &tree_draw_ctx,
   for (const bNode *sim_input : all_simulation_inputs) {
     const auto &storage = *static_cast<const NodeGeometrySimulationInput *>(sim_input->storage);
     if (const bNode *sim_output = ntree.node_by_id(storage.output_node_id)) {
-      sub_contexts.append({float3(0.0f, 0.0f, 0.0f), {sim_input}, {sim_output}});
+      float4 background_color;
+      UI_GetThemeColor4fv(TH_NODE_REGION_SIMULATION, background_color);
+      float4 outline_color = background_color;
+      outline_color[3] = 1.0f;
+      sub_contexts.append({background_color, outline_color, {sim_input}, {sim_output}});
     }
   }
 
@@ -3117,14 +3122,14 @@ static void node_draw_sub_context_frames(TreeDrawContext &tree_draw_ctx,
     immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
 
     GPU_blend(GPU_BLEND_ALPHA);
-    immUniformColor4f(sub_context.color[0], sub_context.color[1], sub_context.color[2], 0.2f);
+    immUniformColor4fv(sub_context.background_color);
     immBegin(GPU_PRIM_TRI_FAN, boundary_positions.size() + 1);
     for (const float3 &p : boundary_positions) {
       immVertex3fv(pos, p);
     }
     immVertex3fv(pos, boundary_positions[0]);
     immEnd();
-    immUniformColor4f(sub_context.color[0], sub_context.color[1], sub_context.color[2], 1.0f);
+    immUniformColor4fv(sub_context.outline_color);
     immBegin(GPU_PRIM_LINE_STRIP, boundary_positions.size() + 1);
     for (const float3 &p : boundary_positions) {
       immVertex3fv(pos, p);

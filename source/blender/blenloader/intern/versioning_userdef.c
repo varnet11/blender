@@ -98,6 +98,10 @@ static void do_versions_theme(const UserDef *userdef, bTheme *btheme)
    */
   {
     /* Keep this block, even when empty. */
+
+    if (btheme->space_node.node_region_simulation[3] == 0) {
+      btheme->space_node.node_region_simulation[3] = 0.1f;
+    }
   }
 
 #undef FROM_DEFAULT_V4_UCHAR
