@@ -1307,7 +1307,7 @@ typedef struct KernelAreaLight {
   float len_v;
   packed_float3 dir;
   float invarea;
-  float cot_half_spread;
+  float tan_half_spread;
   float normalize_spread;
   float pad[2];
 } KernelAreaLight;
@@ -1338,13 +1338,15 @@ typedef struct KernelLight {
 } KernelLight;
 static_assert_align(KernelLight, 16);
 
+using MeshLight = struct MeshLight {
+  int shader_flag;
+  int object_id;
+};
+
 typedef struct KernelLightDistribution {
   float totarea;
   int prim;
-  struct {
-    int shader_flag;
-    int object_id;
-  } mesh_light;
+  MeshLight mesh_light;
 } KernelLightDistribution;
 static_assert_align(KernelLightDistribution, 16);
 
@@ -1393,12 +1395,9 @@ typedef struct KernelLightTreeEmitter {
   float energy;
 
   /* prim_id denotes the location in the lights or triangles array. */
-  int prim_id;
-  struct {
-    int shader_flag;
-    int object_id;
-    EmissionSampling emission_sampling;
-  } mesh_light;
+  int prim;
+  MeshLight mesh_light;
+  EmissionSampling emission_sampling;
 
   /* Parent. */
   int parent_index;
