@@ -612,16 +612,16 @@ ccl_device Spectrum bsdf_microfacet_hair_eval_circular(KernelGlobals kg,
   const float3 R = bsdf_microfacet_hair_eval_r_circular(sc, wi, wo) +
                    bsdf_microfacet_hair_eval_tt_trt_circular(kg, sc, wi, wo, sd->lcg_state);
 
-  /* This choice could be better */
+  /* TODO: better estimation of the pdf */
   *pdf = 1.f;
 
   // original from Huang's EGSR 2022
-  // return rgb_to_spectrum(R / cos_theta(wi));
+  return rgb_to_spectrum(R / cos_theta(wi));
 
   // correction: the extra cos_theta(wo) corresponds to the lack of consideration of Zinke's
   // cos_theta_i^2 in the BCSDF; for instance eq[2] in Huang's should include an extra cos_theta_i
   // (plus here remember wi and wo meanings are flipped)
-  return rgb_to_spectrum(R / (cos_theta(wi) * cos_theta(wo)));
+  /* return rgb_to_spectrum(R / (cos_theta(wi) * cos_theta(wo))); */
 }
 
 ccl_device int bsdf_microfacet_hair_sample_circular(const KernelGlobals kg,
@@ -814,12 +814,12 @@ ccl_device int bsdf_microfacet_hair_sample_circular(const KernelGlobals kg,
   }
 
   // original from Huang's EGSR 2022
-  //*eval *= visibility;
+  *eval *= visibility;
 
   // correction: the extra cos_theta(wo) corresponds to the lack of consideration of Zinke's
   // cos_theta_i^2 in the BCSDF; for instance eq[2] in Huang's should include an extra cos_theta_i
   // (plus here remember wi and wo meanings are flipped)
-  *eval *= visibility / cos_theta(wo);
+  /* *eval *= visibility / cos_theta(wo); */
 
   *omega_in = wo.x * X + wo.y * Y + wo.z * Z;
 
@@ -1155,8 +1155,8 @@ ccl_device Spectrum bsdf_microfacet_hair_eval_elliptic(KernelGlobals kg,
 
   *pdf = 1.f;
 
-  // return rgb_to_spectrum(R / cos_theta(wi)); // original from Huang's EGSR 2022
-  return rgb_to_spectrum(R / (cos_theta(wi) * cos_theta(wo)));
+  return rgb_to_spectrum(R / cos_theta(wi));  // original from Huang's EGSR 2022
+  /* return rgb_to_spectrum(R / (cos_theta(wi) * cos_theta(wo))); */
   // correction: the extra cos_theta(wo) corresponds to the lack of consideration of Zinke's
   // cos_theta_i^2 in the BCSDF; for instance eq[2] in Huang's should include an extra cos_theta_i
   // (plus here remember wi and wo meanings are flipped)
@@ -1373,8 +1373,8 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
     label |= LABEL_TRANSMIT;
   }
 
-  //*eval *= visibility; // original from Huang's EGSR 2022
-  *eval *= visibility / cos_theta(wo);
+  *eval *= visibility;  // original from Huang's EGSR 2022
+  /* *eval *= visibility / cos_theta(wo); */
   // correction: the extra cos_theta(wo) corresponds to the lack of consideration of Zinke's
   // cos_theta_i^2 in the BCSDF; for instance eq[2] in Huang's should include an extra cos_theta_i
   // (plus here remember wi and wo meanings are flipped)
