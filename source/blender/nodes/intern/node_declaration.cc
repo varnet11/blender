@@ -7,6 +7,13 @@
 
 namespace blender::nodes {
 
+void build_node_declaration_dynamic(const bNode &node, NodeDeclaration &r_declaration)
+{
+  NodeDeclarationBuilder node_decl_builder{node, r_declaration};
+  node.typeinfo->declare(node_decl_builder);
+  node_decl_builder.finalize();
+}
+
 void build_node_declaration(const bNodeType &typeinfo, NodeDeclaration &r_declaration)
 {
   NodeDeclarationBuilder node_decl_builder{r_declaration};

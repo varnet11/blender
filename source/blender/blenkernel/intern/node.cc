@@ -3620,7 +3620,7 @@ bool nodeDeclarationEnsureOnOutdatedNode(bNodeTree * /*ntree*/, bNode *node)
   }
   if (node->typeinfo->declaration_is_dynamic) {
     node->runtime->declaration = new blender::nodes::NodeDeclaration();
-    blender::nodes::build_node_declaration(*node->typeinfo, *node->runtime->declaration);
+    blender::nodes::build_node_declaration_dynamic(*node, *node->runtime->declaration);
   }
   else {
     /* Declaration should have been created in #nodeRegisterType. */

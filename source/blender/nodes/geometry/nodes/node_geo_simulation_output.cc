@@ -17,9 +17,42 @@ NODE_STORAGE_FUNCS(NodeGeometrySimulationOutput);
 
 static void node_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Geometry>(N_("Geometry"));
+  const NodeGeometrySimulationOutput &storage = node_storage(b.node());
+  const Span<SimulationStateItem> items(storage.state_items, storage.state_items_num);
+  for (const int i : items.index_range()) {
+    const SimulationStateItem &item = items[i];
+    switch (item.data_type) {
+      case SOCK_FLOAT:
+        b.add_input<decl::Float>(item.name).supports_field();
+        b.add_output<decl::Float>(item.name).dependent_field({i});
+        break;
+      case SOCK_VECTOR:
+        b.add_input<decl::Vector>(item.name).supports_field();
+        b.add_output<decl::Vector>(item.name).dependent_field({i});
+        break;
+      case SOCK_RGBA:
+        b.add_input<decl::Color>(item.name).supports_field();
+        b.add_output<decl::Color>(item.name).dependent_field({i});
+        break;
+      case SOCK_BOOLEAN:
+        b.add_input<decl::Bool>(item.name).supports_field();
+        b.add_output<decl::Bool>(item.name).dependent_field({i});
+        break;
+      case SOCK_INT:
+        b.add_input<decl::Int>(item.name).supports_field();
+        b.add_output<decl::Int>(item.name).dependent_field({i});
+        break;
+      case SOCK_STRING:
+        b.add_input<decl::String>(item.name);
+        b.add_output<decl::String>(item.name);
+        break;
+      case SOCK_GEOMETRY:
+        b.add_input<decl::Geometry>(item.name);
+        b.add_output<decl::Geometry>(item.name);
+        break;
+    }
+  }
   b.add_input<decl::Extend>("", N_("__extend__"));
-  b.add_output<decl::Geometry>(N_("Geometry"));
   b.add_output<decl::Extend>("", N_("__extend__"));
 }
 
@@ -59,39 +92,42 @@ static void node_geo_exec(GeoNodeExecParams params)
 
   const GeoNodesLFUserData &lf_data = *params.user_data();
   bke::sim::ComputeCaches &all_caches = *lf_data.modifier_data->cache_per_frame;
-
   const bke::NodeGroupComputeContext cache_context(lf_data.compute_context, node.identifier);
   bke::sim::SimulationCache &cache = all_caches.ensure_for_context(cache_context.hash());
 
-  if (std::optional<GeometrySet> value = cache.value_at_time("Geometry", time)) {
-    params.set_output("Geometry", std::move(*value));
-    params.set_input_unused("Geometry");
-    return;
-  }
-
-  if (params.lazy_require_input("Geometry")) {
-    return;
-  }
-
-  GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
-  geometry_set.ensure_owns_direct_data();
-  if (storage.use_persistent_cache) {
-    if (!cache.is_empty()) {
-      if (time.time < cache.start_time()->time) {
-        cache.clear();
-      }
+  for (const SimulationStateItem &item : Span(storage.state_items, storage.state_items_num)) {
+    /* TODO: Generic data types. */
+    if (std::optional<GeometrySet> value = cache.value_at_time(item.name, time)) {
+      params.set_output(item.name, std::move(*value));
+      params.set_input_unused(item.name);
+      continue;
     }
-    /* If using the cache or there is no cached data yet, write the input in a new cache value. */
-    cache.store_persistent("Geometry", time, geometry_set);
-  }
-  else {
-    /* TODO: Maybe don't clear the whole cache here. */
-    /* TODO: Move the geometry set here if the output isn't needed. */
-    cache.clear();
-    cache.store_temporary("Geometry", time, geometry_set);
-  }
 
-  params.set_output("Geometry", std::move(geometry_set));
+    if (params.lazy_require_input(item.name)) {
+      continue;
+    }
+
+    GeometrySet geometry_set = params.extract_input<GeometrySet>(item.name);
+    geometry_set.ensure_owns_direct_data();
+    if (storage.use_persistent_cache) {
+      if (!cache.is_empty()) {
+        if (time.time < cache.start_time()->time) {
+          cache.clear();
+        }
+      }
+      /* If using the cache or there is no cached data yet, write the input in a new cache
+       * value.
+       */
+      cache.store_persistent(item.name, time, geometry_set);
+    }
+    else {
+      /* TODO: Maybe don't clear the whole cache here. */
+      /* TODO: Move the geometry set here if the output isn't needed. */
+      cache.clear();
+      cache.store_temporary(item.name, time, geometry_set);
+    }
+    params.set_output(item.name, std::move(geometry_set));
+  }
 }
 
 }  // namespace blender::nodes::node_geo_simulation_output_cc

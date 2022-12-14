@@ -325,11 +325,19 @@ class NodeDeclaration {
 class NodeDeclarationBuilder {
  private:
   NodeDeclaration &declaration_;
+  const bNode *node_;
   Vector<std::unique_ptr<BaseSocketDeclarationBuilder>> builders_;
   bool is_function_node_ = false;
 
  public:
   NodeDeclarationBuilder(NodeDeclaration &declaration);
+  NodeDeclarationBuilder(const bNode &node, NodeDeclaration &declaration);
+
+  /** Only valid for nodes with dynamic declarations. */
+  const bNode &node()
+  {
+    return *node_;
+  }
 
   /**
    * All inputs support fields, and all outputs are fields if any of the inputs is a field.
@@ -361,6 +369,7 @@ void index(const bNode &node, void *r_value);
 void id_or_index(const bNode &node, void *r_value);
 }  // namespace implicit_field_inputs
 
+void build_node_declaration_dynamic(const bNode &node, NodeDeclaration &r_declaration);
 void build_node_declaration(const bNodeType &typeinfo, NodeDeclaration &r_declaration);
 
 /* -------------------------------------------------------------------- */
@@ -513,6 +522,12 @@ inline void SocketDeclaration::make_available(bNode &node) const
 
 inline NodeDeclarationBuilder::NodeDeclarationBuilder(NodeDeclaration &declaration)
     : declaration_(declaration)
+{
+}
+
+inline NodeDeclarationBuilder::NodeDeclarationBuilder(const bNode &node,
+                                                      NodeDeclaration &declaration)
+    : node_(&node), declaration_(declaration)
 {
 }
 

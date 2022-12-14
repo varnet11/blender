@@ -17,23 +17,56 @@ NODE_STORAGE_FUNCS(NodeGeometrySimulationInput);
 
 static void node_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Geometry>(N_("Geometry"));
-  b.add_input<decl::Extend>("", N_("__extend__"));
-
   b.add_output<decl::Float>(N_("Delta Time"));
-  b.add_output<decl::Geometry>(N_("Geometry"));
-  b.add_output<decl::Extend>("", N_("__extend__"));
-}
 
-static void node_layout(uiLayout * /*layout*/, bContext * /*C*/, PointerRNA * /*ptr*/)
-{
-  // const NodeGeometrySimulationInput &storage = node_storage(
-  //     *static_cast<const bNode *>(ptr->data));
-  // const bNodeTree &node_tree = *reinterpret_cast<const bNodeTree *>(ptr->owner_id);
-  // const bNode *sim_output = node_tree.node_by_id(storage.output_node_id);
-  // if (sim_output) {
-  //   uiItemL(layout, sim_output->name, ICON_PHYSICS);
-  // }
+  const bNode &node = b.node();
+  const NodeGeometrySimulationInput &storage = node_storage(node);
+  const int32_t sim_output_node_id = storage.output_node_id;
+  const bNode *sim_output_node = node.owner_tree().node_by_id(sim_output_node_id);
+  if (!sim_output_node) {
+    return;
+  }
+  const NodeGeometrySimulationOutput &output_storage =
+      *static_cast<const NodeGeometrySimulationOutput *>(sim_output_node->storage);
+  const Span<SimulationStateItem> items(output_storage.state_items,
+                                        output_storage.state_items_num);
+
+  for (const int i : items.index_range()) {
+    const SimulationStateItem &item = items[i];
+    switch (item.data_type) {
+      case SOCK_FLOAT:
+        b.add_input<decl::Float>(item.name).supports_field();
+        b.add_output<decl::Float>(item.name).dependent_field({i});
+        break;
+      case SOCK_VECTOR:
+        b.add_input<decl::Vector>(item.name).supports_field();
+        b.add_output<decl::Vector>(item.name).dependent_field({i});
+        break;
+      case SOCK_RGBA:
+        b.add_input<decl::Color>(item.name).supports_field();
+        b.add_output<decl::Color>(item.name).dependent_field({i});
+        break;
+      case SOCK_BOOLEAN:
+        b.add_input<decl::Bool>(item.name).supports_field();
+        b.add_output<decl::Bool>(item.name).dependent_field({i});
+        break;
+      case SOCK_INT:
+        b.add_input<decl::Int>(item.name).supports_field();
+        b.add_output<decl::Int>(item.name).dependent_field({i});
+        break;
+      case SOCK_STRING:
+        b.add_input<decl::String>(item.name);
+        b.add_output<decl::String>(item.name);
+        break;
+      case SOCK_GEOMETRY:
+        b.add_input<decl::Geometry>(item.name);
+        b.add_output<decl::Geometry>(item.name);
+        break;
+    }
+  }
+
+  b.add_input<decl::Extend>("", N_("__extend__"));
+  b.add_output<decl::Extend>("", N_("__extend__"));
 }
 
 static void node_init(bNodeTree *tree, bNode *node)
@@ -68,8 +101,19 @@ static void node_init(bNodeTree *tree, bNode *node)
 
 static void node_geo_exec(GeoNodeExecParams params)
 {
-  const NodeGeometrySimulationInput &storage = node_storage(params.node());
+  const bNode &node = params.node();
+  const NodeGeometrySimulationInput &storage = node_storage(node);
   const int32_t sim_output_node_id = storage.output_node_id;
+  const bNode *sim_output_node = node.owner_tree().node_by_id(sim_output_node_id);
+  if (!sim_output_node) {
+    params.error_message_add(NodeWarningType::Error, TIP_("Missing simulation output node"));
+    params.set_default_remaining_outputs();
+    return;
+  }
+  const NodeGeometrySimulationOutput &output_storage =
+      *static_cast<const NodeGeometrySimulationOutput *>(sim_output_node->storage);
+  const Span<SimulationStateItem> items(output_storage.state_items,
+                                        output_storage.state_items_num);
 
   const Scene *scene = DEG_get_input_scene(params.depsgraph());
   const float scene_ctime = BKE_scene_ctime_get(scene);
@@ -80,31 +124,41 @@ static void node_geo_exec(GeoNodeExecParams params)
 
   const bke::NodeGroupComputeContext cache_context(lf_data.compute_context, sim_output_node_id);
   bke::sim::SimulationCache *cache = all_caches.lookup_context(cache_context.hash());
-  if (!cache) {
-    params.set_output("Geometry", params.extract_input<GeometrySet>("Geometry"));
-    return;
-  }
 
   if (params.lazy_output_is_required("Delta Time")) {
-    const float time_diff = cache->is_empty() ? 0.0f : scene_ctime - cache->last_run_time()->time;
-    const double frame_rate = (double(scene->r.frs_sec) / double(scene->r.frs_sec_base));
-    const float delta_time = float(std::max(0.0f, time_diff) / frame_rate);
-    params.set_output("Delta Time", delta_time);
-  }
-
-  if (std::optional<GeometrySet> cached_value = cache->value_before_time("Geometry", time)) {
-    if (params.lazy_output_is_required("Geometry")) {
-      params.set_output("Geometry", std::move(*cached_value));
+    if (cache) {
+      const float time_diff = cache->is_empty() ? 0.0f :
+                                                  scene_ctime - cache->last_run_time()->time;
+      const double frame_rate = (double(scene->r.frs_sec) / double(scene->r.frs_sec_base));
+      const float delta_time = float(std::max(0.0f, time_diff) / frame_rate);
+      params.set_output("Delta Time", delta_time);
     }
-    return;
+    else {
+      params.set_output("Delta Time", 0.0f);
+    }
   }
 
-  if (params.lazy_require_input("Geometry")) {
-    return;
-  }
+  for (const SimulationStateItem &item : items) {
+    /* TODO: Generic data type. */
+    if (!cache) {
+      params.set_output(item.name, params.extract_input<GeometrySet>(item.name));
+      continue;
+    }
 
-  GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
-  params.set_output("Geometry", std::move(geometry_set));
+    if (std::optional<GeometrySet> cached_value = cache->value_before_time(item.name, time)) {
+      if (params.lazy_output_is_required(item.name)) {
+        params.set_output(item.name, std::move(*cached_value));
+      }
+      continue;
+    }
+
+    if (params.lazy_require_input(item.name)) {
+      continue;
+    }
+
+    GeometrySet geometry_set = params.extract_input<GeometrySet>(item.name);
+    params.set_output(item.name, std::move(geometry_set));
+  }
 }
 
 }  // namespace blender::nodes::node_geo_simulation_input_cc
@@ -118,13 +172,12 @@ void register_node_type_geo_simulation_input()
   ntype.initfunc = file_ns::node_init;
   ntype.geometry_node_execute = file_ns::node_geo_exec;
   ntype.declare = file_ns::node_declare;
-  ntype.draw_buttons = file_ns::node_layout;
   node_type_storage(&ntype,
                     "NodeGeometrySimulationInput",
                     node_free_standard_storage,
                     node_copy_standard_storage);
 
   ntype.geometry_node_execute_supports_laziness = true;
-  // ntype.declaration_is_dynamic = true;
+  ntype.declaration_is_dynamic = true;
   nodeRegisterType(&ntype);
 }
