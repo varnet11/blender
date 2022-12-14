@@ -58,28 +58,35 @@ static void node_declare(NodeDeclarationBuilder &b)
 
 static void node_init(bNodeTree * /*tree*/, bNode *node)
 {
-  NodeGeometrySimulationOutput *data = MEM_cnew<NodeGeometrySimulationOutput>(__func__);
-  data->state_items = MEM_cnew_array<SimulationStateItem>(1, __func__);
-  data->state_items[0].name = BLI_strdup(DATA_("Geometry"));
-  data->state_items[0].data_type = SOCK_GEOMETRY;
-  data->state_items_num = 1;
-  data->use_persistent_cache = false;
-  node->storage = data;
+  NodeGeometrySimulationOutput *storage = MEM_cnew<NodeGeometrySimulationOutput>(__func__);
+  storage->state_items = MEM_cnew_array<SimulationStateItem>(1, __func__);
+  storage->state_items[0].name = BLI_strdup(DATA_("Geometry"));
+  storage->state_items[0].data_type = SOCK_GEOMETRY;
+  storage->state_items_num = 1;
+  storage->use_persistent_cache = false;
+  node->storage = storage;
 }
 
 static void node_free_storage(bNode *node)
 {
   NodeGeometrySimulationOutput &storage = node_storage(*node);
+  for (SimulationStateItem &item : MutableSpan(storage.state_items, storage.state_items_num)) {
+    MEM_SAFE_FREE(item.name);
+  }
   MEM_SAFE_FREE(storage.state_items);
 }
 
-void node_copy_storage(bNodeTree * /*dest_ntree*/, bNode *dst_node, const bNode *src_node)
+static void node_copy_storage(bNodeTree * /*dest_ntree*/, bNode *dst_node, const bNode *src_node)
 {
   const NodeGeometrySimulationOutput &src = node_storage(*src_node);
-  NodeGeometrySimulationOutput &dst = node_storage(*dst_node);
-  MEM_SAFE_FREE(dst.state_items);
-  dst.state_items = MEM_cnew_array<SimulationStateItem>(src.state_items_num, __func__);
-  dst.state_items_num = src.state_items_num;
+  NodeGeometrySimulationOutput *dst = MEM_cnew<NodeGeometrySimulationOutput>(__func__);
+  MEM_SAFE_FREE(dst->state_items);
+  dst->state_items = MEM_cnew_array<SimulationStateItem>(src.state_items_num, __func__);
+  dst->state_items_num = src.state_items_num;
+  for (const int i : IndexRange(dst->state_items_num)) {
+    dst->state_items[i].name = static_cast<char *>(MEM_dupallocN(src.state_items[i].name));
+  }
+  dst_node->storage = dst;
 }
 
 static void node_geo_exec(GeoNodeExecParams params)

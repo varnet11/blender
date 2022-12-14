@@ -1594,7 +1594,7 @@ typedef struct NodeGeometrySimulationOutput {
   int state_items_num;
 
   int8_t use_persistent_cache;
-  int _pad[3];
+  char _pad[3];
 } NodeGeometrySimulationOutput;
 
 typedef struct NodeGeometryDistributePointsInVolume {

@@ -22,6 +22,8 @@ static void node_declare(NodeDeclarationBuilder &b)
   const bNode &node = b.node();
   const NodeGeometrySimulationInput &storage = node_storage(node);
   const int32_t sim_output_node_id = storage.output_node_id;
+  /* TODO: Add node tree and ndoe as arguments to new dynamic declaration function. */
+  node.owner_tree().ensure_topology_cache();
   const bNode *sim_output_node = node.owner_tree().node_by_id(sim_output_node_id);
   if (!sim_output_node) {
     return;

@@ -527,7 +527,7 @@ inline NodeDeclarationBuilder::NodeDeclarationBuilder(NodeDeclaration &declarati
 
 inline NodeDeclarationBuilder::NodeDeclarationBuilder(const bNode &node,
                                                       NodeDeclaration &declaration)
-    : node_(&node), declaration_(declaration)
+    : declaration_(declaration), node_(&node)
 {
 }
 

@@ -1124,11 +1124,11 @@ static void node_init(const bContext *C, bNodeTree *ntree, bNode *node)
   BLI_strncpy(node->name, DATA_(ntype->ui_name), NODE_MAXSTR);
   nodeUniqueName(ntree, node);
 
-  node_add_sockets_from_type(ntree, node, ntype);
-
   if (ntype->initfunc != nullptr) {
     ntype->initfunc(ntree, node);
   }
+
+  node_add_sockets_from_type(ntree, node, ntype);
 
   if (ntree->typeinfo && ntree->typeinfo->node_add_init) {
     ntree->typeinfo->node_add_init(ntree, node);
