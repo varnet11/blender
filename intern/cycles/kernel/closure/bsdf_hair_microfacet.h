@@ -415,12 +415,11 @@ ccl_device float3 bsdf_microfacet_hair_eval_r_circular(ccl_private const ShaderC
 
       const float phi_m = phi_m_min + i * res;
       const float3 wm = sph_dir(tilt, phi_m);
-      const float J = fmaxf(cos(phi_i - phi_m), 0.f);
 
       if (microfacet_visible(wi, wo, make_float3(wm.x, 0.f, wm.z), wh)) {
         const float weight = (i == 0 || i == intervals - 1) ? 0.5f : (i % 2 + 1);
         integral += weight * D(beckmann, roughness, wm, wh) *
-                    G(beckmann, roughness, wi, wo, wm, wh) * J;
+                    G(beckmann, roughness, wi, wo, wm, wh);
       }
     }
     integral *= (2.f / 3.f * res);
@@ -475,7 +474,6 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_circular(KernelGlobals kg,
 
     const float phi_mi = phi_m_min + i * res;
     const float3 wmi = sph_dir(tilt, phi_mi);
-    const float J = fmaxf(cos(phi_i - phi_mi), 0.f);
 
     /* sample wh1 */
     const float2 sample1 = make_float2(lcg_step_float(&rng_quadrature),
@@ -524,7 +522,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_circular(KernelGlobals kg,
 
           const float3 result = T1 * T2 * D2 * A_t * dot_wt_wh2 * dot(wo, wh2) *
                                 sqr(rcp_norm_wh2) / dot(wt, wmi) * weight *
-                                smith_g1(beckmann, roughness, -wt, wmi, wh1) * dot(wi, wmi) * J;
+                                smith_g1(beckmann, roughness, -wt, wmi, wh1) * dot(wi, wmi);
 
           if (isfinite_safe(result))
             S_tt += bsdf->extra->TT * result;
@@ -579,7 +577,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_circular(KernelGlobals kg,
                             A_tr * weight / (dot(wt, wmi) * dot(wtr, wmt)) *
                             smith_g1(beckmann, roughness, -wt, wmi, wh1) *
                             smith_g1(beckmann, roughness, -wtr, wmt, wh2) * dot(wi, wmi) *
-                            dot(wt, wmt) * J;
+                            dot(wt, wmt);
 
       if (isfinite_safe(result))
         S_trt += bsdf->extra->TRT * result;
@@ -615,13 +613,7 @@ ccl_device Spectrum bsdf_microfacet_hair_eval_circular(KernelGlobals kg,
   /* TODO: better estimation of the pdf */
   *pdf = 1.f;
 
-  // original from Huang's EGSR 2022
   return rgb_to_spectrum(R / cos_theta(wi));
-
-  // correction: the extra cos_theta(wo) corresponds to the lack of consideration of Zinke's
-  // cos_theta_i^2 in the BCSDF; for instance eq[2] in Huang's should include an extra cos_theta_i
-  // (plus here remember wi and wo meanings are flipped)
-  /* return rgb_to_spectrum(R / (cos_theta(wi) * cos_theta(wo))); */
 }
 
 ccl_device int bsdf_microfacet_hair_sample_circular(const KernelGlobals kg,
@@ -813,13 +805,7 @@ ccl_device int bsdf_microfacet_hair_sample_circular(const KernelGlobals kg,
     label |= LABEL_TRANSMIT;
   }
 
-  // original from Huang's EGSR 2022
   *eval *= visibility;
-
-  // correction: the extra cos_theta(wo) corresponds to the lack of consideration of Zinke's
-  // cos_theta_i^2 in the BCSDF; for instance eq[2] in Huang's should include an extra cos_theta_i
-  // (plus here remember wi and wo meanings are flipped)
-  /* *eval *= visibility / cos_theta(wo); */
 
   *omega_in = wo.x * X + wo.y * Y + wo.z * Z;
 
@@ -911,14 +897,13 @@ ccl_device float3 bsdf_microfacet_hair_eval_r_elliptic(ccl_private const ShaderC
 
     const float gamma_m = gamma_m_min + i * res;
     const float3 wm = sphg_dir(tilt, gamma_m, a, b);
-    const float J = fmaxf(cos(gamma_i - gamma_m), 0.f);
 
     if (microfacet_visible(wi, wo, make_float3(wm.x, 0.f, wm.z), wh)) {
       const float weight = (i == 0 || i == intervals - 1) ? .5f : (i % 2 + 1);
       const float arc_length = sqrtf(1.f - e2 * sqr(sinf(gamma_m)));
 
       integral += weight * D(beckmann, roughness, wm, wh) *
-                  G(beckmann, roughness, wi, wo, wm, wh) * arc_length * J;
+                  G(beckmann, roughness, wi, wo, wm, wh) * arc_length;
     }
   }
 
@@ -990,7 +975,6 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_elliptic(KernelGlobals kg,
   for (size_t i = 0; i < intervals; i++) {
 
     const float gamma_mi = gamma_m_min + i * res;
-    const float J = fmaxf(cos(gamma_i - gamma_mi), 0.f);
 
     const float3 wmi = sphg_dir(tilt, gamma_mi, a, b);
     const float3 wmi_ = sphg_dir(0.f, gamma_mi, a, b);
@@ -1046,7 +1030,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_elliptic(KernelGlobals kg,
 
           const float3 result = T1 * T2 * D2 * A_t * dot_wt_wh2 * dot(wo, wh2) *
                                 sqr(rcp_norm_wh2) / dot(wt, wmi) * weight *
-                                smith_g1(beckmann, roughness, -wt, wmi, wh1) * dot(wi, wmi) * J;
+                                smith_g1(beckmann, roughness, -wt, wmi, wh1) * dot(wi, wmi);
 
           if (isfinite_safe(result)) {
             const float arc_length = sqrtf(1.f - e2 * sqr(sinf(gamma_mt)));
@@ -1107,7 +1091,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_elliptic(KernelGlobals kg,
                             A_tr * weight / (dot(wt, wmi) * dot(wtr, wmt)) *
                             smith_g1(beckmann, roughness, -wt, wmi, wh1) *
                             smith_g1(beckmann, roughness, -wtr, wmt, wh2) * dot(wi, wmi) *
-                            dot(wt, wmt) * J;
+                            dot(wt, wmt);
 
       if (isfinite_safe(result)) {
         const float arc_length = sqrtf(1.f - e2 * sqr(sin(gamma_mtr)));
@@ -1155,11 +1139,7 @@ ccl_device Spectrum bsdf_microfacet_hair_eval_elliptic(KernelGlobals kg,
 
   *pdf = 1.f;
 
-  return rgb_to_spectrum(R / cos_theta(wi));  // original from Huang's EGSR 2022
-  /* return rgb_to_spectrum(R / (cos_theta(wi) * cos_theta(wo))); */
-  // correction: the extra cos_theta(wo) corresponds to the lack of consideration of Zinke's
-  // cos_theta_i^2 in the BCSDF; for instance eq[2] in Huang's should include an extra cos_theta_i
-  // (plus here remember wi and wo meanings are flipped)
+  return rgb_to_spectrum(R / cos_theta(wi));
 }
 
 ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
@@ -1373,11 +1353,7 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
     label |= LABEL_TRANSMIT;
   }
 
-  *eval *= visibility;  // original from Huang's EGSR 2022
-  /* *eval *= visibility / cos_theta(wo); */
-  // correction: the extra cos_theta(wo) corresponds to the lack of consideration of Zinke's
-  // cos_theta_i^2 in the BCSDF; for instance eq[2] in Huang's should include an extra cos_theta_i
-  // (plus here remember wi and wo meanings are flipped)
+  *eval *= visibility;
   *omega_in = wo.x * X + wo.y * Y + wo.z * Z;
 
   /* correction of the cosine foreshortening term
