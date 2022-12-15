@@ -1365,19 +1365,6 @@ static void modifyGeometry(ModifierData *md,
   }
 }
 
-static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *mesh)
-{
-  GeometrySet geometry_set = GeometrySet::create_with_mesh(mesh, GeometryOwnershipType::Editable);
-
-  modifyGeometry(md, ctx, geometry_set);
-
-  Mesh *new_mesh = geometry_set.get_component_for_write<MeshComponent>().release();
-  if (new_mesh == nullptr) {
-    return BKE_mesh_new_nomain(0, 0, 0, 0, 0);
-  }
-  return new_mesh;
-}
-
 static void modifyGeometrySet(ModifierData *md,
                               const ModifierEvalContext *ctx,
                               GeometrySet *geometry_set)
@@ -1948,7 +1935,7 @@ ModifierTypeInfo modifierType_Nodes = {
     /* deformMatrices */ nullptr,
     /* deformVertsEM */ nullptr,
     /* deformMatricesEM */ nullptr,
-    /* modifyMesh */ modifyMesh,
+    /* modifyMesh */ nullptr,
     /* modifyGeometrySet */ modifyGeometrySet,
 
     /* initData */ initData,
