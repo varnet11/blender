@@ -255,14 +255,6 @@ void BKE_mesh_texspace_get_reference(struct Mesh *me,
 void BKE_mesh_texspace_copy_from_object(struct Mesh *me, struct Object *ob);
 
 /**
- * Split faces based on the edge angle and loop normals.
- * Matches behavior of face splitting in render engines.
- *
- * \note Will leave #CD_NORMAL loop data layer which is used by render engines to set shading up.
- */
-void BKE_mesh_split_faces(struct Mesh *mesh, bool free_loop_normals);
-
-/**
  * Create new mesh from the given object at its current state.
  * The owner of this mesh is unknown, it is up to the caller to decide.
  *
@@ -286,18 +278,6 @@ struct Mesh *BKE_mesh_new_from_object_to_bmain(struct Main *bmain,
                                                struct Depsgraph *depsgraph,
                                                struct Object *object,
                                                bool preserve_all_data_layers);
-
-/**
- * \param use_virtual_modifiers: When enabled calculate virtual-modifiers before applying `md_eval`
- * support this since virtual-modifiers are not modifiers from a user perspective,
- * allowing shape keys to be included with the modifier being applied, see: T91923.
- */
-struct Mesh *BKE_mesh_create_derived_for_modifier(struct Depsgraph *depsgraph,
-                                                  struct Scene *scene,
-                                                  struct Object *ob_eval,
-                                                  struct ModifierData *md_eval,
-                                                  bool use_virtual_modifiers,
-                                                  bool build_shapekey_layers);
 
 /**
  * Move data from a mesh outside of the main data-base into a mesh in the data-base.

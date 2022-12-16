@@ -31,6 +31,7 @@
 #include "DNA_scene_types.h"
 
 #include "BKE_attribute.h"
+#include "BKE_attribute.hh"
 #include "BKE_brush.h"
 #include "BKE_ccg.h"
 #include "BKE_colortools.h"
@@ -131,10 +132,20 @@ const float *SCULPT_vertex_co_get(SculptSession *ss, PBVHVertRef vertex)
 
 bool SCULPT_has_loop_colors(const Object *ob)
 {
+  using namespace blender;
   Mesh *me = BKE_object_get_original_mesh(ob);
-  const CustomDataLayer *layer = BKE_id_attributes_active_color_get(&me->id);
-
-  return layer && BKE_id_attribute_domain(&me->id, layer) == ATTR_DOMAIN_CORNER;
+  const std::optional<bke::AttributeMetaData> meta_data = me->attributes().lookup_meta_data(
+      me->active_color_attribute);
+  if (!meta_data) {
+    return false;
+  }
+  if (meta_data->domain != ATTR_DOMAIN_CORNER) {
+    return false;
+  }
+  if (!(CD_TYPE_AS_MASK(meta_data->data_type) & CD_MASK_COLOR_ALL)) {
+    return false;
+  }
+  return true;
 }
 
 bool SCULPT_has_colors(const SculptSession *ss)
@@ -2862,10 +2873,7 @@ static void calc_local_y(ViewContext *vc, const float center[3], float y[3])
   mul_m4_v3(ob->world_to_object, y);
 }
 
-static void calc_brush_local_mat(const Brush *brush,
-                                 const MTex *mtex,
-                                 Object *ob,
-                                 float local_mat[4][4])
+static void calc_brush_local_mat(const MTex *mtex, Object *ob, float local_mat[4][4])
 {
   const StrokeCache *cache = ob->sculpt->cache;
   float tmat[4][4];
@@ -2938,7 +2946,7 @@ static void update_brush_local_mat(Sculpt *sd, Object *ob)
   if (cache->mirror_symmetry_pass == 0 && cache->radial_symmetry_pass == 0) {
     const Brush *brush = BKE_paint_brush(&sd->paint);
     const MTex *mask_tex = BKE_brush_mask_texture_get(brush, OB_MODE_SCULPT);
-    calc_brush_local_mat(brush, mask_tex, ob, cache->brush_local_mat);
+    calc_brush_local_mat(mask_tex, ob, cache->brush_local_mat);
   }
 }
 

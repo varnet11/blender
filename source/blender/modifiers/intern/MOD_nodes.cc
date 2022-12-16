@@ -1309,19 +1309,6 @@ static void modifyGeometry(ModifierData *md,
   }
 }
 
-static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *mesh)
-{
-  GeometrySet geometry_set = GeometrySet::create_with_mesh(mesh, GeometryOwnershipType::Editable);
-
-  modifyGeometry(md, ctx, geometry_set);
-
-  Mesh *new_mesh = geometry_set.get_component_for_write<MeshComponent>().release();
-  if (new_mesh == nullptr) {
-    return BKE_mesh_new_nomain(0, 0, 0, 0, 0);
-  }
-  return new_mesh;
-}
-
 static void modifyGeometrySet(ModifierData *md,
                               const ModifierEvalContext *ctx,
                               GeometrySet *geometry_set)
@@ -1401,7 +1388,7 @@ static void attribute_search_update_fn(
     }
   }
   else {
-    for (const bNode *node : nmd->node_group->nodes_by_type("NodeGroupInput")) {
+    for (const bNode *node : nmd->node_group->group_input_nodes()) {
       for (const bNodeSocket *socket : node->output_sockets()) {
         if (socket->type == SOCK_GEOMETRY) {
           sockets_to_check.append(socket);
@@ -1882,7 +1869,7 @@ ModifierTypeInfo modifierType_Nodes = {
     /* deformMatrices */ nullptr,
     /* deformVertsEM */ nullptr,
     /* deformMatricesEM */ nullptr,
-    /* modifyMesh */ modifyMesh,
+    /* modifyMesh */ nullptr,
     /* modifyGeometrySet */ modifyGeometrySet,
 
     /* initData */ initData,

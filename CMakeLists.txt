@@ -749,11 +749,6 @@ if("${CMAKE_GENERATOR}" MATCHES "Ninja")
   mark_as_advanced(WITH_NINJA_POOL_JOBS)
 endif()
 
-if(UNIX AND NOT APPLE)
-  option(WITH_CXX11_ABI "Use native C++11 ABI of compiler" ON)
-  mark_as_advanced(WITH_CXX11_ABI)
-endif()
-
 # Installation process.
 set(POSTINSTALL_SCRIPT "" CACHE FILEPATH "Run given CMake script after installation process")
 mark_as_advanced(POSTINSTALL_SCRIPT)
@@ -1721,12 +1716,6 @@ if(
   string(APPEND CMAKE_C_FLAGS " -std=gnu11")
 endif()
 
-if(UNIX AND NOT APPLE)
-  if(NOT WITH_CXX11_ABI)
-    string(APPEND PLATFORM_CFLAGS " -D_GLIBCXX_USE_CXX11_ABI=0")
-  endif()
-endif()
-
 if(WITH_COMPILER_SHORT_FILE_MACRO)
   # Use '-fmacro-prefix-map' for Clang and GCC (MSVC doesn't support this).
   add_check_c_compiler_flag(C_PREFIX_MAP_FLAGS C_MACRO_PREFIX_MAP -fmacro-prefix-map=foo=bar)
@@ -2017,6 +2006,24 @@ endif()
 if(0)
   print_all_vars()
 endif()
+
+set(LIBDIR_STALE)
+
+if(UNIX AND NOT APPLE)
+  # Only search for the path if it's found on the system.
+  if (EXISTS "../lib/linux_centos7_x86_64")
+    set(LIBDIR_STALE "/lib/linux_centos7_x86_64/")
+  endif()
+endif()
+
+if(LIBDIR_STALE)
+  print_cached_vars_containing_value(
+    "${LIBDIR_STALE}"
+    "\nWARNING: found cached references to old library paths!\n"
+    "\nIt is *strongly* recommended to reference updated library paths!\n"
+  )
+endif()
+unset(LIBDIR_STALE)
 
 # Should be the last step of configuration.
 if(POSTCONFIGURE_SCRIPT)
