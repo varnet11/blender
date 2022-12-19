@@ -397,10 +397,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_r_circular(ccl_private const ShaderC
 
     integral = roughness_squared * M_1_PI_F * 0.5f * (temp1 + temp2 + temp3 + temp4);
   }
-  else {
-    /* falls back to numerical integration */
-    const float phi_i = dir_phi(wi);
-
+  else { /* falls back to numerical integration */
     /* initial sample resolution */
     float res = roughness * .7f;
     const float scale = (phi_m_max - phi_m_min) * .5f;
@@ -456,8 +453,6 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_circular(KernelGlobals kg,
   float tmp1 = acosf(fminf(tan_tilt * tan_theta(wo), 0.f));
   if (isnan_safe(tmp1))
     return zero_float3();
-
-  const float phi_i = dir_phi(wi);
 
   const float3 mu_a = bsdf->sigma;
   const float inv_eta = 1.f / eta;
@@ -880,8 +875,6 @@ ccl_device float3 bsdf_microfacet_hair_eval_r_elliptic(ccl_private const ShaderC
   if (gamma_m_max < gamma_m_min)
     gamma_m_max += M_2PI_F;
 
-  const float gamma_i = to_gamma(phi_i, a, b);
-
   /* initial sample resolution */
   float res = roughness * .7f;
   const float scale = (gamma_m_max - gamma_m_min) * .5f;
@@ -961,8 +954,6 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_elliptic(KernelGlobals kg,
   float gamma_m_max = to_gamma(phi_m_max, a, b);
   if (gamma_m_max < gamma_m_min)
     gamma_m_max += M_2PI_F;
-
-  const float gamma_i = to_gamma(phi_i, a, b);
 
   float res = roughness * .8f;
   const float scale = (gamma_m_max - gamma_m_min) * .5f;
