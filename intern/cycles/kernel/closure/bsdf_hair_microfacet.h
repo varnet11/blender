@@ -279,7 +279,7 @@ ccl_device float D(const bool beckmann, const float roughness, const float3 m, c
  * `cos_theta_t`, as it is used when computing the direction of the refracted ray. */
 ccl_device float fresnel(float cos_theta_i, float eta, ccl_private float &cos_theta_t)
 {
-  kernel_assert(cos_theta_i >= 0.f); /* FIXME: cos_theta_i could be NaN. */
+  kernel_assert(!isnan_safe(cos_theta_i));
 
   /* Special cases. */
   if (eta == 1.f) {
@@ -444,10 +444,10 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_circular(KernelGlobals kg,
 
   /* dot(wi, wmi) > 0 */
   const float tan_tilt = tanf(tilt);
-  float phi_m_max = acosf(fmaxf(-tan_tilt * tan_theta(wi), 0.f));
+  const float phi_m_max = acosf(fmaxf(-tan_tilt * tan_theta(wi), 0.f)) - 1e-3f;
   if (isnan_safe(phi_m_max))
     return zero_float3();
-  float phi_m_min = -phi_m_max;
+  const float phi_m_min = -phi_m_max;
 
   /* dot(wo, wmo) < 0 */
   float tmp1 = acosf(fminf(tan_tilt * tan_theta(wo), 0.f));
@@ -475,8 +475,9 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_circular(KernelGlobals kg,
 
     const float3 wh1 = sample_wh(kg, beckmann, roughness, wi, wmi, sample1);
     const float dot_wi_wh1 = dot(wi, wh1);
-    if (dot_wi_wh1 <= 1e-5f)
+    if (!(dot_wi_wh1 > 0)) {
       continue;
+    }
 
     float cos_theta_t1;
     const float T1 = 1.f - fresnel(dot_wi_wh1, eta, cos_theta_t1);
@@ -534,8 +535,9 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_circular(KernelGlobals kg,
       float3 wh2 = sample_wh(kg, beckmann, roughness, -wt, wmt, sample2);
 
       const float cos_th2 = dot(-wt, wh2);
-      if (cos_th2 <= 1e-5f)
+      if (!(cos_th2 > 0)) {
         continue;
+      }
 
       const float R2 = fresnel_dielectric_cos(cos_th2, inv_eta);
       float3 wtr = -reflect(wt, wh2);
@@ -678,7 +680,7 @@ ccl_device int bsdf_microfacet_hair_sample_circular(const KernelGlobals kg,
   const float3 wr = -reflect(wi, wh1);
 
   /* ensure that this is a valid sample */
-  if (dot(wr, wh1) <= 0.f || dot(wr, wmi) <= 0.f || !microfacet_visible(wi, wr, wmi_, wh1)) {
+  if (!(dot(wr, wh1) > 0.f) || !(dot(wr, wmi) > 0.f) || !microfacet_visible(wi, wr, wmi_, wh1)) {
     *pdf = 0.f;
     return LABEL_NONE;
   }
@@ -831,6 +833,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_r_elliptic(ccl_private const ShaderC
 
   /* get elliptical cross section characteristic */
   const float a = 1.f;
+  /* TODO: rename this as aspect ratio? e is in [0, 0.85], b is in [0.52, 1]. */
   const float b = bsdf->extra->eccentricity;
   const float e2 = 1.f - sqr(b / a);
 
@@ -865,8 +868,8 @@ ccl_device float3 bsdf_microfacet_hair_eval_r_elliptic(ccl_private const ShaderC
     phi_m_max1 -= M_2PI_F;
   }
 
-  const float phi_m_min = fmaxf(phi_m_min1, phi_m_min2) + .001f;
-  const float phi_m_max = fminf(phi_m_max1, phi_m_max2) - .001f;
+  const float phi_m_min = fmaxf(phi_m_min1, phi_m_min2) + 1e-3f;
+  const float phi_m_max = fminf(phi_m_max1, phi_m_max2) - 1e-3f;
   if (phi_m_min > phi_m_max)
     return R;
 
@@ -950,8 +953,8 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_elliptic(KernelGlobals kg,
   const float b = bsdf->extra->eccentricity;
   const float e2 = 1.f - sqr(b / a);
 
-  float gamma_m_min = to_gamma(phi_m_min, a, b);
-  float gamma_m_max = to_gamma(phi_m_max, a, b);
+  float gamma_m_min = to_gamma(phi_m_min, a, b) + 1e-3f;
+  float gamma_m_max = to_gamma(phi_m_max, a, b) - 1e-3f;
   if (gamma_m_max < gamma_m_min)
     gamma_m_max += M_2PI_F;
 
@@ -975,8 +978,9 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_elliptic(KernelGlobals kg,
 
     const float3 wh1 = sample_wh(kg, beckmann, roughness, wi, wmi, sample1);
     const float dot_wi_wh1 = dot(wi, wh1);
-    if (dot_wi_wh1 <= 1e-5f)
+    if (!(dot_wi_wh1 > 0)) {
       continue;
+    }
 
     float cos_theta_t1;
     const float T1 = 1.f - fresnel(dot_wi_wh1, eta, cos_theta_t1);
@@ -997,12 +1001,14 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_elliptic(KernelGlobals kg,
 
     const float2 pi = to_point(gamma_mi, a, b);
     const float2 pt = to_point(gamma_mt + M_PI_F, a, b);
+    /* TODO: check the definition of mu_a. */
+    /* TODO: exp -> expf */
     const float3 A_t = exp(-mu_a * len(pi - pt) / cos_theta(wt));
 
     /* TT */
     if (bsdf->extra->TT > 0.f) {
 
-      /* total internal reflection */
+      /* Total internal reflection otherwise. */
       if (dot(wo, wt) >= inv_eta - 1e-5f) {
 
         /* microfacet visiblity from macronormal */
@@ -1040,8 +1046,9 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_elliptic(KernelGlobals kg,
       const float3 wh2 = sample_wh(kg, beckmann, roughness, -wt, wmt, sample2);
 
       const float cos_th2 = dot(-wt, wh2);
-      if (cos_th2 <= 1e-5f)
+      if (!(cos_th2 > 0)) {
         continue;
+      }
 
       const float R2 = fresnel_dielectric_cos(cos_th2, inv_eta);
       const float3 wtr = -reflect(wt, wh2);
@@ -1220,7 +1227,7 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
   const float3 wr = -reflect(wi, wh1);
 
   /* ensure that this is a valid sample */
-  if (dot(wr, wh1) <= 0.f || dot(wr, wmi) <= 0.f || !microfacet_visible(wi, wr, wmi_, wh1)) {
+  if (!(dot(wr, wh1) > 0.f) || !(dot(wr, wmi) > 0.f) || !microfacet_visible(wi, wr, wmi_, wh1)) {
     *pdf = 0.f;
     return LABEL_NONE;
   }
@@ -1263,8 +1270,9 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
 
     wtt = -refract_angle(-wt, wh2, cos_theta_t2, *eta);
 
-    if (dot(wtt, wmt) < 0.f && cos_theta_t2 != 0.f) /* total internal reflection */
+    if (dot(wtt, wmt) < 0.f && cos_theta_t2 != 0.f) {
       TT = bsdf->extra->TT * T1 * A_t * T2;
+    }
 
     /* sample TRT lobe */
     const float phi_tr = dir_phi(wtr);
