@@ -1023,19 +1023,13 @@ ccl_device_noinline int svm_node_closure_bsdf(KernelGlobals kg,
         if (model_type == NODE_MICROFACET_HAIR_ELLIPTIC_GGX ||
             model_type == NODE_MICROFACET_HAIR_ELLIPTIC_BECKMANN) {
 
-          uint eccentricity_ofs, twist_rate_ofs, axis_ofs;
-          svm_unpack_node_uchar4(
-              data_node7.x, &eccentricity_ofs, &twist_rate_ofs, &axis_ofs, &temp);
+          uint eccentricity_ofs;
+          svm_unpack_node_uchar4(data_node7.x, &eccentricity_ofs, &temp, &temp, &temp);
 
           float eccentricity = stack_load_float_default(stack, eccentricity_ofs, data_node7.y);
-          float twist_rate = stack_load_float_default(stack, twist_rate_ofs, data_node7.z);
-          float axis_rot = stack_load_float_default(stack, axis_ofs, data_node7.w);
 
           /* Eccentricity */
           bsdf->extra->eccentricity = (eccentricity > 1.f) ? 1.f / eccentricity : eccentricity;
-
-          /* Angular twist rate per unit length */
-          bsdf->extra->twist_rate = twist_rate;
 
           const AttributeDescriptor attr_descr_intercept = find_attribute(kg, sd, data_node4.z);
           bsdf->extra->attr_descr_intercept = curve_attribute_float(
@@ -1044,10 +1038,6 @@ ccl_device_noinline int svm_node_closure_bsdf(KernelGlobals kg,
           const AttributeDescriptor attr_descr_length = find_attribute(kg, sd, data_node4.w);
           bsdf->extra->attr_descr_length = curve_attribute_float(
               kg, sd, attr_descr_length, NULL, NULL);
-
-          bsdf->extra->axis_rot = axis_rot > 0.0f ?
-                                      random * axis_rot :
-                                      -axis_rot;  // allowing this negative mode for debugging
         }
 
         sd->flag |= bsdf_microfacet_hair_setup(sd, bsdf);

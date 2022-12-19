@@ -32,15 +32,6 @@ static void node_declare(NodeDeclarationBuilder &b)
       .min(0.0f)
       .max(1.0f)
       .subtype(PROP_FACTOR);
-  b.add_input<decl::Float>(N_("Random Axis"))
-      .default_value(0.0f)
-      .min(-1.0f)
-      .max(1.0f);
-  b.add_input<decl::Float>(N_("Twist Rate"))
-      .default_value(0.0f)
-      .min(0.0f)
-      .max(2.0f)
-      .subtype(PROP_FACTOR);
   b.add_input<decl::Float>(N_("Roughness"))
       .default_value(0.3f)
       .min(0.0f)
@@ -106,9 +97,6 @@ static void node_shader_update_hair_microfacet(bNodeTree *ntree, bNode *node)
   int parametrization = node->custom1;
   int model_type = node->custom2;
 
-  bool circular = (model_type == SHD_MICROFACET_HAIR_CIRCULAR_GGX ||
-                   model_type == SHD_MICROFACET_HAIR_CIRCULAR_GGX_ANALYTIC ||
-                   model_type == SHD_MICROFACET_HAIR_CIRCULAR_BECKMANN);
   bool elliptical = (model_type == SHD_MICROFACET_HAIR_ELLIPTIC_GGX ||
                      model_type == SHD_MICROFACET_HAIR_ELLIPTIC_BECKMANN);
 
@@ -137,12 +125,6 @@ static void node_shader_update_hair_microfacet(bNodeTree *ntree, bNode *node)
           ntree, sock, parametrization == SHD_MICROFACET_HAIR_PIGMENT_CONCENTRATION);
     }
     else if (STREQ(sock->name, "Eccentricity")) {
-      nodeSetSocketAvailability(ntree, sock, elliptical);
-    }
-    else if (STREQ(sock->name, "Random Axis")) {
-      nodeSetSocketAvailability(ntree, sock, elliptical);
-    }
-    else if (STREQ(sock->name, "Twist Rate")) {
       nodeSetSocketAvailability(ntree, sock, elliptical);
     }
   }

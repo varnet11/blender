@@ -1169,14 +1169,11 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
   const float3 Y = safe_normalize(sd->dPdu);
   const float3 Z0 = safe_normalize(cross(X0, Y));
 
-  /* rotate (Z,X) around Y */
-  const float curve_parameter = bsdf->extra->attr_descr_intercept;
-  const float curve_length = bsdf->extra->attr_descr_length;
-  const float curve_twist_rate = bsdf->extra->twist_rate;
-  const float curve_twist_start = bsdf->extra->axis_rot;
+  /* const float curve_parameter = bsdf->extra->attr_descr_intercept; */
+  /* const float curve_length = bsdf->extra->attr_descr_length; */
 
-  const float twist_angle = M_2PI_F * (curve_twist_start +
-                                       curve_twist_rate * curve_parameter * curve_length);
+  /* TODO: compute the ellipse orientation based on the curve normal or user-defined normal? */
+  const float twist_angle = 0.0f;
   const float sin_twist_angle = sinf(twist_angle);
   const float cos_twist_angle = cosf(twist_angle);
 

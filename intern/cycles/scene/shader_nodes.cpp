@@ -3666,8 +3666,6 @@ NODE_DEFINE(MicrofacetHairBsdfNode)
                    SocketType::VECTOR);
 
   SOCKET_IN_FLOAT(eccentricity, "Eccentricity", 0.85f);
-  SOCKET_IN_FLOAT(random_axis, "Random Axis", 0.0f);
-  SOCKET_IN_FLOAT(twist_rate, "Twist Rate", 0.0f);
 
   SOCKET_IN_FLOAT(offset, "Offset", 2.f * M_PI_F / 180.f);
   SOCKET_IN_FLOAT(roughness, "Roughness", 0.3f);
@@ -3729,8 +3727,6 @@ void MicrofacetHairBsdfNode::compile(SVMCompiler &compiler)
   ShaderInput *Blur_in = input("Blur");
 
   ShaderInput *eccentricity_in = input("Eccentricity");
-  ShaderInput *random_axis_in = input("Random Axis");
-  ShaderInput *twist_rate_in = input("Twist Rate");
 
   int color_ofs = compiler.stack_assign(input("Color"));
   int tint_ofs = compiler.stack_assign(input("Tint"));
@@ -3809,12 +3805,12 @@ void MicrofacetHairBsdfNode::compile(SVMCompiler &compiler)
 
   /* data node 7 */
   compiler.add_node(compiler.encode_uchar4(compiler.stack_assign_if_linked(eccentricity_in),
-                                           compiler.stack_assign_if_linked(twist_rate_in),
-                                           compiler.stack_assign_if_linked(random_axis_in),
+                                           SVM_STACK_INVALID,
+                                           SVM_STACK_INVALID,
                                            SVM_STACK_INVALID),
                     __float_as_uint(eccentricity),
-                    __float_as_uint(twist_rate),
-                    __float_as_uint(random_axis));
+                    0,
+                    0);
 }
 
 /* Prepares the input data for the OSL shader. */
