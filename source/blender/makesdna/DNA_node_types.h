@@ -1579,24 +1579,12 @@ typedef struct NodeGeometryUVUnwrap {
   uint8_t method;
 } NodeGeometryUVUnwrap;
 
-typedef struct SimulationStateItem {
-  char *name;
-  /* TODO: Use a different enum instead to support Byte colors, geometry, etc. */
-  /* eNodeSocketDatatype */
-  int8_t data_type;
-  char _pad[7];
-} SimulationStateItem;
-
 typedef struct NodeGeometrySimulationInput {
   int32_t output_node_id;
 } NodeGeometrySimulationInput;
 
 typedef struct NodeGeometrySimulationOutput {
-  SimulationStateItem *state_items;
-  int state_items_num;
-
   int8_t use_persistent_cache;
-  char _pad[3];
 } NodeGeometrySimulationOutput;
 
 typedef struct NodeGeometryDistributePointsInVolume {
