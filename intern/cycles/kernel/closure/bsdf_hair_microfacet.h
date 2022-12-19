@@ -277,7 +277,7 @@ ccl_device float D(const bool beckmann, const float roughness, const float3 m, c
 
 /* Compute fresnel reflection. Also return the dot product of the refracted ray and the normal as
  * `cos_theta_t`, as it is used when computing the direction of the refracted ray. */
-ccl_device float fresnel(float cos_theta_i, float eta, ccl_private float &cos_theta_t)
+ccl_device float fresnel(float cos_theta_i, float eta, ccl_private float *cos_theta_t)
 {
   kernel_assert(!isnan_safe(cos_theta_i));
 
@@ -294,7 +294,7 @@ ccl_device float fresnel(float cos_theta_i, float eta, ccl_private float &cos_th
   /* Using Snell's law, calculate the squared cosine of the angle between the surface normal and
    * the transmitted ray. */
   float cos_theta_t_sqr = 1.f - (1.f - cos_theta_i * cos_theta_i) / (eta * eta);
-  cos_theta_t = safe_sqrtf(cos_theta_t_sqr);
+  *cos_theta_t = safe_sqrtf(cos_theta_t_sqr);
 
   if (cos_theta_t_sqr <= 0) {
     /* Total internal reflection. */
@@ -302,13 +302,13 @@ ccl_device float fresnel(float cos_theta_i, float eta, ccl_private float &cos_th
   }
 
   /* Amplitudes of reflected waves. */
-  float a_s = (cos_theta_i - eta * cos_theta_t) / (cos_theta_i + eta * cos_theta_t);
-  float a_p = (cos_theta_t - eta * cos_theta_i) / (cos_theta_t + eta * cos_theta_i);
+  float a_s = (cos_theta_i - eta * (*cos_theta_t)) / (cos_theta_i + eta * (*cos_theta_t));
+  float a_p = (*cos_theta_t - eta * cos_theta_i) / (*cos_theta_t + eta * cos_theta_i);
 
   float r = .5f * (sqr(a_s) + sqr(a_p));
 
   /* Adjust the sign of the transmitted direction to be relative to the surface normal. */
-  cos_theta_t = -cos_theta_t;
+  *cos_theta_t = -(*cos_theta_t);
 
   return r;
 }
@@ -480,7 +480,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_circular(KernelGlobals kg,
     }
 
     float cos_theta_t1;
-    const float T1 = 1.f - fresnel(dot_wi_wh1, eta, cos_theta_t1);
+    const float T1 = 1.f - fresnel(dot_wi_wh1, eta, &cos_theta_t1);
 
     /* refraction at the first interface */
     const float3 wt = -refract_angle(wi, wh1, cos_theta_t1, inv_eta);
@@ -689,7 +689,7 @@ ccl_device int bsdf_microfacet_hair_sample_circular(const KernelGlobals kg,
   float3 TRT = zero_float3();
 
   float cos_theta_t1;
-  float R1 = fresnel(dot(wi, wh1), *eta, cos_theta_t1);
+  float R1 = fresnel(dot(wi, wh1), *eta, &cos_theta_t1);
   float3 R = make_float3(bsdf->extra->R * R1);
 
   /* sample TT lobe */
@@ -718,7 +718,7 @@ ccl_device int bsdf_microfacet_hair_sample_circular(const KernelGlobals kg,
     const float3 A_t = exp(-mu_a * (2.f * cos_gamma_t / cos_theta_wt));
 
     float cos_theta_t2;
-    const float R2 = fresnel(dot(-wt, wh2), inv_eta, cos_theta_t2);
+    const float R2 = fresnel(dot(-wt, wh2), inv_eta, &cos_theta_t2);
     const float3 T1 = make_float3(1.f - R1);
     const float3 T2 = make_float3(1.f - R2);
 
@@ -736,7 +736,7 @@ ccl_device int bsdf_microfacet_hair_sample_circular(const KernelGlobals kg,
     wh3 = sample_wh(kg, beckmann, roughness, wtr, wmtr, sample_h3);
 
     float cos_theta_t3;
-    const float R3 = fresnel(dot(wtr, wh3), inv_eta, cos_theta_t3);
+    const float R3 = fresnel(dot(wtr, wh3), inv_eta, &cos_theta_t3);
 
     wtrt = -refract_angle(wtr, wh3, cos_theta_t3, *eta);
 
@@ -983,7 +983,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_elliptic(KernelGlobals kg,
     }
 
     float cos_theta_t1;
-    const float T1 = 1.f - fresnel(dot_wi_wh1, eta, cos_theta_t1);
+    const float T1 = 1.f - fresnel(dot_wi_wh1, eta, &cos_theta_t1);
 
     /* refraction at the first interface */
     const float3 wt = -refract_angle(wi, wh1, cos_theta_t1, inv_eta);
@@ -1236,7 +1236,7 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
   float3 TRT = zero_float3();
 
   float cos_theta_t1;
-  const float R1 = fresnel(dot(wi, wh1), *eta, cos_theta_t1);
+  const float R1 = fresnel(dot(wi, wh1), *eta, &cos_theta_t1);
   float3 R = make_float3(bsdf->extra->R * R1);
 
   /* sample TT lobe */
@@ -1264,7 +1264,7 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
     const float3 A_t = exp(-mu_a * len(pi - pt) / cos_theta(wt));
 
     float cos_theta_t2;
-    const float R2 = fresnel(dot(-wt, wh2), inv_eta, cos_theta_t2);
+    const float R2 = fresnel(dot(-wt, wh2), inv_eta, &cos_theta_t2);
     const float3 T1 = make_float3(1.f - R1);
     const float3 T2 = make_float3(1.f - R2);
 
@@ -1283,7 +1283,7 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
     wh3 = sample_wh(kg, beckmann, roughness, wtr, wmtr, sample_h3);
 
     float cos_theta_t3;
-    const float R3 = fresnel(dot(wtr, wh3), inv_eta, cos_theta_t3);
+    const float R3 = fresnel(dot(wtr, wh3), inv_eta, &cos_theta_t3);
 
     wtrt = -refract_angle(wtr, wh3, cos_theta_t3, *eta);
 
