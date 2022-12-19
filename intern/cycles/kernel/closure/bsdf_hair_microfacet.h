@@ -197,8 +197,7 @@ ccl_device_inline float3 sample_wh(KernelGlobals kg,
                                    const float roughness,
                                    const float3 wi,
                                    const float3 wm,
-                                   const float randu,
-                                   const float randv)
+                                   const float2 rand)
 {
   /* Coordinate transformation for microfacet sampling */
   float3 s, t;
@@ -209,7 +208,7 @@ ccl_device_inline float3 sample_wh(KernelGlobals kg,
 
   float G1o;
   const float3 wh_wm = microfacet_sample_stretched(
-      kg, wi_wm, roughness, roughness, randu, randv, beckmann, &G1o);
+      kg, wi_wm, roughness, roughness, rand.x, rand.y, beckmann, &G1o);
 
   const float3 wh = wh_wm.x * s + wh_wm.y * t + wh_wm.z * n;
   return wh;
@@ -479,7 +478,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_circular(KernelGlobals kg,
     const float2 sample1 = make_float2(lcg_step_float(&rng_quadrature),
                                        lcg_step_float(&rng_quadrature));
 
-    const float3 wh1 = sample_wh(kg, beckmann, roughness, wi, wmi, sample1.x, sample1.y);
+    const float3 wh1 = sample_wh(kg, beckmann, roughness, wi, wmi, sample1);
     const float dot_wi_wh1 = dot(wi, wh1);
     if (dot_wi_wh1 <= 1e-5f)
       continue;
@@ -537,7 +536,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_circular(KernelGlobals kg,
       const float2 sample2 = make_float2(lcg_step_float(&rng_quadrature),
                                          lcg_step_float(&rng_quadrature));
 
-      float3 wh2 = sample_wh(kg, beckmann, roughness, -wt, wmt, sample2.x, sample2.y);
+      float3 wh2 = sample_wh(kg, beckmann, roughness, -wt, wmt, sample2);
 
       const float cos_th2 = dot(-wt, wh2);
       if (cos_th2 <= 1e-5f)
@@ -680,7 +679,7 @@ ccl_device int bsdf_microfacet_hair_sample_circular(const KernelGlobals kg,
   }
 
   /* sample R lobe */
-  const float3 wh1 = sample_wh(kg, beckmann, roughness, wi, wmi, sample_h1.x, sample_h1.y);
+  const float3 wh1 = sample_wh(kg, beckmann, roughness, wi, wmi, sample_h1);
   const float3 wr = -reflect(wi, wh1);
 
   /* ensure that this is a valid sample */
@@ -706,7 +705,7 @@ ccl_device int bsdf_microfacet_hair_sample_circular(const KernelGlobals kg,
   const float3 wmt = sph_dir(-tilt, phi_mt);
   const float3 wmt_ = sph_dir(0.f, phi_mt);
 
-  const float3 wh2 = sample_wh(kg, beckmann, roughness, -wt, wmt, sample_h2.x, sample_h2.y);
+  const float3 wh2 = sample_wh(kg, beckmann, roughness, -wt, wmt, sample_h2);
   const float3 wtr = -reflect(wt, wh2);
 
   float3 wh3;
@@ -737,7 +736,7 @@ ccl_device int bsdf_microfacet_hair_sample_circular(const KernelGlobals kg,
     wmtr = sph_dir(-tilt, phi_mtr);
     wmtr_ = sph_dir(0.f, phi_mtr);
 
-    wh3 = sample_wh(kg, beckmann, roughness, wtr, wmtr, sample_h3.x, sample_h3.y);
+    wh3 = sample_wh(kg, beckmann, roughness, wtr, wmtr, sample_h3);
 
     float cos_theta_t3;
     const float R3 = fresnel(dot(wtr, wh3), inv_eta, cos_theta_t3);
@@ -983,7 +982,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_elliptic(KernelGlobals kg,
     const float2 sample1 = make_float2(lcg_step_float(&rng_quadrature),
                                        lcg_step_float(&rng_quadrature));
 
-    const float3 wh1 = sample_wh(kg, beckmann, roughness, wi, wmi, sample1.x, sample1.y);
+    const float3 wh1 = sample_wh(kg, beckmann, roughness, wi, wmi, sample1);
     const float dot_wi_wh1 = dot(wi, wh1);
     if (dot_wi_wh1 <= 1e-5f)
       continue;
@@ -1047,7 +1046,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_elliptic(KernelGlobals kg,
       const float2 sample2 = make_float2(lcg_step_float(&rng_quadrature),
                                          lcg_step_float(&rng_quadrature));
 
-      const float3 wh2 = sample_wh(kg, beckmann, roughness, -wt, wmt, sample2.x, sample2.y);
+      const float3 wh2 = sample_wh(kg, beckmann, roughness, -wt, wmt, sample2);
 
       const float cos_th2 = dot(-wt, wh2);
       if (cos_th2 <= 1e-5f)
@@ -1225,7 +1224,7 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
   }
 
   /* sample R lobe */
-  const float3 wh1 = sample_wh(kg, beckmann, roughness, wi, wmi, sample_h1.x, sample_h1.y);
+  const float3 wh1 = sample_wh(kg, beckmann, roughness, wi, wmi, sample_h1);
 
   const float3 wr = -reflect(wi, wh1);
 
@@ -1250,7 +1249,7 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
   const float3 wmt = sphg_dir(-tilt, gamma_mt, a, b);
   const float3 wmt_ = sphg_dir(0.f, gamma_mt, a, b);
 
-  const float3 wh2 = sample_wh(kg, beckmann, roughness, -wt, wmt, sample_h2.x, sample_h2.y);
+  const float3 wh2 = sample_wh(kg, beckmann, roughness, -wt, wmt, sample_h2);
 
   const float3 wtr = -reflect(wt, wh2);
 
@@ -1282,7 +1281,7 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
     wmtr = sphg_dir(-tilt, gamma_mtr, a, b);
     wmtr_ = sphg_dir(0.f, gamma_mtr, a, b);
 
-    wh3 = sample_wh(kg, beckmann, roughness, wtr, wmtr, sample_h3.x, sample_h3.y);
+    wh3 = sample_wh(kg, beckmann, roughness, wtr, wmtr, sample_h3);
 
     float cos_theta_t3;
     const float R3 = fresnel(dot(wtr, wh3), inv_eta, cos_theta_t3);
