@@ -912,6 +912,7 @@ static void export_hair_curves(Scene *scene,
   std::optional<BL::FloatAttribute> b_attr_radius = find_curves_radius_attribute(b_curves);
 
   /* Evaluate geometry normals. */
+  /* TODO: implement proper RNA curves API. */
   const Curves *curves = (Curves *)b_curves.ptr.owner_id;
   const auto curves_geometry = blender::bke::CurvesGeometry::wrap(curves->geometry);
   const blender::VArray<int> resolutions = curves_geometry.resolution();
