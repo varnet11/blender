@@ -1023,12 +1023,20 @@ ccl_device_noinline int svm_node_closure_bsdf(KernelGlobals kg,
           float eccentricity = stack_load_float_default(stack, eccentricity_ofs, data_node5.y);
 
           /* Eccentricity */
-          bsdf->extra->eccentricity = (eccentricity > 1.f) ? 1.f / eccentricity : eccentricity;
+          bsdf->extra->eccentricity = (eccentricity > 1.0f) ? 1.0f / eccentricity : eccentricity;
 
           const AttributeDescriptor attr_descr_normal = find_attribute(kg, sd, data_node5.z);
           const float3 normal = curve_attribute_float3(kg, sd, attr_descr_normal, NULL, NULL);
           const float3 binormal = safe_normalize(cross(sd->dPdu, normal));
-          bsdf->extra->geom = make_float4(binormal.x, binormal.y, binormal.z, 0.0f);
+
+          /* Align X axis with the ellipse major axis. */
+          if (eccentricity > 1.0f) {
+            const float3 normal = safe_normalize(cross(binormal, sd->dPdu));
+            bsdf->extra->geom = make_float4(normal.x, normal.y, normal.z, 0.0f);
+          }
+          else {
+            bsdf->extra->geom = make_float4(binormal.x, binormal.y, binormal.z, 0.0f);
+          }
         }
 
         sd->flag |= bsdf_microfacet_hair_setup(sd, bsdf);
