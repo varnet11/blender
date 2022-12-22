@@ -66,7 +66,7 @@ ccl_device int bsdf_microfacet_hair_setup(ccl_private ShaderData *sd,
    * the center, to grazing the other edge. This is the sine of the angle
    * between sd->Ng and Z, as seen from the tangent X. */
 
-  float h = (sd->type & PRIMITIVE_CURVE_RIBBON) ? -sd->v : -dot(X, sd->Ng);
+  float h = (sd->type & PRIMITIVE_CURVE_RIBBON) ? -sd->v : -dot(X, sd->N);
 
   kernel_assert(fabsf(h) < 1.0f + 1e-4f);
   kernel_assert(isfinite_safe(X));
@@ -109,6 +109,11 @@ ccl_device_inline float tan_theta(const float3 w)
 }
 
 /* Returns sin(phi) and cos(phi) of the given direction. */
+ccl_device float sin_phi(const float3 w)
+{
+  return w.x / cos_theta(w);
+}
+
 ccl_device float2 sincos_phi(const float3 w)
 {
   float c = cos_theta(w);
@@ -1132,6 +1137,14 @@ ccl_device Spectrum bsdf_microfacet_hair_eval_elliptic(KernelGlobals kg,
   const float3 wi = make_float3(dot(sd->I, X), dot(sd->I, Y), dot(sd->I, Z));
   const float3 wo = make_float3(dot(omega_in, X), dot(omega_in, Y), dot(omega_in, Z));
 
+  /* Treat as transparent material if intersection lies outside of the projected radius. */
+  const float e2 = 1.0f - sqr(bsdf->extra->eccentricity);
+  const float radius = sqrtf(1.0f - e2 * sqr(sin_phi(wi)));
+  if (fabsf(bsdf->extra->geom.w) > radius) {
+    *pdf = 0.0f;
+    return zero_spectrum();
+  }
+
   /* evaluate */
   const float3 R = bsdf_microfacet_hair_eval_r_elliptic(sc, wi, wo) +
                    bsdf_microfacet_hair_eval_tt_trt_elliptic(kg, sc, wi, wo, sd->lcg_state);
@@ -1157,12 +1170,6 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
   *eta = bsdf->eta;
   const float inv_eta = 1.0f / *eta;
 
-  if (bsdf->extra->R <= 0.0f && bsdf->extra->TT <= 0.0f && bsdf->extra->TRT <= 0.0f) {
-    /* early out for inactive lobe */
-    *pdf = 0.0f;
-    return LABEL_NONE;
-  }
-
   /* get local wi (convention is reversed from other hair bcsdfs) */
   const float3 X = float4_to_float3(bsdf->extra->geom);
   float3 Y = sd->dPdu;
@@ -1170,6 +1177,31 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
   Y = safe_normalize(cross(Z, X));
 
   const float3 wi = make_float3(dot(sd->I, X), dot(sd->I, Y), dot(sd->I, Z));
+
+  /* get elliptical cross section characteristic */
+  const float a = 1.0f;
+  const float b = bsdf->extra->eccentricity;
+  const float e2 = 1.0f - sqr(b / a);
+
+  /* macronormal */
+  const float2 sincos_phi_i = sincos_phi(wi);
+  const float sin_phi_i = sincos_phi_i.x;
+  const float cos_phi_i = sincos_phi_i.y;
+  const float d_i = sqrtf(1.0f - e2 * sqr(sin_phi_i));
+
+  /* Treat as transparent material if intersection lies outside of the projected radius. */
+  if (fabsf(bsdf->extra->geom.w) > d_i) {
+    *omega_in = -sd->I;
+    *pdf = 1;
+    *eval = one_spectrum();
+    return LABEL_TRANSMIT | LABEL_TRANSPARENT;
+  }
+
+  if (bsdf->extra->R <= 0.0f && bsdf->extra->TT <= 0.0f && bsdf->extra->TRT <= 0.0f) {
+    /* early out for inactive lobe */
+    *pdf = 0.0f;
+    return LABEL_NONE;
+  }
 
   const float tilt = -bsdf->alpha;
   const float roughness = bsdf->roughness;
@@ -1185,16 +1217,6 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
   const float2 sample_h3 = make_float2(lcg_step_float(&sd->lcg_state),
                                        lcg_step_float(&sd->lcg_state));
 
-  /* get elliptical cross section characteristic */
-  const float a = 1.0f;
-  const float b = bsdf->extra->eccentricity;
-  const float e2 = 1.0f - sqr(b / a);
-
-  /* macronormal */
-  const float2 sincos_phi_i = sincos_phi(wi);
-  const float sin_phi_i = sincos_phi_i.x;
-  const float cos_phi_i = sincos_phi_i.y;
-  const float d_i = sqrtf(1.0f - e2 * sqr(sin_phi_i));
   const float h = d_i * (sample_h * 2.0f - 1.0f);
   const float gamma_mi = atan2f(cos_phi_i, -b / a * sin_phi_i) -
                          acosf(h / sqrtf(sqr(cos_phi_i) + sqr(b / a * sin_phi_i)));
