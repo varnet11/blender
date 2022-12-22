@@ -3697,9 +3697,8 @@ MicrofacetHairBsdfNode::MicrofacetHairBsdfNode() : BsdfBaseNode(get_node_type())
 /* Enable retrieving Hair Info -> Random if Random isn't linked. */
 void MicrofacetHairBsdfNode::attributes(Shader *shader, AttributeRequestSet *attributes)
 {
-  /* Make sure we have these 2 for elliptical cross section tracking */
-  attributes->add(ATTR_STD_CURVE_INTERCEPT);
-  attributes->add(ATTR_STD_CURVE_LENGTH);
+  /* Make sure we have the normal for elliptical cross section tracking */
+  attributes->add(ATTR_STD_VERTEX_NORMAL);
 
   if (!input("Random")->link) {
     attributes->add(ATTR_STD_CURVE_RANDOM);
@@ -3753,63 +3752,49 @@ void MicrofacetHairBsdfNode::compile(SVMCompiler &compiler)
   compiler.add_node(
       NODE_CLOSURE_BSDF,
       /* Socket IDs can be packed 4 at a time into a single data packet */
-      compiler.encode_uchar4(closure, roughness_ofs, 0, compiler.closure_mix_weight_offset()),
+      compiler.encode_uchar4(
+          closure, roughness_ofs, random_roughness_ofs, compiler.closure_mix_weight_offset()),
       /* The rest are stored as unsigned integers */
       __float_as_uint(roughness),
-      0);
+      __float_as_uint(random_roughness));
+
   /* data node */
   compiler.add_node(normal_ofs,
                     compiler.encode_uchar4(offset_ofs, ior_ofs, color_ofs, parametrization),
                     __float_as_uint(offset),
                     __float_as_uint(ior));
+
   /* data node 2 */
-  compiler.add_node(
-      compiler.encode_uchar4(0, melanin_ofs, melanin_redness_ofs, absorption_coefficient_ofs),
-      0,
-      __float_as_uint(melanin),
-      __float_as_uint(melanin_redness));
+  compiler.add_node(compiler.encode_uchar4(compiler.stack_assign_if_linked(Blur_in),
+                                           melanin_ofs,
+                                           melanin_redness_ofs,
+                                           absorption_coefficient_ofs),
+                    __float_as_uint(Blur),
+                    __float_as_uint(melanin),
+                    __float_as_uint(melanin_redness));
 
   /* data node 3 */
-  compiler.add_node(
-      compiler.encode_uchar4(tint_ofs, random_in_ofs, random_color_ofs, random_roughness_ofs),
-      __float_as_uint(random),
-      __float_as_uint(random_color),
-      __float_as_uint(random_roughness));
-
-  int attr_intercept = compiler.attribute(ATTR_STD_CURVE_INTERCEPT);
-  int attr_length = compiler.attribute(ATTR_STD_CURVE_LENGTH);
+  compiler.add_node(compiler.encode_uchar4(tint_ofs, random_in_ofs, random_color_ofs, 0),
+                    __float_as_uint(random),
+                    __float_as_uint(random_color),
+                    attr_random);
 
   /* data node 4 */
-  compiler.add_node(
-      compiler.encode_uchar4(
-          SVM_STACK_INVALID, SVM_STACK_INVALID, SVM_STACK_INVALID, SVM_STACK_INVALID),
-      attr_random,
-      attr_intercept,
-      attr_length);
-
-  /* data node 5 */
   compiler.add_node(compiler.encode_uchar4(compiler.stack_assign_if_linked(R_in),
                                            compiler.stack_assign_if_linked(TT_in),
                                            compiler.stack_assign_if_linked(TRT_in),
-                                           SVM_STACK_INVALID),
+                                           model_type),
                     __float_as_uint(R),
                     __float_as_uint(TT),
                     __float_as_uint(TRT));
 
-  /* data node 6 */
-  compiler.add_node(
-      compiler.encode_uchar4(0, compiler.stack_assign_if_linked(Blur_in), 0, model_type),
-      0,
-      __float_as_uint(Blur),
-      0);
-
-  /* data node 7 */
+  /* data node 5 */
   compiler.add_node(compiler.encode_uchar4(compiler.stack_assign_if_linked(eccentricity_in),
                                            SVM_STACK_INVALID,
                                            SVM_STACK_INVALID,
                                            SVM_STACK_INVALID),
                     __float_as_uint(eccentricity),
-                    0,
+                    compiler.attribute(ATTR_STD_VERTEX_NORMAL),
                     0);
 }
 

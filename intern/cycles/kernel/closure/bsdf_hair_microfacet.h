@@ -17,13 +17,6 @@ typedef struct MicrofacetHairExtra {
   float TRT;
 
   float eccentricity;
-  float twist_rate;
-  float attr_descr_intercept;
-  float attr_descr_length;
-
-  float axis_rot;
-  float diffraction_weight;
-  float pad1, pad2, pad3;
 
   /* Geometry data. */
   float4 geom;
@@ -73,15 +66,20 @@ ccl_device int bsdf_microfacet_hair_setup(ccl_private ShaderData *sd,
    * the center, to grazing the other edge. This is the sine of the angle
    * between sd->Ng and Z, as seen from the tangent X. */
 
-  /* TODO: we convert this value to a cosine later and discard the sign, so
-   * we could probably save some operations. */
   float h = (sd->type & PRIMITIVE_CURVE_RIBBON) ? -sd->v : -dot(X, sd->Ng);
 
   kernel_assert(fabsf(h) < 1.0f + 1e-4f);
   kernel_assert(isfinite_safe(X));
   kernel_assert(isfinite_safe(h));
 
-  bsdf->extra->geom = make_float4(X.x, X.y, X.z, h);
+  if (bsdf->model_type == NODE_MICROFACET_HAIR_ELLIPTIC_GGX ||
+      bsdf->model_type == NODE_MICROFACET_HAIR_ELLIPTIC_BECKMANN) {
+    /* Local frame is independent of the ray direction for elliptical hairs. */
+    bsdf->extra->geom.w = h;
+  }
+  else {
+    bsdf->extra->geom = make_float4(X.x, X.y, X.z, h);
+  }
 
   return SD_BSDF | SD_BSDF_HAS_EVAL | SD_BSDF_NEEDS_LCG | SD_BSDF_HAS_TRANSMISSION;
 }
@@ -1126,23 +1124,10 @@ ccl_device Spectrum bsdf_microfacet_hair_eval_elliptic(KernelGlobals kg,
 {
   /* get local wi(convention is reversed from other hair bcsdfs) */
   ccl_private MicrofacetHairBSDF *bsdf = (ccl_private MicrofacetHairBSDF *)sc;
-  const float3 X0 = float4_to_float3(bsdf->extra->geom);
-  const float3 Y = safe_normalize(sd->dPdu);
-  const float3 Z0 = safe_normalize(cross(X0, Y));
-
-  /* rotate (Z,X) around Y */
-  const float curve_parameter = bsdf->extra->attr_descr_intercept;
-  const float curve_length = bsdf->extra->attr_descr_length;
-  const float curve_twist_rate = bsdf->extra->twist_rate;
-  const float curve_twist_start = bsdf->extra->axis_rot;
-
-  const float twist_angle = M_2PI_F * (curve_twist_start +
-                                       curve_twist_rate * curve_parameter * curve_length);
-  const float sin_twist_angle = sinf(twist_angle);
-  const float cos_twist_angle = cosf(twist_angle);
-
-  const float3 Z = cos_twist_angle * Z0 + sin_twist_angle * X0;
-  const float3 X = -sin_twist_angle * Z0 + cos_twist_angle * X0;
+  const float3 X = float4_to_float3(bsdf->extra->geom);
+  float3 Y = sd->dPdu;
+  const float3 Z = safe_normalize(cross(X, Y));
+  Y = safe_normalize(cross(Z, X));
 
   const float3 wi = make_float3(dot(sd->I, X), dot(sd->I, Y), dot(sd->I, Z));
   const float3 wo = make_float3(dot(omega_in, X), dot(omega_in, Y), dot(omega_in, Z));
@@ -1179,20 +1164,10 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
   }
 
   /* get local wi (convention is reversed from other hair bcsdfs) */
-  const float3 X0 = float4_to_float3(bsdf->extra->geom);
-  const float3 Y = safe_normalize(sd->dPdu);
-  const float3 Z0 = safe_normalize(cross(X0, Y));
-
-  /* const float curve_parameter = bsdf->extra->attr_descr_intercept; */
-  /* const float curve_length = bsdf->extra->attr_descr_length; */
-
-  /* TODO: compute the ellipse orientation based on the curve normal or user-defined normal? */
-  const float twist_angle = 0.0f;
-  const float sin_twist_angle = sinf(twist_angle);
-  const float cos_twist_angle = cosf(twist_angle);
-
-  const float3 Z = cos_twist_angle * Z0 + sin_twist_angle * X0;
-  const float3 X = -sin_twist_angle * Z0 + cos_twist_angle * X0;
+  const float3 X = float4_to_float3(bsdf->extra->geom);
+  float3 Y = sd->dPdu;
+  const float3 Z = safe_normalize(cross(X, Y));
+  Y = safe_normalize(cross(Z, X));
 
   const float3 wi = make_float3(dot(sd->I, X), dot(sd->I, Y), dot(sd->I, Z));
 

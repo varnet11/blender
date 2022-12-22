@@ -272,10 +272,13 @@ static void ExportCurveSegments(Scene *scene, Hair *hair, ParticleCurveData *CDa
   if (hair->num_curves())
     return;
 
+  Attribute *attr_normal = NULL;
   Attribute *attr_intercept = NULL;
   Attribute *attr_length = NULL;
   Attribute *attr_random = NULL;
 
+  if (hair->need_attribute(scene, ATTR_STD_VERTEX_NORMAL))
+    attr_normal = hair->attributes.add(ATTR_STD_VERTEX_NORMAL);
   if (hair->need_attribute(scene, ATTR_STD_CURVE_INTERCEPT))
     attr_intercept = hair->attributes.add(ATTR_STD_CURVE_INTERCEPT);
   if (hair->need_attribute(scene, ATTR_STD_CURVE_LENGTH))
@@ -323,6 +326,11 @@ static void ExportCurveSegments(Scene *scene, Hair *hair, ParticleCurveData *CDa
           attr_intercept->add(time);
 
         num_curve_keys++;
+      }
+
+      if (attr_normal != NULL) {
+        /* TODO: compute geometry normals. */
+        attr_normal->add(make_float3(1.0f, 0.0f, 0.0f));
       }
 
       if (attr_length != NULL) {
@@ -881,10 +889,14 @@ static void export_hair_curves(Scene *scene,
   int *curve_shader = hair->get_curve_shader().data();
 
   /* Add requested attributes. */
+  float3 *attr_normal = NULL;
   float *attr_intercept = NULL;
   float *attr_length = NULL;
   float *attr_random = NULL;
 
+  if (hair->need_attribute(scene, ATTR_STD_VERTEX_NORMAL)) {
+    attr_normal = hair->attributes.add(ATTR_STD_VERTEX_NORMAL)->data_float3();
+  }
   if (hair->need_attribute(scene, ATTR_STD_CURVE_INTERCEPT)) {
     attr_intercept = hair->attributes.add(ATTR_STD_CURVE_INTERCEPT)->data_float();
   }
@@ -911,6 +923,11 @@ static void export_hair_curves(Scene *scene,
       const int point_offset = first_point_index + j;
       const float3 co = get_float3(b_attr_position.data[point_offset].vector());
       const float radius = b_attr_radius ? b_attr_radius->data[point_offset].value() : 0.005f;
+
+      if (attr_normal) {
+        /* TODO: compute geometry normals. */
+        attr_normal[point_offset] = make_float3(1.0f, 0.0f, 0.0f);
+      }
 
       curve_keys[point_offset] = co;
       curve_radius[point_offset] = radius;

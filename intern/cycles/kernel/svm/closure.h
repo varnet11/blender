@@ -884,8 +884,6 @@ ccl_device_noinline int svm_node_closure_bsdf(KernelGlobals kg,
       uint4 data_node3 = read_node(kg, &offset);
       uint4 data_node4 = read_node(kg, &offset);
       uint4 data_node5 = read_node(kg, &offset);
-      uint4 data_node6 = read_node(kg, &offset);
-      uint4 data_node7 = read_node(kg, &offset);
 
       Spectrum weight = sd->svm_closure_weight * mix_weight;
 
@@ -894,9 +892,9 @@ ccl_device_noinline int svm_node_closure_bsdf(KernelGlobals kg,
       float alpha = stack_load_float_default(stack, offset_ofs, data_node.z);
       float ior = stack_load_float_default(stack, ior_ofs, data_node.w);
 
-      uint coat_ofs, melanin_ofs, melanin_redness_ofs, absorption_coefficient_ofs;
+      uint Blur_ofs, melanin_ofs, melanin_redness_ofs, absorption_coefficient_ofs;
       svm_unpack_node_uchar4(data_node2.x,
-                             &coat_ofs,
+                             &Blur_ofs,
                              &melanin_ofs,
                              &melanin_redness_ofs,
                              &absorption_coefficient_ofs);
@@ -905,7 +903,7 @@ ccl_device_noinline int svm_node_closure_bsdf(KernelGlobals kg,
       svm_unpack_node_uchar4(
           data_node3.x, &tint_ofs, &random_ofs, &random_color_ofs, &random_roughness_ofs);
 
-      const AttributeDescriptor attr_descr_random = find_attribute(kg, sd, data_node4.y);
+      const AttributeDescriptor attr_descr_random = find_attribute(kg, sd, data_node3.w);
       float random = 0.0f;
       if (attr_descr_random.offset != ATTR_STD_NOT_FOUND) {
         random = primitive_surface_attribute_float(kg, sd, attr_descr_random, NULL, NULL);
@@ -914,16 +912,13 @@ ccl_device_noinline int svm_node_closure_bsdf(KernelGlobals kg,
         random = stack_load_float_default(stack, random_ofs, data_node3.y);
       }
 
-      uint R_ofs, TT_ofs, TRT_ofs, temp;
-      uint Blur_ofs, model_type;
+      uint R_ofs, TT_ofs, TRT_ofs, model_type;
 
-      svm_unpack_node_uchar4(data_node5.x, &R_ofs, &TT_ofs, &TRT_ofs, &temp);
-      float R = stack_load_float_default(stack, R_ofs, data_node5.y);
-      float TT = stack_load_float_default(stack, TT_ofs, data_node5.z);
-      float TRT = stack_load_float_default(stack, TRT_ofs, data_node5.w);
-
-      svm_unpack_node_uchar4(data_node6.x, &temp, &Blur_ofs, &temp, &model_type);
-      float blur = stack_load_float_default(stack, Blur_ofs, data_node6.z);
+      svm_unpack_node_uchar4(data_node4.x, &R_ofs, &TT_ofs, &TRT_ofs, &model_type);
+      float R = stack_load_float_default(stack, R_ofs, data_node4.y);
+      float TT = stack_load_float_default(stack, TT_ofs, data_node4.z);
+      float TRT = stack_load_float_default(stack, TRT_ofs, data_node4.w);
+      float blur = stack_load_float_default(stack, Blur_ofs, data_node2.y);
 
       ccl_private MicrofacetHairBSDF *bsdf = (ccl_private MicrofacetHairBSDF *)bsdf_alloc(
           sd, sizeof(MicrofacetHairBSDF), weight);
@@ -941,8 +936,7 @@ ccl_device_noinline int svm_node_closure_bsdf(KernelGlobals kg,
         bsdf->blur = clamp(blur, 0.0f, 1.0f);
 
         /* Random factors range: [-randomization/2, +randomization/2]. */
-        float random_roughness = stack_load_float_default(
-            stack, random_roughness_ofs, data_node3.w);
+        float random_roughness = param2;
         float factor_random_roughness = 1.0f + 2.0f * (random - 0.5f) * random_roughness;
         float roughness = param1 * factor_random_roughness;
 
@@ -1023,21 +1017,18 @@ ccl_device_noinline int svm_node_closure_bsdf(KernelGlobals kg,
         if (model_type == NODE_MICROFACET_HAIR_ELLIPTIC_GGX ||
             model_type == NODE_MICROFACET_HAIR_ELLIPTIC_BECKMANN) {
 
-          uint eccentricity_ofs;
-          svm_unpack_node_uchar4(data_node7.x, &eccentricity_ofs, &temp, &temp, &temp);
+          uint eccentricity_ofs, temp;
+          svm_unpack_node_uchar4(data_node5.x, &eccentricity_ofs, &temp, &temp, &temp);
 
-          float eccentricity = stack_load_float_default(stack, eccentricity_ofs, data_node7.y);
+          float eccentricity = stack_load_float_default(stack, eccentricity_ofs, data_node5.y);
 
           /* Eccentricity */
           bsdf->extra->eccentricity = (eccentricity > 1.f) ? 1.f / eccentricity : eccentricity;
 
-          const AttributeDescriptor attr_descr_intercept = find_attribute(kg, sd, data_node4.z);
-          bsdf->extra->attr_descr_intercept = curve_attribute_float(
-              kg, sd, attr_descr_intercept, NULL, NULL);
-
-          const AttributeDescriptor attr_descr_length = find_attribute(kg, sd, data_node4.w);
-          bsdf->extra->attr_descr_length = curve_attribute_float(
-              kg, sd, attr_descr_length, NULL, NULL);
+          const AttributeDescriptor attr_descr_normal = find_attribute(kg, sd, data_node5.z);
+          const float3 normal = curve_attribute_float3(kg, sd, attr_descr_normal, NULL, NULL);
+          const float3 binormal = safe_normalize(cross(sd->dPdu, normal));
+          bsdf->extra->geom = make_float4(binormal.x, binormal.y, binormal.z, 0.0f);
         }
 
         sd->flag |= bsdf_microfacet_hair_setup(sd, bsdf);
