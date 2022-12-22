@@ -3,6 +3,7 @@
 
 #include <optional>
 
+#include "BKE_curves.hh"
 #include "blender/sync.h"
 #include "blender/util.h"
 
@@ -910,6 +911,13 @@ static void export_hair_curves(Scene *scene,
   BL::FloatVectorAttribute b_attr_position = find_curves_position_attribute(b_curves);
   std::optional<BL::FloatAttribute> b_attr_radius = find_curves_radius_attribute(b_curves);
 
+  /* Evaluate geometry normals. */
+  const Curves *curves = (Curves *)b_curves.ptr.owner_id;
+  const auto curves_geometry = blender::bke::CurvesGeometry::wrap(curves->geometry);
+  const blender::VArray<int> resolutions = curves_geometry.resolution();
+  const auto evaluated_normals = curves_geometry.evaluated_normals();
+  const auto evaluated_offsets = curves_geometry.evaluated_offsets();
+
   /* Export curves and points. */
   for (int i = 0; i < num_curves; i++) {
     const int first_point_index = b_curves.curve_offset_data[i].value();
@@ -918,6 +926,9 @@ static void export_hair_curves(Scene *scene,
     float3 prev_co = zero_float3();
     float length = 0.0f;
 
+    const int resolution = resolutions[i];
+    const int evaluated_offset = evaluated_offsets[i];
+
     /* Position and radius. */
     for (int j = 0; j < num_points; j++) {
       const int point_offset = first_point_index + j;
@@ -925,8 +936,8 @@ static void export_hair_curves(Scene *scene,
       const float radius = b_attr_radius ? b_attr_radius->data[point_offset].value() : 0.005f;
 
       if (attr_normal) {
-        /* TODO: compute geometry normals. */
-        attr_normal[point_offset] = make_float3(1.0f, 0.0f, 0.0f);
+        const blender::float3 normal = evaluated_normals[evaluated_offset + j * resolution];
+        attr_normal[point_offset] = make_float3(normal.x, normal.y, normal.z);
       }
 
       curve_keys[point_offset] = co;
