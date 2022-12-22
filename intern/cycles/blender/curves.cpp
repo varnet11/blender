@@ -926,6 +926,8 @@ static void export_hair_curves(Scene *scene,
     float3 prev_co = zero_float3();
     float length = 0.0f;
 
+    /* TODO: It seems a waste of time to compute the normals of the subdivided curve, but only use
+     * those of the control points. Maybe the API of `evaluated_normals()` should be changed. */
     const int resolution = resolutions[i];
     const int evaluated_offset = evaluated_offsets[i];
 
