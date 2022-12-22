@@ -1017,20 +1017,20 @@ ccl_device_noinline int svm_node_closure_bsdf(KernelGlobals kg,
         if (model_type == NODE_MICROFACET_HAIR_ELLIPTIC_GGX ||
             model_type == NODE_MICROFACET_HAIR_ELLIPTIC_BECKMANN) {
 
-          uint eccentricity_ofs, temp;
-          svm_unpack_node_uchar4(data_node5.x, &eccentricity_ofs, &temp, &temp, &temp);
+          uint aspect_ratio_ofs, temp;
+          svm_unpack_node_uchar4(data_node5.x, &aspect_ratio_ofs, &temp, &temp, &temp);
 
-          float eccentricity = stack_load_float_default(stack, eccentricity_ofs, data_node5.y);
+          float aspect_ratio = stack_load_float_default(stack, aspect_ratio_ofs, data_node5.y);
 
-          /* Eccentricity */
-          bsdf->extra->eccentricity = (eccentricity > 1.0f) ? 1.0f / eccentricity : eccentricity;
+          /* Aspect Ratio */
+          bsdf->extra->aspect_ratio = (aspect_ratio > 1.0f) ? 1.0f / aspect_ratio : aspect_ratio;
 
           const AttributeDescriptor attr_descr_normal = find_attribute(kg, sd, data_node5.z);
           const float3 normal = curve_attribute_float3(kg, sd, attr_descr_normal, NULL, NULL);
           const float3 binormal = safe_normalize(cross(sd->dPdu, normal));
 
           /* Align X axis with the ellipse major axis. */
-          if (eccentricity > 1.0f) {
+          if (aspect_ratio > 1.0f) {
             const float3 normal = safe_normalize(cross(binormal, sd->dPdu));
             bsdf->extra->geom = make_float4(normal.x, normal.y, normal.z, 0.0f);
           }

@@ -907,8 +907,8 @@ class MicrofacetHairBsdfNode : public BsdfBaseNode {
   /* Absorption coefficient (unfiltered). */
   NODE_SOCKET_API(float3, absorption_coefficient)
 
-  /* Eccentricity. */
-  NODE_SOCKET_API(float, eccentricity)
+  /* Aspect Ratio. */
+  NODE_SOCKET_API(float, aspect_ratio)
   /* Randomization factor for axis rotation. */
   NODE_SOCKET_API(float, random_axis)
   /* Twist rate. */

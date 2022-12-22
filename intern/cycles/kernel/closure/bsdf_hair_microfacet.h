@@ -16,7 +16,7 @@ typedef struct MicrofacetHairExtra {
   float TT;
   float TRT;
 
-  float eccentricity;
+  float aspect_ratio;
 
   /* Geometry data. */
   float4 geom;
@@ -844,7 +844,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_r_elliptic(ccl_private const ShaderC
   /* get elliptical cross section characteristic */
   const float a = 1.0f;
   /* TODO: rename this as aspect ratio? e is in [0, 0.85], b is in [0.52, 1]. */
-  const float b = bsdf->extra->eccentricity;
+  const float b = bsdf->extra->aspect_ratio;
   const float e2 = 1.0f - sqr(b / a);
 
   /* this follows blender's convention (unlike the circular case?) */
@@ -966,8 +966,8 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_elliptic(KernelGlobals kg,
 
   /* get elliptical cross section characteristic */
   const float a = 1.0f;
-  const float b = bsdf->extra->eccentricity;
-  const float e2 = 1.0f - sqr(b / a);
+  const float b = bsdf->extra->aspect_ratio;
+  const float e2 = 1.0f - sqr(b / a); /* Squared Eccentricity. */
 
   float gamma_m_min = to_gamma(phi_m_min, a, b) + 1e-3f;
   float gamma_m_max = to_gamma(phi_m_max, a, b) - 1e-3f;
@@ -1138,7 +1138,7 @@ ccl_device Spectrum bsdf_microfacet_hair_eval_elliptic(KernelGlobals kg,
   const float3 wo = make_float3(dot(omega_in, X), dot(omega_in, Y), dot(omega_in, Z));
 
   /* Treat as transparent material if intersection lies outside of the projected radius. */
-  const float e2 = 1.0f - sqr(bsdf->extra->eccentricity);
+  const float e2 = 1.0f - sqr(bsdf->extra->aspect_ratio);
   const float radius = sqrtf(1.0f - e2 * sqr(sin_phi(wi)));
   if (fabsf(bsdf->extra->geom.w) > radius) {
     *pdf = 0.0f;
@@ -1180,7 +1180,7 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
 
   /* get elliptical cross section characteristic */
   const float a = 1.0f;
-  const float b = bsdf->extra->eccentricity;
+  const float b = bsdf->extra->aspect_ratio;
   const float e2 = 1.0f - sqr(b / a);
 
   /* macronormal */

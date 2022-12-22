@@ -27,7 +27,7 @@ static void node_declare(NodeDeclarationBuilder &b)
       .default_value({0.245531f, 0.52f, 1.365f})
       .min(0.0f)
       .max(1000.0f);
-  b.add_input<decl::Float>(N_("Eccentricity"))
+  b.add_input<decl::Float>(N_("Aspect Ratio"))
       .default_value(0.85f)
       .min(0.0f)
       .max(1.0f)
@@ -124,7 +124,7 @@ static void node_shader_update_hair_microfacet(bNodeTree *ntree, bNode *node)
       nodeSetSocketAvailability(
           ntree, sock, parametrization == SHD_MICROFACET_HAIR_PIGMENT_CONCENTRATION);
     }
-    else if (STREQ(sock->name, "Eccentricity")) {
+    else if (STREQ(sock->name, "Aspect Ratio")) {
       nodeSetSocketAvailability(ntree, sock, elliptical);
     }
   }

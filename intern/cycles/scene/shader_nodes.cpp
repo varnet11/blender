@@ -3665,7 +3665,7 @@ NODE_DEFINE(MicrofacetHairBsdfNode)
                    make_float3(0.245531f, 0.52f, 1.365f),
                    SocketType::VECTOR);
 
-  SOCKET_IN_FLOAT(eccentricity, "Eccentricity", 0.85f);
+  SOCKET_IN_FLOAT(aspect_ratio, "Aspect Ratio", 0.85f);
 
   SOCKET_IN_FLOAT(offset, "Offset", 2.f * M_PI_F / 180.f);
   SOCKET_IN_FLOAT(roughness, "Roughness", 0.3f);
@@ -3725,7 +3725,7 @@ void MicrofacetHairBsdfNode::compile(SVMCompiler &compiler)
   ShaderInput *TRT_in = input("TRT lobe");
   ShaderInput *Blur_in = input("Blur");
 
-  ShaderInput *eccentricity_in = input("Eccentricity");
+  ShaderInput *aspect_ratio_in = input("Aspect Ratio");
 
   int color_ofs = compiler.stack_assign(input("Color"));
   int tint_ofs = compiler.stack_assign(input("Tint"));
@@ -3789,11 +3789,11 @@ void MicrofacetHairBsdfNode::compile(SVMCompiler &compiler)
                     __float_as_uint(TRT));
 
   /* data node 5 */
-  compiler.add_node(compiler.encode_uchar4(compiler.stack_assign_if_linked(eccentricity_in),
+  compiler.add_node(compiler.encode_uchar4(compiler.stack_assign_if_linked(aspect_ratio_in),
                                            SVM_STACK_INVALID,
                                            SVM_STACK_INVALID,
                                            SVM_STACK_INVALID),
-                    __float_as_uint(eccentricity),
+                    __float_as_uint(aspect_ratio),
                     compiler.attribute(ATTR_STD_VERTEX_NORMAL),
                     0);
 }
