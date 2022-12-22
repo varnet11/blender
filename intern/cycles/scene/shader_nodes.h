@@ -909,10 +909,6 @@ class MicrofacetHairBsdfNode : public BsdfBaseNode {
 
   /* Aspect Ratio. */
   NODE_SOCKET_API(float, aspect_ratio)
-  /* Randomization factor for axis rotation. */
-  NODE_SOCKET_API(float, random_axis)
-  /* Twist rate. */
-  NODE_SOCKET_API(float, twist_rate)
 
   NODE_SOCKET_API(float, R)
   NODE_SOCKET_API(float, TT)
