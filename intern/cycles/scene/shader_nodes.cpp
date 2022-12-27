@@ -3698,7 +3698,10 @@ MicrofacetHairBsdfNode::MicrofacetHairBsdfNode() : BsdfBaseNode(get_node_type())
 void MicrofacetHairBsdfNode::attributes(Shader *shader, AttributeRequestSet *attributes)
 {
   /* Make sure we have the normal for elliptical cross section tracking */
-  attributes->add(ATTR_STD_VERTEX_NORMAL);
+  if (model_type == NODE_MICROFACET_HAIR_ELLIPTIC_BECKMANN ||
+      model_type == NODE_MICROFACET_HAIR_ELLIPTIC_GGX) {
+    attributes->add(ATTR_STD_VERTEX_NORMAL);
+  }
 
   if (!input("Random")->link) {
     attributes->add(ATTR_STD_CURVE_RANDOM);
