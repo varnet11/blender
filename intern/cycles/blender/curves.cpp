@@ -326,12 +326,12 @@ static void ExportCurveSegments(Scene *scene, Hair *hair, ParticleCurveData *CDa
         if (attr_intercept)
           attr_intercept->add(time);
 
-        num_curve_keys++;
-      }
+        if (attr_normal) {
+          /* TODO: compute geometry normals. */
+          attr_normal->add(make_float3(1.0f, 0.0f, 0.0f));
+        }
 
-      if (attr_normal != NULL) {
-        /* TODO: compute geometry normals. */
-        attr_normal->add(make_float3(1.0f, 0.0f, 0.0f));
+        num_curve_keys++;
       }
 
       if (attr_length != NULL) {
