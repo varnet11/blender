@@ -398,23 +398,23 @@ ccl_device float3 bsdf_microfacet_hair_eval_r_circular(ccl_private const ShaderC
 
     integral = roughness_squared * M_1_PI_F * 0.5f * (temp1 + temp2 + temp3 + temp4);
   }
-  else { /* falls back to numerical integration */
-    /* initial sample resolution */
+  else { /* Falls back to numerical integration. */
+    /* Maximal sample resolution. */
     float res = roughness * 0.7f;
-    const float scale = (phi_m_max - phi_m_min) * 0.5f;
-    size_t intervals = 2 * (size_t)ceilf(scale / res) + 1;
+    /* Number of intervals should be even. */
+    const size_t intervals = 2 * (size_t)ceilf((phi_m_max - phi_m_min) / res * 0.5f);
 
-    /* modified resolution based on integral domain */
+    /* Modified resolution based on numbers of intervals. */
     res = (phi_m_max - phi_m_min) / float(intervals);
 
-    /* integrate using Simpson's rule */
-    for (size_t i = 0; i < intervals; i++) {
+    /* Integrate using Simpson's rule. */
+    for (size_t i = 0; i <= intervals; i++) {
 
       const float phi_m = phi_m_min + i * res;
       const float3 wm = sph_dir(tilt, phi_m);
 
       if (microfacet_visible(wi, wo, make_float3(wm.x, 0.0f, wm.z), wh)) {
-        const float weight = (i == 0 || i == intervals - 1) ? 0.5f : (i % 2 + 1);
+        const float weight = (i == 0 || i == intervals) ? 0.5f : (i % 2 + 1);
         integral += weight * D(beckmann, roughness, wm, wh) *
                     G(beckmann, roughness, wi, wo, wm, wh);
       }
@@ -458,14 +458,13 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_circular(KernelGlobals kg,
   const float3 mu_a = bsdf->sigma;
   const float inv_eta = 1.0f / eta;
 
-  float res = roughness * .8f;
-  const float scale = (phi_m_max - phi_m_min) * 0.5f;
-  size_t intervals = 2 * (size_t)ceilf(scale / res) + 1;
+  float res = roughness * 0.8f;
+  const size_t intervals = 2 * (size_t)ceilf((phi_m_max - phi_m_min) / res * 0.5f);
   res = (phi_m_max - phi_m_min) / intervals;
 
   float3 S_tt = zero_float3();
   float3 S_trt = zero_float3();
-  for (size_t i = 0; i < intervals; i++) {
+  for (size_t i = 0; i <= intervals; i++) {
 
     const float phi_mi = phi_m_min + i * res;
     const float3 wmi = sph_dir(tilt, phi_mi);
@@ -495,7 +494,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_circular(KernelGlobals kg,
     }
 
     /* Simpson's rule weight */
-    float weight = (i == 0 || i == intervals - 1) ? 0.5f : (i % 2 + 1);
+    float weight = (i == 0 || i == intervals) ? 0.5f : (i % 2 + 1);
 
     float3 A_t = exp(mu_a * 2.0f * cosf(phi_t - phi_mi) / cos_theta(wt));
 
@@ -891,23 +890,23 @@ ccl_device float3 bsdf_microfacet_hair_eval_r_elliptic(ccl_private const ShaderC
     gamma_m_max += M_2PI_F;
   }
 
-  /* initial sample resolution */
+  /* Maximal sample resolution. */
   float res = roughness * .7f;
-  const float scale = (gamma_m_max - gamma_m_min) * 0.5f;
-  size_t intervals = 2 * (size_t)ceilf(scale / res) + 1;
+  /* Number of intervals should be even. */
+  const size_t intervals = 2 * (size_t)ceilf((gamma_m_max - gamma_m_min) / res * 0.5f);
 
-  /* modified resolution based on integral domain */
+  /* Modified resolution based on numbers of intervals. */
   res = (gamma_m_max - gamma_m_min) / float(intervals);
 
-  /* integrate using Simpson's rule */
+  /* Integrate using Simpson's rule. */
   float integral = 0.0f;
-  for (size_t i = 0; i < intervals; i++) {
+  for (size_t i = 0; i <= intervals; i++) {
 
     const float gamma_m = gamma_m_min + i * res;
     const float3 wm = sphg_dir(tilt, gamma_m, a, b);
 
     if (microfacet_visible(wi, wo, make_float3(wm.x, 0.0f, wm.z), wh)) {
-      const float weight = (i == 0 || i == intervals - 1) ? 0.5f : (i % 2 + 1);
+      const float weight = (i == 0 || i == intervals) ? 0.5f : (i % 2 + 1);
       const float arc_length = sqrtf(1.0f - e2 * sqr(sinf(gamma_m)));
 
       integral += weight * D(beckmann, roughness, wm, wh) *
@@ -976,13 +975,12 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_elliptic(KernelGlobals kg,
   }
 
   float res = roughness * 0.8f;
-  const float scale = (gamma_m_max - gamma_m_min) * 0.5f;
-  size_t intervals = 2 * (size_t)ceilf(scale / res) + 1;
+  const size_t intervals = 2 * (size_t)ceilf((gamma_m_max - gamma_m_min) / res * 0.5f);
   res = (gamma_m_max - gamma_m_min) / intervals;
 
   float3 S_tt = zero_float3();
   float3 S_trt = zero_float3();
-  for (size_t i = 0; i < intervals; i++) {
+  for (size_t i = 0; i <= intervals; i++) {
 
     const float gamma_mi = gamma_m_min + i * res;
 
@@ -1015,7 +1013,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_elliptic(KernelGlobals kg,
     }
 
     /* Simpson's rule weight */
-    const float weight = (i == 0 || i == intervals - 1) ? 0.5f : (i % 2 + 1);
+    const float weight = (i == 0 || i == intervals) ? 0.5f : (i % 2 + 1);
 
     const float2 pi = to_point(gamma_mi, a, b);
     const float2 pt = to_point(gamma_mt + M_PI_F, a, b);
