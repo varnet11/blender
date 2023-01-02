@@ -373,6 +373,7 @@ AddCurvesOnMeshOutputs add_curves_on_mesh(CurvesGeometry &curves,
   }
 
   curves.fill_curve_types(new_curves_range, CURVE_TYPE_CATMULL_ROM);
+  curves.normal_mode_for_write().fill(NORMAL_MODE_CURVATURE_VECTOR);
 
   /* Explicitly set all other attributes besides those processed above to default values. */
   bke::MutableAttributeAccessor attributes = curves.attributes_for_write();

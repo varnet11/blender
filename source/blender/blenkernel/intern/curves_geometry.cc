@@ -673,17 +673,31 @@ Span<float3> CurvesGeometry::evaluated_tangents() const
 {
   this->runtime->tangent_cache_mutex.ensure([&]() {
     const Span<float3> evaluated_positions = this->evaluated_positions();
+    Span<float3> positions = this->positions();
+    VArray<int> resolution = this->resolution();
     const VArray<bool> cyclic = this->cyclic();
+    const VArray<int8_t> types = this->curve_types();
 
     this->runtime->evaluated_tangent_cache.resize(this->evaluated_points_num());
     MutableSpan<float3> tangents = this->runtime->evaluated_tangent_cache;
 
     threading::parallel_for(this->curves_range(), 128, [&](IndexRange curves_range) {
       for (const int curve_index : curves_range) {
+        const IndexRange points = this->points_for_curve(curve_index);
         const IndexRange evaluated_points = this->evaluated_points_for_curve(curve_index);
-        curves::poly::calculate_tangents(evaluated_positions.slice(evaluated_points),
-                                         cyclic[curve_index],
-                                         tangents.slice(evaluated_points));
+        switch (types[curve_index]) {
+          case CURVE_TYPE_CATMULL_ROM:
+            curves::catmull_rom::calculate_tangents(positions.slice(points),
+                                                    cyclic[curve_index],
+                                                    resolution[curve_index],
+                                                    tangents.slice(evaluated_points));
+            break;
+          default:
+            curves::poly::calculate_tangents(evaluated_positions.slice(evaluated_points),
+                                             cyclic[curve_index],
+                                             tangents.slice(evaluated_points));
+            break;
+        }
       }
     });
 
@@ -720,6 +734,7 @@ Span<float3> CurvesGeometry::evaluated_tangents() const
       });
     }
   });
+
   return this->runtime->evaluated_tangent_cache;
 }
 
@@ -737,6 +752,8 @@ Span<float3> CurvesGeometry::evaluated_normals() const
   this->runtime->normal_cache_mutex.ensure([&]() {
     const Span<float3> evaluated_tangents = this->evaluated_tangents();
     const VArray<bool> cyclic = this->cyclic();
+    Span<float3> positions = this->positions();
+    VArray<int> resolution = this->resolution();
     const VArray<int8_t> normal_mode = this->normal_mode();
     const VArray<int8_t> types = this->curve_types();
     const VArray<float> tilt = this->tilt();
@@ -749,6 +766,7 @@ Span<float3> CurvesGeometry::evaluated_normals() const
       Vector<float> evaluated_tilts;
 
       for (const int curve_index : curves_range) {
+        const IndexRange points = this->points_for_curve(curve_index);
         const IndexRange evaluated_points = this->evaluated_points_for_curve(curve_index);
         switch (normal_mode[curve_index]) {
           case NORMAL_MODE_Z_UP:
@@ -759,6 +777,25 @@ Span<float3> CurvesGeometry::evaluated_normals() const
             curves::poly::calculate_normals_minimum(evaluated_tangents.slice(evaluated_points),
                                                     cyclic[curve_index],
                                                     evaluated_normals.slice(evaluated_points));
+            break;
+          case NORMAL_MODE_CURVATURE_VECTOR:
+            switch (types[curve_index]) {
+              case CURVE_TYPE_CATMULL_ROM:
+                curves::catmull_rom::calculate_normals(positions.slice(points),
+                                                       cyclic[curve_index],
+                                                       resolution[curve_index],
+                                                       evaluated_tangents.slice(evaluated_points),
+                                                       evaluated_normals.slice(evaluated_points));
+                break;
+              default:
+                const Span<float3> evaluated_positions = this->evaluated_positions();
+                curves::poly::calculate_curvature_vectors(
+                    evaluated_positions.slice(evaluated_points),
+                    evaluated_tangents.slice(evaluated_points),
+                    cyclic[curve_index],
+                    evaluated_normals.slice(evaluated_points));
+                break;
+            }
             break;
         }
 

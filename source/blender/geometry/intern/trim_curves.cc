@@ -262,11 +262,12 @@ static T interpolate_catmull_rom(const Span<T> src_data,
   if (i3 == src_data.size()) {
     i3 = src_cyclic ? 0 : insertion_point.next_index;
   }
-  return bke::curves::catmull_rom::interpolate<T>(src_data[i0],
-                                                  src_data[insertion_point.index],
-                                                  src_data[insertion_point.next_index],
-                                                  src_data[i3],
-                                                  insertion_point.parameter);
+  return bke::curves::catmull_rom::interpolate(0,
+                                               src_data[i0],
+                                               src_data[insertion_point.index],
+                                               src_data[insertion_point.next_index],
+                                               src_data[i3],
+                                               insertion_point.parameter);
 }
 
 static bke::curves::bezier::Insertion knot_insert_bezier(

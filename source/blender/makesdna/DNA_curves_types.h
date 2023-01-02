@@ -80,6 +80,7 @@ typedef enum KnotsMode {
 typedef enum NormalMode {
   NORMAL_MODE_MINIMUM_TWIST = 0,
   NORMAL_MODE_Z_UP = 1,
+  NORMAL_MODE_CURVATURE_VECTOR = 2,
 } NormalMode;
 
 /**

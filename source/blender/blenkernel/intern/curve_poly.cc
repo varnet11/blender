@@ -199,4 +199,77 @@ void calculate_normals_minimum(const Span<float3> tangents,
   }
 }
 
+void calculate_curvature_vectors(const Span<float3> positions,
+                                 const Span<float3> tangents,
+                                 const bool cyclic,
+                                 MutableSpan<float3> normals)
+{
+  const int size = positions.size();
+
+  BLI_assert(normals.size() == size);
+  BLI_assert(tangents.size() == size);
+
+  if (normals.is_empty()) {
+    return;
+  }
+
+  const float epsilon = 1e-4f;
+
+  /* Fill in the first normal, in case the following computations are invalid. */
+  const float3 &first_tangent = tangents.first();
+  if (fabs(first_tangent.x) + fabs(first_tangent.y) < epsilon) {
+    normals.first() = {1.0f, 0.0f, 0.0f};
+  }
+  else {
+    normals.first() = math::normalize(float3(first_tangent.y, -first_tangent.x, 0.0f));
+  }
+
+  /* Computing normals from the second point to the second to last point, or from the first point
+   * to the last point for cyclic curve. */
+  /* TODO: maybe better to compute only for control points. */
+  int first_valid_normal_index = -1;
+  const int start_index = cyclic ? 0 : 1;
+  const int end_index = cyclic ? size - 1 : size - 2;
+  for (int i = start_index; i < end_index; i++) {
+    const float3 previous_segment = (i == 0) ? positions.last() - positions.first() :
+                                               positions[i - 1] - positions[i];
+    const float3 next_segment = (i == size - 1) ? positions.first() - positions.last() :
+                                                  positions[i + 1] - positions[i];
+    const float3 binormal = math::cross(math::normalize(next_segment),
+                                        math::normalize(previous_segment));
+    float normal_len;
+    float3 normal = math::normalize_and_get_length(math::cross(tangents[i], binormal), normal_len);
+    if (normal_len > epsilon) {
+      if (first_valid_normal_index != -1 && math::dot(normal, normals[i - 1]) < 0) {
+        /* Prevent sudden normal changes. */
+        normal = -normal;
+      }
+      if (first_valid_normal_index == -1) {
+        first_valid_normal_index = i;
+      }
+      normals[i] = normal;
+    }
+    else {
+      if (first_valid_normal_index != -1) {
+        normals[i] = normals[i - 1];
+      }
+    }
+  }
+
+  if (first_valid_normal_index == -1) {
+    normals.fill(normals.first());
+  }
+  else {
+    const float3 &first_valid_normal = normals[first_valid_normal_index];
+    /* If the first few normals are invalid, use the normal from the first point with a valid
+     * normal. */
+    normals.take_front(first_valid_normal_index).fill(first_valid_normal);
+    if (!cyclic) {
+      /* The last normal is the same as the second to last normal. The normal is already filled if
+       * the curve is cyclic. */
+      normals.last() = normals[size - 2];
+    }
+  }
+}
+
 }  // namespace blender::bke::curves::poly

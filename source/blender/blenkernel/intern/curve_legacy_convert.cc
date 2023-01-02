@@ -50,6 +50,7 @@ static HandleType handle_type_from_legacy(const uint8_t handle_type_legacy)
 
 static NormalMode normal_mode_from_legacy(const short twist_mode)
 {
+  /* TODO: add curvature vector mode. */
   switch (twist_mode) {
     case CU_TWIST_Z_UP:
     case CU_TWIST_TANGENT:

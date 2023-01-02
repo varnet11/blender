@@ -521,6 +521,13 @@ void calculate_tangents(Span<float3> positions, bool is_cyclic, MutableSpan<floa
 void calculate_normals_minimum(Span<float3> tangents, bool cyclic, MutableSpan<float3> normals);
 
 /**
+ * Calculate curvature vectors. TODO: more description. */
+void calculate_curvature_vectors(Span<float3> positions,
+                                 Span<float3> tangents,
+                                 bool cyclic,
+                                 MutableSpan<float3> normals);
+
+/**
  * Calculate a vector perpendicular to every tangent on the X-Y plane (unless the tangent is
  * vertical, in that case use the X direction).
  */
@@ -696,6 +703,16 @@ void interpolate_to_evaluated(GSpan src, Span<int> evaluated_offsets, GMutableSp
 
 namespace catmull_rom {
 
+void calculate_tangents(Span<float3> positions,
+                        bool is_cyclic,
+                        int resolution,
+                        MutableSpan<float3> tangents);
+void calculate_normals(Span<float3> positions,
+                       bool is_cyclic,
+                       int resolution,
+                       Span<float3> tangents,
+                       MutableSpan<float3> normals);
+
 /**
  * Calculate the number of evaluated points that #interpolate_to_evaluated is expected to produce.
  * \param points_num: The number of points in the curve.
@@ -719,6 +736,8 @@ void interpolate_to_evaluated(const GSpan src,
                               GMutableSpan dst);
 
 void calculate_basis(const float parameter, float4 &r_weights);
+void calculate_basis_derivative(const float parameter, float4 &r_weights);
+void calculate_basis_derivative2(const float parameter, float4 &r_weights);
 
 /**
  * Interpolate the control point values for the given parameter on the piecewise segment.
@@ -727,11 +746,24 @@ void calculate_basis(const float parameter, float4 &r_weights);
  * \param parameter: Parameter in range [0, 1] to compute the interpolation for.
  */
 template<typename T>
-T interpolate(const T &a, const T &b, const T &c, const T &d, const float parameter)
+T interpolate(
+    const int order, const T &a, const T &b, const T &c, const T &d, const float parameter)
 {
   BLI_assert(0.0f <= parameter && parameter <= 1.0f);
   float4 n;
-  calculate_basis(parameter, n);
+
+  switch (order) {
+    case 1:
+      calculate_basis_derivative(parameter, n);
+      break;
+    case 2:
+      calculate_basis_derivative2(parameter, n);
+      break;
+    default:
+      calculate_basis(parameter, n);
+      break;
+  }
+
   if constexpr (is_same_any_v<T, float, float2, float3>) {
     /* Save multiplications by adjusting weights after mix. */
     return 0.5f * attribute_math::mix4<T>(n, a, b, c, d);

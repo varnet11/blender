@@ -199,6 +199,10 @@ static Array<float3> curve_normal_point_domain(const bke::CurvesGeometry &curves
             case NORMAL_MODE_MINIMUM_TWIST:
               bke::curves::poly::calculate_normals_minimum(nurbs_tangents, cyclic, curve_normals);
               break;
+            case NORMAL_MODE_CURVATURE_VECTOR:
+              bke::curves::poly::calculate_curvature_vectors(
+                  curve_positions, nurbs_tangents, cyclic, curve_normals);
+              break;
           }
           break;
         }
@@ -504,7 +508,7 @@ static ComponentAttributeProviders create_attribute_providers_for_curve()
   static const fn::CustomMF_SI_SO<int8_t, int8_t> normal_mode_clamp{
       "Normal Mode Validate",
       [](int8_t value) {
-        return std::clamp<int8_t>(value, NORMAL_MODE_MINIMUM_TWIST, NORMAL_MODE_Z_UP);
+        return std::clamp<int8_t>(value, NORMAL_MODE_MINIMUM_TWIST, NORMAL_MODE_CURVATURE_VECTOR);
       },
       fn::CustomMF_presets::AllSpanOrSingle()};
   static BuiltinCustomDataLayerProvider normal_mode("normal_mode",
