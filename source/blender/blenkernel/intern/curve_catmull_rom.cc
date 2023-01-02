@@ -86,14 +86,11 @@ static void interpolate_to_evaluated(const int order,
 
   if (src.size() == 1) {
     switch (order) {
-      case 1:
-        dst.first() = float3(0.0f, 0.0f, 1.0f);
-        break;
-      case 2:
-        dst.first() = float3(1.0f, 0.0f, 0.0f);
+      case 0:
+        dst.first() = src.first();
         break;
       default:
-        dst.first() = src.first();
+        dst.first() = T(0);
         break;
     }
     return;
@@ -204,6 +201,11 @@ void calculate_tangents(const Span<float3> positions,
                         const int resolution,
                         MutableSpan<float3> evaluated_tangents)
 {
+  if (evaluated_tangents.size() == 1) {
+    evaluated_tangents[0] = float3(0.0f, 0.0f, 1.0f);
+    return;
+  }
+
   interpolate_to_evaluated(
       1,
       positions,
@@ -225,6 +227,11 @@ void calculate_normals(const Span<float3> positions,
                        const Span<float3> evaluated_tangents,
                        MutableSpan<float3> evaluated_normals)
 {
+  if (evaluated_normals.size() == 1) {
+    evaluated_normals[0] = float3(1.0f, 0.0f, 0.0f);
+    return;
+  }
+
   /* Compute the second derivative (r'') of the control points, evaluated at t = 0. */
   interpolate_to_evaluated(
       2,
