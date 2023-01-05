@@ -247,7 +247,7 @@ static float find_root_newton_bisection(float x_begin,
 }
 
 /* Calculate normals by minimizing the potential energy due to twist and bending. Global
- * estimation involves integration and is thus too costly. Instead, we start with the first
+ * optimization would involve integration and is too costly. Instead, we start with the first
  * curvature vector and propogate it along the curve. */
 void calculate_normals(const Span<float3> positions,
                        const bool is_cyclic,
