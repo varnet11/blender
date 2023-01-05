@@ -710,7 +710,6 @@ void calculate_tangents(Span<float3> positions,
 void calculate_normals(Span<float3> positions,
                        bool is_cyclic,
                        int resolution,
-                       Span<float3> tangents,
                        MutableSpan<float3> normals);
 
 /**

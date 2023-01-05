@@ -784,7 +784,6 @@ Span<float3> CurvesGeometry::evaluated_normals() const
                 curves::catmull_rom::calculate_normals(positions.slice(points),
                                                        cyclic[curve_index],
                                                        resolution[curve_index],
-                                                       evaluated_tangents.slice(evaluated_points),
                                                        evaluated_normals.slice(evaluated_points));
                 break;
               default:
