@@ -665,6 +665,7 @@ Span<float3> CurvesGeometry::evaluated_tangents() const
         const IndexRange evaluated_points = this->evaluated_points_for_curve(curve_index);
         switch (types[curve_index]) {
           case CURVE_TYPE_CATMULL_ROM:
+            /* NOTE: this causes test geo_node_curves_test_sample_curves to fail. */
             curves::catmull_rom::calculate_tangents(positions.slice(points),
                                                     cyclic[curve_index],
                                                     resolution[curve_index],
