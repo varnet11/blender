@@ -48,10 +48,9 @@ void calculate_basis_derivative(const float parameter, float4 &r_weights)
 void calculate_basis_derivative2(const float parameter, float4 &r_weights)
 {
   const float t = parameter;
-  const float s = 1.0f - parameter;
   r_weights[0] = -6.0f * t + 4.0f;
   r_weights[1] = 18.0f * t - 10.0f;
-  r_weights[2] = 18.0f * s - 10.0f;
+  r_weights[2] = -18.0f * t + 8.0f;
   r_weights[3] = 6.0f * t - 2.0f;
 }
 
