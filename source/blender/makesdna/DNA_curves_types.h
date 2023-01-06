@@ -78,18 +78,24 @@ typedef enum KnotsMode {
 
 /** Method used to calculate the normals of a curve's evaluated points. */
 typedef enum NormalMode {
+  /** Calculate normals with the smallest twist around the curve tangent across the whole curve. */
   NORMAL_MODE_MINIMUM_TWIST = 0,
+  /**
+   * Calculate normals perpendicular to the Z axis and the curve tangent. If a series of points
+   * is vertical, the X axis is used.
+   */
   NORMAL_MODE_Z_UP = 1,
   NORMAL_MODE_CURVATURE_VECTOR = 2,
 } NormalMode;
 
 /**
  * A reusable data structure for geometry consisting of many curves. All control point data is
- * stored contiguously for better efficiency. Data for each curve is stored as a slice of the
- * main #point_data array.
+ * stored contiguously for better efficiency when there are many curves. Multiple curve types are
+ * supported, as described in #CurveType. Data for each curve is accessed by slicing the main
+ * #point_data arrays.
  *
  * The data structure is meant to separate geometry data storage and processing from Blender
- * focussed ID data-block handling. The struct can also be embedded to allow reusing it.
+ * focused ID data-block handling. The struct can also be embedded to allow reusing it.
  */
 typedef struct CurvesGeometry {
   /**
@@ -121,7 +127,7 @@ typedef struct CurvesGeometry {
    */
   int point_num;
   /**
-   * The number of curves in the data-block.
+   * The number of curves.
    */
   int curve_num;
 
@@ -131,6 +137,11 @@ typedef struct CurvesGeometry {
   CurvesGeometryRuntimeHandle *runtime;
 } CurvesGeometry;
 
+/**
+ * A data-block corresponding to a number of curves of various types with various attributes.
+ * Geometry data (as opposed to pointers to other data-blocks and higher level data for user
+ * interaction) is embedded in the #CurvesGeometry struct.
+ */
 typedef struct Curves {
   ID id;
   /** Animation data (must be immediately after #id). */
@@ -152,8 +163,8 @@ typedef struct Curves {
    */
   char symmetry;
   /**
-   * #eAttrDomain. The active selection mode domain. At most one selection mode can be active
-   * at a time.
+   * #eAttrDomain. The active domain for edit/sculpt mode selection. Only one selection mode can
+   * be active at a time.
    */
   char selection_domain;
   char _pad[4];
@@ -169,7 +180,7 @@ typedef struct Curves {
 
   /**
    * The name of the attribute on the surface #Mesh used to give meaning to the UV attachment
-   * coordinates stored on each curve. Expected to be a 2D vector attribute on the face corner
+   * coordinates stored for each curve. Expected to be a 2D vector attribute on the face corner
    * domain.
    */
   char *surface_uv_map;

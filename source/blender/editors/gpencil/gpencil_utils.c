@@ -1780,6 +1780,20 @@ float ED_gpencil_cursor_radius(bContext *C, int x, int y)
   return radius;
 }
 
+float ED_gpencil_radial_control_scale(struct bContext *C,
+                                      struct Brush *brush,
+                                      float initial_value,
+                                      const int mval[2])
+{
+  float scale_fac = 1.0f;
+  if ((brush && brush->gpencil_settings) && (brush->gpencil_tool == GPAINT_TOOL_DRAW)) {
+    float cursor_radius = ED_gpencil_cursor_radius(C, mval[0], mval[1]);
+    scale_fac = max_ff(cursor_radius, 1.0f) / max_ff(initial_value, 1.0f);
+  }
+
+  return scale_fac;
+}
+
 /**
  * Helper callback for drawing the cursor itself.
  */
@@ -3354,4 +3368,39 @@ void ED_gpencil_layer_merge(bGPdata *gpd,
   if (gpl_dst->mask_layers.first) {
     BKE_gpencil_layer_mask_sort(gpd, gpl_dst);
   }
+}
+
+static void gpencil_layer_new_name_get(bGPdata *gpd, char *rname)
+{
+  int index = 0;
+  LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
+    if (strstr(gpl->info, "GP_Layer")) {
+      index++;
+    }
+  }
+
+  if (index == 0) {
+    BLI_strncpy(rname, "GP_Layer", 128);
+    return;
+  }
+  char *name = BLI_sprintfN("%.*s.%03d", 128, "GP_Layer", index);
+  BLI_strncpy(rname, name, 128);
+  MEM_freeN(name);
+}
+
+int ED_gpencil_new_layer_dialog(bContext *C, wmOperator *op)
+{
+  Object *ob = CTX_data_active_object(C);
+  PropertyRNA *prop;
+  if (RNA_int_get(op->ptr, "layer") == -1) {
+    prop = RNA_struct_find_property(op->ptr, "new_layer_name");
+    if (!RNA_property_is_set(op->ptr, prop)) {
+      char name[MAX_NAME];
+      bGPdata *gpd = ob->data;
+      gpencil_layer_new_name_get(gpd, name);
+      RNA_property_string_set(op->ptr, prop, name);
+      return WM_operator_props_dialog_popup(C, op, 200);
+    }
+  }
+  return 0;
 }
