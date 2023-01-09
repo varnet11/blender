@@ -13,6 +13,14 @@ static void node_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>(N_("Curve")).supported_type(GEO_COMPONENT_TYPE_CURVE);
   b.add_input<decl::Bool>(N_("Selection")).default_value(true).hide_value().field_on_all();
+  b.add_input<decl::Float>(N_("Weight"))
+      .default_value(0.8f)
+      .min(0.0f)
+      .max(1.0f)
+      .description(
+          "With a larger weight, the normals are more aligned with the curvature vector, but "
+          "might be less stable when animated. Cross-sections with smaller aspect ratios should "
+          "have larger weights.");
   b.add_output<decl::Geometry>(N_("Curve")).propagate_all();
 }
 
@@ -26,13 +34,23 @@ static void node_init(bNodeTree * /*tree*/, bNode *node)
   node->custom1 = NORMAL_MODE_MINIMUM_TWIST;
 }
 
-static void set_normal_mode(bke::CurvesGeometry &curves,
-                            const NormalMode mode,
-                            const Field<bool> &selection_field)
+static void node_update(bNodeTree *ntree, bNode *node)
+{
+  bNodeSocket *weight_socket = static_cast<bNodeSocket *>(node->inputs.first)->next->next;
+  nodeSetSocketAvailability(ntree, weight_socket, node->custom1 == NORMAL_MODE_CURVATURE_VECTOR);
+}
+
+static void set_normal_mode_and_weight(bke::CurvesGeometry &curves,
+                                       const NormalMode mode,
+                                       const Field<bool> &selection_field,
+                                       const Field<float> &weight_field)
 {
   bke::CurvesFieldContext field_context{curves, ATTR_DOMAIN_CURVE};
   fn::FieldEvaluator evaluator{field_context, curves.curves_num()};
   evaluator.set_selection(selection_field);
+  if (mode == NORMAL_MODE_CURVATURE_VECTOR) {
+    evaluator.add_with_destination(weight_field, curves.curvature_vector_weight_for_write());
+  }
   evaluator.evaluate();
   const IndexMask selection = evaluator.get_evaluated_selection_as_mask();
   curves.normal_mode_for_write().fill_indices(selection, mode);
@@ -45,11 +63,16 @@ static void node_geo_exec(GeoNodeExecParams params)
 
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Curve");
   Field<bool> selection_field = params.extract_input<Field<bool>>("Selection");
+  Field<float> weight_field;
+
+  if (mode == NORMAL_MODE_CURVATURE_VECTOR) {
+    weight_field = params.extract_input<Field<float>>("Weight");
+  }
 
   geometry_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
     if (Curves *curves_id = geometry_set.get_curves_for_write()) {
       bke::CurvesGeometry &curves = bke::CurvesGeometry::wrap(curves_id->geometry);
-      set_normal_mode(curves, mode, selection_field);
+      set_normal_mode_and_weight(curves, mode, selection_field, weight_field);
     }
   });
 
@@ -67,6 +90,7 @@ void register_node_type_geo_set_curve_normal()
   ntype.declare = file_ns::node_declare;
   ntype.geometry_node_execute = file_ns::node_geo_exec;
   ntype.initfunc = file_ns::node_init;
+  ntype.updatefunc = file_ns::node_update;
   ntype.draw_buttons = file_ns::node_layout;
 
   nodeRegisterType(&ntype);

@@ -251,12 +251,15 @@ static float find_root_newton_bisection(float x_begin,
 void calculate_normals(const Span<float3> positions,
                        const bool is_cyclic,
                        const int resolution,
+                       const float weight_bending,
                        MutableSpan<float3> evaluated_normals)
 {
   if (evaluated_normals.size() == 1) {
     evaluated_normals[0] = float3(1.0f, 0.0f, 0.0f);
     return;
   }
+
+  const float weight_twist = 1.0f - clamp_f(weight_bending, 0.0f, 1.0f);
 
   /* TODO: check if derivatives == 0.*/
   Vector<float3> first_derivatives_(evaluated_normals.size());
@@ -265,21 +268,35 @@ void calculate_normals(const Span<float3> positions,
 
   Vector<float3> second_derivatives_(evaluated_normals.size());
   MutableSpan<float3> second_derivatives = second_derivatives_;
-  interpolate_to_evaluated(2, positions, is_cyclic, resolution, second_derivatives);
+  if (weight_twist < 1.0f) {
+    interpolate_to_evaluated(2, positions, is_cyclic, resolution, second_derivatives);
+  }
+  else {
+    /* TODO: Actually only the first entry needs to be evaluated. */
+    interpolate_to_evaluated(
+        2,
+        positions,
+        is_cyclic,
+        [resolution](const int segment_i) -> IndexRange {
+          return {segment_i * resolution, 1};
+        },
+        second_derivatives);
+  }
 
-  /* TODO: below are hair-specific values, assuming elliptical cross-section. Maybe make them more
-   * general by specifying user-defined weight? */
-  /* Values taken from Table 9.5 in book Chemical and Physical Behavior of Human Hair by Clarence
-   * R. Robbins, 5th edition. Unit: GPa. */
-  const float youngs_modulus = 3.89f;
-  const float shear_modulus = 0.89f;
-  /* Assuming major axis a = 1. */
-  const float aspect_ratio = 0.5f; /* Minimal realistic value. */
-  const float aspect_ratio_squared = aspect_ratio * aspect_ratio;
-  const float torsion_constant = M_PI * aspect_ratio_squared * aspect_ratio /
-                                 (1.0f + aspect_ratio_squared);
-  const float moment_of_inertia_coefficient = M_PI * aspect_ratio * 0.25f *
-                                              (1.0f - aspect_ratio_squared);
+  /* Hair-specific values, taken from Table 9.5 in book Chemical and Physical Behavior of Human
+   * Hair by Clarence R. Robbins, 5th edition. Unit: GPa. */
+  // const float youngs_modulus = 3.89f;
+  // const float shear_modulus = 0.89f;
+  // /* Assuming major axis a = 1. */
+  // const float aspect_ratio = 0.5f; /* Minimal realistic value. */
+  // const float aspect_ratio_squared = aspect_ratio * aspect_ratio;
+  // const float torsion_constant = M_PI * aspect_ratio_squared * aspect_ratio /
+  //                                (1.0f + aspect_ratio_squared);
+  // const float moment_of_inertia_coefficient = M_PI * aspect_ratio * 0.25f *
+  //                                             (1.0f - aspect_ratio_squared);
+
+  // const float weight_bending = 0.5f * youngs_modulus * moment_of_inertia_coefficient;
+  // const float weight_twist = 0.5f * shear_modulus * torsion_constant;
 
   const float dt = 1.0f / resolution;
   /* Compute evaluated_normals. */
@@ -296,15 +313,15 @@ void calculate_normals(const Span<float3> positions,
       continue;
     }
 
+    if (weight_twist == 0.0f) {
+      if (angle_normalized_v3v3(curvature_vector, evaluated_normals[i - 1]) < 0) {
+        curvature_vector = -curvature_vector;
+      }
+      evaluated_normals[i] = curvature_vector;
+      continue;
+    }
+
     const float first_derivative_norm = math::length(first_derivatives[i]);
-    /* Arc length depends on the unit, assuming meter. */
-    const float arc_length = first_derivative_norm * dt;
-    const float curvature = math::length(binormal) / pow3f(first_derivative_norm);
-
-    const float weight_twist = 0.5f * shear_modulus * torsion_constant / arc_length;
-    const float weight_bending = 0.5f * arc_length * curvature * curvature * youngs_modulus *
-                                 moment_of_inertia_coefficient;
-
     const float3 last_tangent = math::normalize(first_derivatives[i - 1]);
     const float3 current_tangent = first_derivatives[i] / first_derivative_norm;
     const float angle = angle_normalized_v3v3(last_tangent, current_tangent);
@@ -314,6 +331,18 @@ void calculate_normals(const Span<float3> positions,
             math::rotate_direction_around_axis(
                 last_normal, math::normalize(math::cross(last_tangent, current_tangent)), angle) :
             last_normal;
+
+    if (weight_twist == 1.0f) {
+      evaluated_normals[i] = minimal_twist_normal;
+      continue;
+    }
+
+    /* Arc length depends on the unit, assuming meter. */
+    const float arc_length = first_derivative_norm * dt;
+    const float curvature = math::length(binormal) / pow3f(first_derivative_norm);
+
+    const float coefficient_twist = weight_twist / arc_length;
+    const float coefficient_bending = weight_bending * arc_length * curvature * curvature;
 
     /* Angle between the curvature vector and the minimal twist normal. */
     float theta_t = angle_normalized_v3v3(curvature_vector, minimal_twist_normal);
@@ -326,18 +355,18 @@ void calculate_normals(const Span<float3> positions,
      * equation: 2 * wt * (θ - θt)  + wb * sin(2θ) = 0, with θ being the angle between the computed
      * normal and the curvature vector. */
     const float theta_begin = 0.0f;
-    const float theta_end = weight_twist + weight_bending * cosf(2.0f * theta_t) < 0 ?
-                                0.5f * acosf(-weight_twist / weight_bending) :
+    const float theta_end = coefficient_twist + coefficient_bending * cosf(2.0f * theta_t) < 0 ?
+                                0.5f * acosf(-coefficient_twist / coefficient_bending) :
                                 theta_t;
 
     const float theta = find_root_newton_bisection(
         theta_begin,
         theta_end,
-        [weight_bending, weight_twist, theta_t](float t) -> float {
-          return 2.0f * weight_twist * (t - theta_t) + weight_bending * sinf(2.0f * t);
+        [coefficient_bending, coefficient_twist, theta_t](float t) -> float {
+          return 2.0f * coefficient_twist * (t - theta_t) + coefficient_bending * sinf(2.0f * t);
         },
-        [weight_bending, weight_twist](float t) -> float {
-          return 2.0f * (weight_twist + weight_bending * cosf(2.0f * t));
+        [coefficient_bending, coefficient_twist](float t) -> float {
+          return 2.0f * (coefficient_twist + coefficient_bending * cosf(2.0f * t));
         },
         1e-5f);
 
@@ -347,6 +376,8 @@ void calculate_normals(const Span<float3> positions,
                             -current_tangent;
     evaluated_normals[i] = math::rotate_direction_around_axis(curvature_vector, axis, theta);
   }
+
+  /* TODO: correct normals along the cyclic curve. */
 }
 
 }  // namespace blender::bke::curves::catmull_rom

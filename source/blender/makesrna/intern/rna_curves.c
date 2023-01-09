@@ -42,7 +42,8 @@ const EnumPropertyItem rna_enum_curve_normal_modes[] = {
      "CURVATURE_VECTOR",
      ICON_NONE,
      "Curvature Vector",
-     "Calculate normals aligned with the local curvature vectors."},
+     "Calculate normals that are linearly interpolated between minimal twist normals and local "
+     "curvature vectors."},
     {0, NULL, 0, NULL, NULL},
 };
 

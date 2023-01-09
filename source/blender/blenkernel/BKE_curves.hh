@@ -243,6 +243,13 @@ class CurvesGeometry : public ::CurvesGeometry {
   MutableSpan<int8_t> normal_mode_for_write();
 
   /**
+   * Used for normal mode curvature vector, specifying the weight as opposed to the minimal twist
+   * normal.
+   */
+  VArray<float> curvature_vector_weight() const;
+  MutableSpan<float> curvature_vector_weight_for_write();
+
+  /**
    * Handle types for Bezier control points. Call #tag_topology_changed after changes.
    */
   VArray<int8_t> handle_types_left() const;
@@ -707,6 +714,7 @@ void calculate_tangents(Span<float3> positions,
 void calculate_normals(Span<float3> positions,
                        bool is_cyclic,
                        int resolution,
+                       float weight_bending,
                        MutableSpan<float3> normals);
 
 /**

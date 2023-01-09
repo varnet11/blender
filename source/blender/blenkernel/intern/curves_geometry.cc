@@ -31,6 +31,7 @@ static const std::string ATTR_CURVE_TYPE = "curve_type";
 static const std::string ATTR_CYCLIC = "cyclic";
 static const std::string ATTR_RESOLUTION = "resolution";
 static const std::string ATTR_NORMAL_MODE = "normal_mode";
+static const std::string ATTR_CURVATURE_VECTOR_WEIGHT = "curvature_vector_weight";
 static const std::string ATTR_HANDLE_TYPE_LEFT = "handle_type_left";
 static const std::string ATTR_HANDLE_TYPE_RIGHT = "handle_type_right";
 static const std::string ATTR_HANDLE_POSITION_LEFT = "handle_left";
@@ -347,6 +348,15 @@ VArray<int8_t> CurvesGeometry::normal_mode() const
 MutableSpan<int8_t> CurvesGeometry::normal_mode_for_write()
 {
   return get_mutable_attribute<int8_t>(*this, ATTR_DOMAIN_CURVE, ATTR_NORMAL_MODE);
+}
+
+VArray<float> CurvesGeometry::curvature_vector_weight() const
+{
+  return get_varray_attribute<float>(*this, ATTR_DOMAIN_CURVE, ATTR_CURVATURE_VECTOR_WEIGHT, 0.8f);
+}
+MutableSpan<float> CurvesGeometry::curvature_vector_weight_for_write()
+{
+  return get_mutable_attribute<float>(*this, ATTR_DOMAIN_CURVE, ATTR_CURVATURE_VECTOR_WEIGHT);
 }
 
 VArray<float> CurvesGeometry::tilt() const
@@ -733,6 +743,7 @@ Span<float3> CurvesGeometry::evaluated_normals() const
     const VArray<bool> cyclic = this->cyclic();
     Span<float3> positions = this->positions();
     VArray<int> resolution = this->resolution();
+    const VArray<float> weight = this->curvature_vector_weight();
     const VArray<int8_t> normal_mode = this->normal_mode();
     const VArray<int8_t> types = this->curve_types();
     const VArray<float> tilt = this->tilt();
@@ -763,6 +774,7 @@ Span<float3> CurvesGeometry::evaluated_normals() const
                 curves::catmull_rom::calculate_normals(positions.slice(points),
                                                        cyclic[curve_index],
                                                        resolution[curve_index],
+                                                       weight[curve_index],
                                                        evaluated_normals.slice(evaluated_points));
                 break;
               default:
