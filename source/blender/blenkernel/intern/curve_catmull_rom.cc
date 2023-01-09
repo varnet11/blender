@@ -226,7 +226,16 @@ static float find_root_newton_bisection(float x_begin,
                                         const float precision)
 {
   float x_mid = 0.5f * (x_begin + x_end);
+
   float y_begin = eval(x_begin);
+  if (y_begin == 0.0f) {
+    return x_begin;
+  }
+
+  float y_end = eval(x_end);
+  if (y_end == 0.0f) {
+    return x_end;
+  }
 
   BLI_assert(signf(y_begin) != signf(eval(x_end)));
 
@@ -261,7 +270,6 @@ void calculate_normals(const Span<float3> positions,
 
   const float weight_twist = 1.0f - clamp_f(weight_bending, 0.0f, 1.0f);
 
-  /* TODO: check if derivatives == 0.*/
   Vector<float3> first_derivatives_(evaluated_normals.size());
   MutableSpan<float3> first_derivatives = first_derivatives_;
   interpolate_to_evaluated(1, positions, is_cyclic, resolution, first_derivatives);
@@ -307,9 +315,12 @@ void calculate_normals(const Span<float3> positions,
     /* TODO: Catmull-Rom is not C2 continuous. Some smoothening maybe? */
     float3 curvature_vector = math::normalize(math::cross(binormal, first_derivatives[i]));
 
+    const float first_derivative_norm = math::length(first_derivatives[i]);
+    const float curvature = math::length(binormal) / pow3f(first_derivative_norm);
+
     if (i == 0) {
       /* TODO: Does it make sense to propogate from where the curvature is the largest? */
-      evaluated_normals[i] = curvature_vector;
+      evaluated_normals[i] = curvature > 1e-4f ? curvature_vector : float3(1.0f, 0.0f, 0.0f);
       continue;
     }
 
@@ -321,28 +332,26 @@ void calculate_normals(const Span<float3> positions,
       continue;
     }
 
-    const float first_derivative_norm = math::length(first_derivatives[i]);
     const float3 last_tangent = math::normalize(first_derivatives[i - 1]);
     const float3 current_tangent = first_derivatives[i] / first_derivative_norm;
     const float angle = angle_normalized_v3v3(last_tangent, current_tangent);
     const float3 last_normal = evaluated_normals[i - 1];
     const float3 minimal_twist_normal =
-        angle > 0 ?
+        angle > 0 && first_derivative_norm > 0 ?
             math::rotate_direction_around_axis(
                 last_normal, math::normalize(math::cross(last_tangent, current_tangent)), angle) :
             last_normal;
 
-    if (weight_twist == 1.0f) {
-      evaluated_normals[i] = minimal_twist_normal;
-      continue;
-    }
-
     /* Arc length depends on the unit, assuming meter. */
     const float arc_length = first_derivative_norm * dt;
-    const float curvature = math::length(binormal) / pow3f(first_derivative_norm);
 
     const float coefficient_twist = weight_twist / arc_length;
     const float coefficient_bending = weight_bending * arc_length * curvature * curvature;
+
+    if (weight_twist == 1.0f || !(coefficient_bending > 0)) {
+      evaluated_normals[i] = minimal_twist_normal;
+      continue;
+    }
 
     /* Angle between the curvature vector and the minimal twist normal. */
     float theta_t = angle_normalized_v3v3(curvature_vector, minimal_twist_normal);
@@ -368,7 +377,7 @@ void calculate_normals(const Span<float3> positions,
         [coefficient_bending, coefficient_twist](float t) -> float {
           return 2.0f * (coefficient_twist + coefficient_bending * cosf(2.0f * t));
         },
-        1e-5f);
+        1e-4f);
 
     const float3 axis = math::dot(current_tangent,
                                   math::cross(curvature_vector, minimal_twist_normal)) > 0 ?
