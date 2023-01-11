@@ -3644,16 +3644,21 @@ NODE_DEFINE(MicrofacetHairBsdfNode)
   SOCKET_ENUM(
       parametrization, "Parametrization", parametrization_enum, NODE_MICROFACET_HAIR_REFLECTANCE);
 
-  /* Hair integration mode specified as enum. */
-  static NodeEnum model_type_enum;
-  model_type_enum.insert("Microfacet Circular GGX", NODE_MICROFACET_HAIR_CIRCULAR_GGX);
-  model_type_enum.insert("Microfacet Circular GGX Analytical",
-                         NODE_MICROFACET_HAIR_CIRCULAR_GGX_ANALYTIC);
-  model_type_enum.insert("Microfacet Circular Beckmann", NODE_MICROFACET_HAIR_CIRCULAR_BECKMANN);
-  model_type_enum.insert("Microfacet Elliptical GGX", NODE_MICROFACET_HAIR_ELLIPTIC_GGX);
-  model_type_enum.insert("Microfacet Elliptical Beckmann", NODE_MICROFACET_HAIR_ELLIPTIC_BECKMANN);
+  /* Hair microfacet normal distribution mode specified as enum. */
+  static NodeEnum distribution_type_enum;
+  distribution_type_enum.insert("GGX", NODE_MICROFACET_HAIR_GGX);
+  distribution_type_enum.insert("Beckmann", NODE_MICROFACET_HAIR_BECKMANN);
+  SOCKET_ENUM(
+      distribution_type, "Distribution Type", distribution_type_enum, NODE_MICROFACET_HAIR_GGX);
 
-  SOCKET_ENUM(model_type, "model_type", model_type_enum, NODE_MICROFACET_HAIR_CIRCULAR_GGX);
+  /* Hair cross-section type specified as enum. */
+  static NodeEnum cross_section_type_enum;
+  distribution_type_enum.insert("Circular", NODE_MICROFACET_HAIR_CIRCULAR);
+  distribution_type_enum.insert("Elliptical", NODE_MICROFACET_HAIR_ELLIPTIC);
+  SOCKET_ENUM(cross_section_type,
+              "Cross Section Type",
+              cross_section_type_enum,
+              NODE_MICROFACET_HAIR_CIRCULAR);
 
   /* Initialize sockets to their default values. */
   SOCKET_IN_COLOR(color, "Color", make_float3(0.017513f, 0.005763f, 0.002059f));
@@ -3698,8 +3703,7 @@ MicrofacetHairBsdfNode::MicrofacetHairBsdfNode() : BsdfBaseNode(get_node_type())
 void MicrofacetHairBsdfNode::attributes(Shader *shader, AttributeRequestSet *attributes)
 {
   /* Make sure we have the normal for elliptical cross section tracking */
-  if (model_type == NODE_MICROFACET_HAIR_ELLIPTIC_BECKMANN ||
-      model_type == NODE_MICROFACET_HAIR_ELLIPTIC_GGX) {
+  if (cross_section_type == NODE_MICROFACET_HAIR_ELLIPTIC) {
     attributes->add(ATTR_STD_VERTEX_NORMAL);
   }
 
@@ -3777,16 +3781,17 @@ void MicrofacetHairBsdfNode::compile(SVMCompiler &compiler)
                     __float_as_uint(melanin_redness));
 
   /* data node 3 */
-  compiler.add_node(compiler.encode_uchar4(tint_ofs, random_in_ofs, random_color_ofs, 0),
-                    __float_as_uint(random),
-                    __float_as_uint(random_color),
-                    attr_random);
+  compiler.add_node(
+      compiler.encode_uchar4(tint_ofs, random_in_ofs, random_color_ofs, cross_section_type),
+      __float_as_uint(random),
+      __float_as_uint(random_color),
+      attr_random);
 
   /* data node 4 */
   compiler.add_node(compiler.encode_uchar4(compiler.stack_assign_if_linked(R_in),
                                            compiler.stack_assign_if_linked(TT_in),
                                            compiler.stack_assign_if_linked(TRT_in),
-                                           model_type),
+                                           distribution_type),
                     __float_as_uint(R),
                     __float_as_uint(TT),
                     __float_as_uint(TRT));
@@ -3805,7 +3810,8 @@ void MicrofacetHairBsdfNode::compile(SVMCompiler &compiler)
 void MicrofacetHairBsdfNode::compile(OSLCompiler &compiler)
 {
   compiler.parameter(this, "parametrization");
-  compiler.parameter(this, "model_type");
+  compiler.parameter(this, "cross_section_type");
+  compiler.parameter(this, "distribution_type");
   compiler.add(this, "node_microfacet_hair_bsdf");
 }
 

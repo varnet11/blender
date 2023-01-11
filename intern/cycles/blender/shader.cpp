@@ -668,11 +668,16 @@ static ShaderNode *add_node(Scene *scene,
                                                     "parametrization",
                                                     NODE_MICROFACET_HAIR_NUM,
                                                     NODE_MICROFACET_HAIR_REFLECTANCE));
-    microfacet_hair->set_model_type(
-        (NodeMicrofacetHairModelType)get_enum(b_microfacet_hair_node.ptr,
-                                              "model_type",
-                                              NODE_MICROFACET_HAIR_MODEL_TYPE_NUM,
-                                              NODE_MICROFACET_HAIR_CIRCULAR_GGX));
+    microfacet_hair->set_cross_section_type(
+        (NodeMicrofacetHairCrossSectionType)get_enum(b_microfacet_hair_node.ptr,
+                                                     "cross_section_type",
+                                                     NODE_MICROFACET_HAIR_CROSS_SECTION_TYPE_NUM,
+                                                     NODE_MICROFACET_HAIR_CIRCULAR));
+    microfacet_hair->set_distribution_type(
+        (NodeMicrofacetHairDistributionType)get_enum(b_microfacet_hair_node.ptr,
+                                                     "distribution_type",
+                                                     NODE_MICROFACET_HAIR_DISTRIBUTION_TYPE_NUM,
+                                                     NODE_MICROFACET_HAIR_GGX));
     node = microfacet_hair;
   }
   else if (b_node.is_a(&RNA_ShaderNodeBsdfPrincipled)) {

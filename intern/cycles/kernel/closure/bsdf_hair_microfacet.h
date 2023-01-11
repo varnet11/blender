@@ -37,8 +37,11 @@ typedef struct MicrofacetHairBSDF {
   /* Blur. */
   float blur;
 
-  /* Circular/Ellipitic and GGX/Beckmann. */
-  int model_type;
+  /* GGX/Beckmann. */
+  int distribution_type;
+
+  /* Circular/Elliptical */
+  int cross_section_type;
 
   /* Extra closure. */
   ccl_private MicrofacetHairExtra *extra;
@@ -72,8 +75,7 @@ ccl_device int bsdf_microfacet_hair_setup(ccl_private ShaderData *sd,
   kernel_assert(isfinite_safe(X));
   kernel_assert(isfinite_safe(h));
 
-  if (bsdf->model_type == NODE_MICROFACET_HAIR_ELLIPTIC_GGX ||
-      bsdf->model_type == NODE_MICROFACET_HAIR_ELLIPTIC_BECKMANN) {
+  if (bsdf->cross_section_type == NODE_MICROFACET_HAIR_ELLIPTIC) {
     /* Local frame is independent of the ray direction for elliptical hairs. */
     bsdf->extra->geom.w = h;
   }
@@ -329,8 +331,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_r_circular(ccl_private const ShaderC
   const float tilt = -bsdf->alpha;
   const float roughness = bsdf->roughness;
   const float eta = bsdf->eta;
-  const bool beckmann = (bsdf->model_type == NODE_MICROFACET_HAIR_CIRCULAR_BECKMANN);
-  const bool analytical_ggx = (bsdf->model_type == NODE_MICROFACET_HAIR_CIRCULAR_GGX_ANALYTIC);
+  const bool beckmann = (bsdf->distribution_type == NODE_MICROFACET_HAIR_BECKMANN);
 
   float3 R = zero_float3();
   if (bsdf->extra->R <= 0.0f)
@@ -359,68 +360,26 @@ ccl_device float3 bsdf_microfacet_hair_eval_r_circular(ccl_private const ShaderC
 
   float integral = 0.0f;
 
-  /* analytical for ggx (no masking term) */
-  if (analytical_ggx) {
-    const float phi_h = dir_phi(wh);
-    const float d_max = phi_h - phi_m_max;
-    const float d_min = phi_h - phi_m_min;
+  /* Maximal sample resolution. */
+  float res = roughness * 0.7f;
+  /* Number of intervals should be even. */
+  const size_t intervals = 2 * (size_t)ceilf((phi_m_max - phi_m_min) / res * 0.5f);
 
-    const float roughness_squared = roughness * roughness;
+  /* Modified resolution based on numbers of intervals. */
+  res = (phi_m_max - phi_m_min) / float(intervals);
 
-    float sm, cm;
-    fast_sincosf(tilt, &sm, &cm);
+  /* Integrate using Simpson's rule. */
+  for (size_t i = 0; i <= intervals; i++) {
 
-    const float C = sqrtf(1.0f - roughness_squared);
-    const float A = cm * cos_theta(wh) * C;
-    const float B = sm * sin_theta(wh) * C;
-    const float A2 = sqr(A);
-    const float B2 = sqr(B);
-    const float tmp1 = 1.0f / sqrtf(sqr(B - 1.0f) - A2);
-    const float tmp2 = 1.0f / sqrtf(sqr(B + 1.0f) - A2);
+    const float phi_m = phi_m_min + i * res;
+    const float3 wm = sph_dir(tilt, phi_m);
 
-    float smax, cmax, smin, cmin;
-    fast_sincosf(d_max, &smax, &cmax);
-    fast_sincosf(d_min, &smin, &cmin);
-
-    const float tmax = smax / (1.0f + cmax);
-    const float tmin = smin / (1.0f + cmin);
-
-    const float temp1 = 2.0f * (A2 - B2 + 3.0f * B - 2) * sqr(tmp1) * tmp1 *
-                        (atanf((A - B + 1.0f) * tmp1 * tmax) -
-                         atanf((A - B + 1.0f) * tmp1 * tmin));
-    const float temp2 = 2.0f * (A2 - B2 - 3.0f * B - 2) * sqr(tmp2) * tmp2 *
-                        (atanf((B - A + 1.0f) * tmp2 * tmax) -
-                         atanf((B - A + 1.0f) * tmp2 * tmin));
-    const float temp3 = A * sqr(tmp1) *
-                        (smax / (A * cmax + B - 1.0f) - smin / (A * cmin + B - 1.0f));
-    const float temp4 = A * sqr(tmp2) *
-                        (smax / (A * cmax + B + 1.0f) - smin / (A * cmin + B + 1.0f));
-
-    integral = roughness_squared * M_1_PI_F * 0.5f * (temp1 + temp2 + temp3 + temp4);
-  }
-  else { /* Falls back to numerical integration. */
-    /* Maximal sample resolution. */
-    float res = roughness * 0.7f;
-    /* Number of intervals should be even. */
-    const size_t intervals = 2 * (size_t)ceilf((phi_m_max - phi_m_min) / res * 0.5f);
-
-    /* Modified resolution based on numbers of intervals. */
-    res = (phi_m_max - phi_m_min) / float(intervals);
-
-    /* Integrate using Simpson's rule. */
-    for (size_t i = 0; i <= intervals; i++) {
-
-      const float phi_m = phi_m_min + i * res;
-      const float3 wm = sph_dir(tilt, phi_m);
-
-      if (microfacet_visible(wi, wo, make_float3(wm.x, 0.0f, wm.z), wh)) {
-        const float weight = (i == 0 || i == intervals) ? 0.5f : (i % 2 + 1);
-        integral += weight * D(beckmann, roughness, wm, wh) *
-                    G(beckmann, roughness, wi, wo, wm, wh);
-      }
+    if (microfacet_visible(wi, wo, make_float3(wm.x, 0.0f, wm.z), wh)) {
+      const float weight = (i == 0 || i == intervals) ? 0.5f : (i % 2 + 1);
+      integral += weight * D(beckmann, roughness, wm, wh) * G(beckmann, roughness, wi, wo, wm, wh);
     }
-    integral *= (2.0f / 3.0f * res);
   }
+  integral *= (2.0f / 3.0f * res);
 
   const float F = fresnel_dielectric_cos(dot(wi, wh), eta);
 
@@ -438,7 +397,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_circular(KernelGlobals kg,
   const float tilt = -bsdf->alpha;
   const float roughness = bsdf->roughness;
   const float eta = bsdf->eta;
-  const bool beckmann = (bsdf->model_type == NODE_MICROFACET_HAIR_CIRCULAR_BECKMANN);
+  const bool beckmann = (bsdf->distribution_type == NODE_MICROFACET_HAIR_BECKMANN);
 
   if (bsdf->extra->TT <= 0.0f && bsdf->extra->TRT <= 0.0f)
     return zero_float3();
@@ -652,7 +611,7 @@ ccl_device int bsdf_microfacet_hair_sample_circular(const KernelGlobals kg,
 
   const float tilt = -bsdf->alpha;
   const float roughness = bsdf->roughness;
-  const bool beckmann = (bsdf->model_type == NODE_MICROFACET_HAIR_CIRCULAR_BECKMANN);
+  const bool beckmann = (bsdf->distribution_type == NODE_MICROFACET_HAIR_BECKMANN);
 
   /* generate sample */
   float sample_lobe = randu;
@@ -833,7 +792,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_r_elliptic(ccl_private const ShaderC
   const float tilt = -bsdf->alpha;
   const float roughness = bsdf->roughness;
   const float eta = bsdf->eta;
-  const bool beckmann = (bsdf->model_type == NODE_MICROFACET_HAIR_ELLIPTIC_BECKMANN);
+  const bool beckmann = (bsdf->distribution_type == NODE_MICROFACET_HAIR_BECKMANN);
 
   float3 R = zero_float3();
   if (bsdf->extra->R <= 0.0f) {
@@ -933,7 +892,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_elliptic(KernelGlobals kg,
   const float tilt = -bsdf->alpha;
   const float roughness = bsdf->roughness;
   const float eta = bsdf->eta;
-  const bool beckmann = (bsdf->model_type == NODE_MICROFACET_HAIR_ELLIPTIC_BECKMANN);
+  const bool beckmann = (bsdf->distribution_type == NODE_MICROFACET_HAIR_BECKMANN);
 
   if (bsdf->extra->TT <= 0.0f && bsdf->extra->TRT <= 0.0f) {
     return zero_float3();
@@ -1203,7 +1162,7 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
 
   const float tilt = -bsdf->alpha;
   const float roughness = bsdf->roughness;
-  const bool beckmann = (bsdf->model_type == NODE_MICROFACET_HAIR_ELLIPTIC_BECKMANN);
+  const bool beckmann = (bsdf->distribution_type == NODE_MICROFACET_HAIR_BECKMANN);
 
   /* generate sample */
   float sample_lobe = randu;
@@ -1387,17 +1346,12 @@ ccl_device Spectrum bsdf_microfacet_hair_eval(KernelGlobals kg,
 {
   ccl_private MicrofacetHairBSDF *bsdf = (ccl_private MicrofacetHairBSDF *)sc;
 
-  switch (bsdf->model_type) {
-    case NODE_MICROFACET_HAIR_CIRCULAR_GGX:
-    case NODE_MICROFACET_HAIR_CIRCULAR_GGX_ANALYTIC:
-    case NODE_MICROFACET_HAIR_CIRCULAR_BECKMANN:
-      return bsdf_microfacet_hair_eval_circular(kg, sd, sc, omega_in, pdf);
-    case NODE_MICROFACET_HAIR_ELLIPTIC_GGX:
-    case NODE_MICROFACET_HAIR_ELLIPTIC_BECKMANN:
-      return bsdf_microfacet_hair_eval_elliptic(kg, sd, sc, omega_in, pdf);
-    default:
-      return bsdf_microfacet_hair_eval_circular(kg, sd, sc, omega_in, pdf);
+  if (bsdf->cross_section_type == NODE_MICROFACET_HAIR_CIRCULAR ||
+      bsdf->extra->aspect_ratio == 1.0f) {
+    return bsdf_microfacet_hair_eval_circular(kg, sd, sc, omega_in, pdf);
   }
+
+  return bsdf_microfacet_hair_eval_elliptic(kg, sd, sc, omega_in, pdf);
 }
 
 ccl_device int bsdf_microfacet_hair_sample(KernelGlobals kg,
@@ -1413,20 +1367,14 @@ ccl_device int bsdf_microfacet_hair_sample(KernelGlobals kg,
 {
   ccl_private MicrofacetHairBSDF *bsdf = (ccl_private MicrofacetHairBSDF *)sc;
 
-  switch (bsdf->model_type) {
-    case NODE_MICROFACET_HAIR_CIRCULAR_GGX:
-    case NODE_MICROFACET_HAIR_CIRCULAR_GGX_ANALYTIC:
-    case NODE_MICROFACET_HAIR_CIRCULAR_BECKMANN:
-      return bsdf_microfacet_hair_sample_circular(
-          kg, sc, sd, randu, randv, eval, omega_in, pdf, sampled_roughness, eta);
-    case NODE_MICROFACET_HAIR_ELLIPTIC_GGX:
-    case NODE_MICROFACET_HAIR_ELLIPTIC_BECKMANN:
-      return bsdf_microfacet_hair_sample_elliptic(
-          kg, sc, sd, randu, randv, eval, omega_in, pdf, sampled_roughness, eta);
-    default:
-      return bsdf_microfacet_hair_sample_circular(
-          kg, sc, sd, randu, randv, eval, omega_in, pdf, sampled_roughness, eta);
+  if (bsdf->cross_section_type == NODE_MICROFACET_HAIR_CIRCULAR ||
+      bsdf->extra->aspect_ratio == 1.0f) {
+    return bsdf_microfacet_hair_sample_circular(
+        kg, sc, sd, randu, randv, eval, omega_in, pdf, sampled_roughness, eta);
   }
+
+  return bsdf_microfacet_hair_sample_elliptic(
+      kg, sc, sd, randu, randv, eval, omega_in, pdf, sampled_roughness, eta);
 }
 
 /* Implements Filter Glossy by capping the effective roughness. */

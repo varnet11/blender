@@ -81,24 +81,25 @@ static void node_declare(NodeDeclarationBuilder &b)
 static void node_shader_buts_microfacet_hair(uiLayout *layout, bContext * /*C*/, PointerRNA *ptr)
 {
   uiItemR(layout, ptr, "parametrization", UI_ITEM_R_SPLIT_EMPTY_NAME, "", ICON_NONE);
-  uiItemR(layout, ptr, "model_type", UI_ITEM_R_SPLIT_EMPTY_NAME, "", ICON_NONE);
+  uiItemR(layout, ptr, "cross_section_type", UI_ITEM_R_SPLIT_EMPTY_NAME, "", ICON_NONE);
+  uiItemR(layout, ptr, "distribution_type", UI_ITEM_R_SPLIT_EMPTY_NAME, "", ICON_NONE);
 }
 
 /* Initialize the custom Parametrization property to Color. */
 static void node_shader_init_hair_microfacet(bNodeTree * /*ntree*/, bNode *node)
 {
-  node->custom1 = SHD_MICROFACET_HAIR_REFLECTANCE;
-  node->custom2 = SHD_MICROFACET_HAIR_CIRCULAR_GGX;
+  node->custom0 = SHD_MICROFACET_HAIR_REFLECTANCE;
+  node->custom1 = SHD_MICROFACET_HAIR_CIRCULAR;
+  node->custom2 = SHD_MICROFACET_HAIR_GGX;
 }
 
 /* Triggers (in)visibility of some sockets when changing Parametrization. */
 static void node_shader_update_hair_microfacet(bNodeTree *ntree, bNode *node)
 {
-  int parametrization = node->custom1;
-  int model_type = node->custom2;
+  int parametrization = node->custom0;
+  int cross_section_type = node->custom1;
 
-  bool elliptical = (model_type == SHD_MICROFACET_HAIR_ELLIPTIC_GGX ||
-                     model_type == SHD_MICROFACET_HAIR_ELLIPTIC_BECKMANN);
+  bool elliptical = (cross_section_type == SHD_MICROFACET_HAIR_ELLIPTIC);
 
   LISTBASE_FOREACH (bNodeSocket *, sock, &node->inputs) {
     if (STREQ(sock->name, "Color")) {

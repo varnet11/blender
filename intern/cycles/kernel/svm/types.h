@@ -402,14 +402,17 @@ typedef enum NodeMicrofacetHairParametrization {
   NODE_MICROFACET_HAIR_NUM,
 } NodeMicrofacetHairParametrization;
 
-typedef enum NodeMicrofacetHairModelType {
-  NODE_MICROFACET_HAIR_CIRCULAR_GGX = 0,
-  NODE_MICROFACET_HAIR_CIRCULAR_GGX_ANALYTIC = 1,
-  NODE_MICROFACET_HAIR_CIRCULAR_BECKMANN = 2,
-  NODE_MICROFACET_HAIR_ELLIPTIC_GGX = 3,
-  NODE_MICROFACET_HAIR_ELLIPTIC_BECKMANN = 4,
-  NODE_MICROFACET_HAIR_MODEL_TYPE_NUM,
-} NodeMicrofacetHairModelType;
+typedef enum NodeMicrofacetHairDistributionType {
+  NODE_MICROFACET_HAIR_GGX = 0,
+  NODE_MICROFACET_HAIR_BECKMANN = 1,
+  NODE_MICROFACET_HAIR_DISTRIBUTION_TYPE_NUM,
+} NodeMicrofacetHairDistributionType;
+
+typedef enum NodeMicrofacetHairCrossSectionType {
+  NODE_MICROFACET_HAIR_CIRCULAR = 0,
+  NODE_MICROFACET_HAIR_ELLIPTIC = 1,
+  NODE_MICROFACET_HAIR_CROSS_SECTION_TYPE_NUM,
+} NodeMicrofacetHairCrossSectionType;
 
 typedef enum NodeCombSepColorType {
   NODE_COMBSEP_COLOR_RGB,

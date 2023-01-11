@@ -322,10 +322,8 @@ typedef struct bNode {
    */
   int16_t type;
 
-  char _pad1[2];
-
   /** Used for some builtin nodes that store properties but don't have a storage struct . */
-  int16_t custom1, custom2;
+  int16_t custom0, custom1, custom2;
   float custom3, custom4;
 
   /** Optional link to libdata. */
@@ -1687,12 +1685,13 @@ enum {
 #define SHD_MICROFACET_HAIR_PIGMENT_CONCENTRATION 1
 #define SHD_MICROFACET_HAIR_DIRECT_ABSORPTION 2
 
-/* microfacet hair modes */
-#define SHD_MICROFACET_HAIR_CIRCULAR_GGX 0
-#define SHD_MICROFACET_HAIR_CIRCULAR_GGX_ANALYTIC 1
-#define SHD_MICROFACET_HAIR_CIRCULAR_BECKMANN 2
-#define SHD_MICROFACET_HAIR_ELLIPTIC_GGX 3
-#define SHD_MICROFACET_HAIR_ELLIPTIC_BECKMANN 4
+/* microfacet hair cross-section */
+#define SHD_MICROFACET_HAIR_CIRCULAR 0
+#define SHD_MICROFACET_HAIR_ELLIPTIC 1
+
+/* microfacet hair distribution */
+#define SHD_MICROFACET_HAIR_GGX 0
+#define SHD_MICROFACET_HAIR_BECKMANN 1
 
 /* blend texture */
 #define SHD_BLEND_LINEAR 0

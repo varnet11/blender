@@ -899,9 +899,9 @@ ccl_device_noinline int svm_node_closure_bsdf(KernelGlobals kg,
                              &melanin_redness_ofs,
                              &absorption_coefficient_ofs);
 
-      uint tint_ofs, random_ofs, random_color_ofs, random_roughness_ofs;
+      uint tint_ofs, random_ofs, random_color_ofs, cross_section_type;
       svm_unpack_node_uchar4(
-          data_node3.x, &tint_ofs, &random_ofs, &random_color_ofs, &random_roughness_ofs);
+          data_node3.x, &tint_ofs, &random_ofs, &random_color_ofs, &cross_section_type);
 
       const AttributeDescriptor attr_descr_random = find_attribute(kg, sd, data_node3.w);
       float random = 0.0f;
@@ -912,9 +912,8 @@ ccl_device_noinline int svm_node_closure_bsdf(KernelGlobals kg,
         random = stack_load_float_default(stack, random_ofs, data_node3.y);
       }
 
-      uint R_ofs, TT_ofs, TRT_ofs, model_type;
-
-      svm_unpack_node_uchar4(data_node4.x, &R_ofs, &TT_ofs, &TRT_ofs, &model_type);
+      uint R_ofs, TT_ofs, TRT_ofs, distribution_type;
+      svm_unpack_node_uchar4(data_node4.x, &R_ofs, &TT_ofs, &TRT_ofs, &distribution_type);
       float R = stack_load_float_default(stack, R_ofs, data_node4.y);
       float TT = stack_load_float_default(stack, TT_ofs, data_node4.z);
       float TRT = stack_load_float_default(stack, TRT_ofs, data_node4.w);
@@ -940,24 +939,17 @@ ccl_device_noinline int svm_node_closure_bsdf(KernelGlobals kg,
         float factor_random_roughness = 1.0f + 2.0f * (random - 0.5f) * random_roughness;
         float roughness = param1 * factor_random_roughness;
 
-        /* if (model_type >= NODE_MICROFACET_HAIR_HYBRID_NEAR_FIELD && model_type <
-         * NODE_MICROFACET_HAIR_MODEL_TYPE_NUM) */
-        /* model_type is a uint, so no need to compare to 0
-         * (NODE_MICROFACET_HAIR_HYBRID_NEAR_FIELD), which generates a warning */
-        if (model_type < NODE_MICROFACET_HAIR_MODEL_TYPE_NUM)
-          bsdf->model_type = model_type;
-        else
-          bsdf->model_type = NODE_MICROFACET_HAIR_CIRCULAR_GGX;  // default
+        bsdf->cross_section_type = clamp(
+            cross_section_type, NODE_MICROFACET_HAIR_CIRCULAR, NODE_MICROFACET_HAIR_ELLIPTIC);
 
-        if (bsdf->model_type == NODE_MICROFACET_HAIR_CIRCULAR_GGX ||
-            bsdf->model_type == NODE_MICROFACET_HAIR_CIRCULAR_GGX_ANALYTIC ||
-            bsdf->model_type == NODE_MICROFACET_HAIR_ELLIPTIC_GGX) {
-          // empirical equivalences
+        bsdf->distribution_type = clamp(
+            distribution_type, NODE_MICROFACET_HAIR_GGX, NODE_MICROFACET_HAIR_BECKMANN);
+
+        /* Empirical equivalences compared with principled hair BSDF. */
+        if (bsdf->distribution_type == NODE_MICROFACET_HAIR_GGX) {
           roughness *= 0.5f;
         }
-        else if (bsdf->model_type == NODE_MICROFACET_HAIR_CIRCULAR_BECKMANN ||
-                 bsdf->model_type == NODE_MICROFACET_HAIR_ELLIPTIC_BECKMANN) {
-          // empirical equivalences
+        else { /* bsdf->distribution_type == NODE_MICROFACET_HAIR_BECKMANN*/
           roughness *= 2.f / 3.f;
         }
 
@@ -1014,8 +1006,7 @@ ccl_device_noinline int svm_node_closure_bsdf(KernelGlobals kg,
           }
         }
 
-        if (model_type == NODE_MICROFACET_HAIR_ELLIPTIC_GGX ||
-            model_type == NODE_MICROFACET_HAIR_ELLIPTIC_BECKMANN) {
+        if (cross_section_type == NODE_MICROFACET_HAIR_ELLIPTIC) {
 
           uint aspect_ratio_ofs, temp;
           svm_unpack_node_uchar4(data_node5.x, &aspect_ratio_ofs, &temp, &temp, &temp);
