@@ -3676,9 +3676,9 @@ NODE_DEFINE(MicrofacetHairBsdfNode)
   SOCKET_IN_FLOAT(roughness, "Roughness", 0.3f);
   SOCKET_IN_FLOAT(ior, "IOR", 1.55f);
 
-  SOCKET_IN_FLOAT(R, "R lobe", 1.0f);
-  SOCKET_IN_FLOAT(TT, "TT lobe", 1.0f);
-  SOCKET_IN_FLOAT(TRT, "TRT lobe", 1.0f);
+  SOCKET_IN_FLOAT(R, "Reflection", 1.0f);
+  SOCKET_IN_FLOAT(TT, "Transmission", 1.0f);
+  SOCKET_IN_FLOAT(TRT, "Secondary Reflection", 1.0f);
 
   SOCKET_IN_FLOAT(Blur, "Blur", 1.0f);
 
@@ -3727,9 +3727,9 @@ void MicrofacetHairBsdfNode::compile(SVMCompiler &compiler)
   ShaderInput *melanin_redness_in = input("Melanin Redness");
   ShaderInput *random_color_in = input("Random Color");
 
-  ShaderInput *R_in = input("R lobe");
-  ShaderInput *TT_in = input("TT lobe");
-  ShaderInput *TRT_in = input("TRT lobe");
+  ShaderInput *R_in = input("Reflection");
+  ShaderInput *TT_in = input("Transmission");
+  ShaderInput *TRT_in = input("Secondary Reflection");
   ShaderInput *Blur_in = input("Blur");
 
   ShaderInput *aspect_ratio_in = input("Aspect Ratio");
