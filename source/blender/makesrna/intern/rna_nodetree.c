@@ -6233,7 +6233,7 @@ static void def_hair_microfacet(StructRNA *srna)
   RNA_def_property_enum_items(prop, node_microfacet_hair_parametrization_items);
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_ShaderNode_socket_update");
 
-  prop = RNA_def_property(srna, "cross_section_type", PROP_ENUM, PROP_NONE);
+  prop = RNA_def_property(srna, "cross_section", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "cross_section");
   RNA_def_property_ui_text(
       prop, "Hair Cross Section Shape", "Select the hair's cross section shape");

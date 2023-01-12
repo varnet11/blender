@@ -3652,13 +3652,10 @@ NODE_DEFINE(MicrofacetHairBsdfNode)
       distribution_type, "Distribution Type", distribution_type_enum, NODE_MICROFACET_HAIR_GGX);
 
   /* Hair cross-section type specified as enum. */
-  static NodeEnum cross_section_type_enum;
+  static NodeEnum cross_section_enum;
   distribution_type_enum.insert("Circular", NODE_MICROFACET_HAIR_CIRCULAR);
   distribution_type_enum.insert("Elliptical", NODE_MICROFACET_HAIR_ELLIPTIC);
-  SOCKET_ENUM(cross_section_type,
-              "Cross Section Type",
-              cross_section_type_enum,
-              NODE_MICROFACET_HAIR_CIRCULAR);
+  SOCKET_ENUM(cross_section, "Cross Section", cross_section_enum, NODE_MICROFACET_HAIR_CIRCULAR);
 
   /* Initialize sockets to their default values. */
   SOCKET_IN_COLOR(color, "Color", make_float3(0.017513f, 0.005763f, 0.002059f));
@@ -3701,7 +3698,7 @@ MicrofacetHairBsdfNode::MicrofacetHairBsdfNode() : BsdfBaseNode(get_node_type())
 void MicrofacetHairBsdfNode::attributes(Shader *shader, AttributeRequestSet *attributes)
 {
   /* Make sure we have the normal for elliptical cross section tracking */
-  if (cross_section_type == NODE_MICROFACET_HAIR_ELLIPTIC) {
+  if (cross_section == NODE_MICROFACET_HAIR_ELLIPTIC) {
     attributes->add(ATTR_STD_VERTEX_NORMAL);
   }
 
@@ -3777,7 +3774,7 @@ void MicrofacetHairBsdfNode::compile(SVMCompiler &compiler)
 
   /* data node 3 */
   compiler.add_node(
-      compiler.encode_uchar4(tint_ofs, random_in_ofs, random_color_ofs, cross_section_type),
+      compiler.encode_uchar4(tint_ofs, random_in_ofs, random_color_ofs, cross_section),
       __float_as_uint(random),
       __float_as_uint(random_color),
       attr_random);
@@ -3805,7 +3802,7 @@ void MicrofacetHairBsdfNode::compile(SVMCompiler &compiler)
 void MicrofacetHairBsdfNode::compile(OSLCompiler &compiler)
 {
   compiler.parameter(this, "parametrization");
-  compiler.parameter(this, "cross_section_type");
+  compiler.parameter(this, "cross_section");
   compiler.parameter(this, "distribution_type");
   compiler.add(this, "node_microfacet_hair_bsdf");
 }

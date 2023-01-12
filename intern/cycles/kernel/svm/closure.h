@@ -889,16 +889,16 @@ ccl_device_noinline int svm_node_closure_bsdf(KernelGlobals kg,
 
       uint offset_ofs, ior_ofs, color_ofs, parametrization;
       svm_unpack_node_uchar4(data_node.y, &offset_ofs, &ior_ofs, &color_ofs, &parametrization);
-      float alpha = stack_load_float_default(stack, offset_ofs, data_node.z);
+      float tilt = stack_load_float_default(stack, offset_ofs, data_node.z);
       float ior = stack_load_float_default(stack, ior_ofs, data_node.w);
 
       uint melanin_ofs, melanin_redness_ofs, absorption_coefficient_ofs, temp;
       svm_unpack_node_uchar4(
           data_node2.x, &temp, &melanin_ofs, &melanin_redness_ofs, &absorption_coefficient_ofs);
 
-      uint tint_ofs, random_ofs, random_color_ofs, cross_section_type;
+      uint tint_ofs, random_ofs, random_color_ofs, cross_section;
       svm_unpack_node_uchar4(
-          data_node3.x, &tint_ofs, &random_ofs, &random_color_ofs, &cross_section_type);
+          data_node3.x, &tint_ofs, &random_ofs, &random_color_ofs, &cross_section);
 
       const AttributeDescriptor attr_descr_random = find_attribute(kg, sd, data_node3.w);
       float random = 0.0f;
@@ -934,8 +934,8 @@ ccl_device_noinline int svm_node_closure_bsdf(KernelGlobals kg,
         float factor_random_roughness = 1.0f + 2.0f * (random - 0.5f) * random_roughness;
         float roughness = param1 * factor_random_roughness;
 
-        bsdf->cross_section_type = clamp(
-            cross_section_type, NODE_MICROFACET_HAIR_CIRCULAR, NODE_MICROFACET_HAIR_ELLIPTIC);
+        bsdf->cross_section = clamp(
+            cross_section, NODE_MICROFACET_HAIR_CIRCULAR, NODE_MICROFACET_HAIR_ELLIPTIC);
 
         bsdf->distribution_type = clamp(
             distribution_type, NODE_MICROFACET_HAIR_GGX, NODE_MICROFACET_HAIR_BECKMANN);
@@ -950,7 +950,7 @@ ccl_device_noinline int svm_node_closure_bsdf(KernelGlobals kg,
 
         bsdf->N = N;
         bsdf->roughness = roughness;
-        bsdf->alpha = alpha;
+        bsdf->tilt = tilt;
         bsdf->eta = ior;
 
         switch (parametrization) {
@@ -1001,7 +1001,7 @@ ccl_device_noinline int svm_node_closure_bsdf(KernelGlobals kg,
           }
         }
 
-        if (cross_section_type == NODE_MICROFACET_HAIR_ELLIPTIC) {
+        if (cross_section == NODE_MICROFACET_HAIR_ELLIPTIC) {
 
           uint aspect_ratio_ofs, temp;
           svm_unpack_node_uchar4(data_node5.x, &aspect_ratio_ofs, &temp, &temp, &temp);

@@ -12,6 +12,7 @@
 CCL_NAMESPACE_BEGIN
 
 typedef struct MicrofacetHairExtra {
+  /* TODO: is this necessary? */
   float R;
   float TT;
   float TRT;
@@ -30,7 +31,7 @@ typedef struct MicrofacetHairBSDF {
   /* Microfacet distribution roughness. */
   float roughness;
   /* Cuticle tilt angle. */
-  float alpha;
+  float tilt;
   /* IOR. */
   float eta;
 
@@ -38,7 +39,7 @@ typedef struct MicrofacetHairBSDF {
   int distribution_type;
 
   /* Circular/Elliptical */
-  int cross_section_type;
+  int cross_section;
 
   /* Extra closure. */
   ccl_private MicrofacetHairExtra *extra;
@@ -58,21 +59,21 @@ ccl_device int bsdf_microfacet_hair_setup(ccl_private ShaderData *sd,
 
   bsdf->roughness = clamp(bsdf->roughness, 0.001f, 1.0f);
 
-  /* Compute local frame, aligned to curve tangent and ray direction. */
-  float3 Y = safe_normalize(sd->dPdu);
-  float3 X = safe_normalize(cross(Y, sd->I));
+  /* Compute local frame. The Y axis is aligned with the curve tangent; the X axis is perpendicular
+   to the ray direction for circular cross-sections, or aligned with the major axis for elliptical
+   cross-sections. */
+  const float3 Y = safe_normalize(sd->dPdu);
+  const float3 X = safe_normalize(cross(Y, sd->I));
 
-  /* h -1..0..1 means the rays goes from grazing the hair, to hitting it at
-   * the center, to grazing the other edge. This is the sine of the angle
-   * between sd->Ng and Z, as seen from the tangent X. */
-
-  float h = (sd->type & PRIMITIVE_CURVE_RIBBON) ? -sd->v : -dot(X, sd->N);
+  /* h -1..0..1 means the rays goes from grazing the hair, to hitting it at the center, to grazing
+   * the other edge. This is the cosine of the angle between sd->N and X. */
+  const float h = (sd->type & PRIMITIVE_CURVE_RIBBON) ? -sd->v : -dot(X, sd->N);
 
   kernel_assert(fabsf(h) < 1.0f + 1e-4f);
   kernel_assert(isfinite_safe(X));
   kernel_assert(isfinite_safe(h));
 
-  if (bsdf->cross_section_type == NODE_MICROFACET_HAIR_ELLIPTIC) {
+  if (bsdf->cross_section == NODE_MICROFACET_HAIR_ELLIPTIC) {
     /* Local frame is independent of the ray direction for elliptical hairs. */
     bsdf->extra->geom.w = h;
   }
@@ -140,13 +141,13 @@ ccl_device_inline float2 dir_sph(const float3 w)
   return make_float2(dir_theta(w), dir_phi(w));
 }
 
-/* Compute the vector direction given spherical coordinates */
-ccl_device_inline float3 sph_dir(float theta, float gamma)
+/* Compute the vector direction given spherical coordinates. */
+ccl_device_inline float3 sph_dir(float theta, float phi)
 {
-  float sin_theta, cos_theta, sin_gamma, cos_gamma;
+  float sin_theta, cos_theta, sin_phi, cos_phi;
   fast_sincosf(theta, &sin_theta, &cos_theta);
-  fast_sincosf(gamma, &sin_gamma, &cos_gamma);
-  return make_float3(sin_gamma * cos_theta, sin_theta, cos_gamma * cos_theta);
+  fast_sincosf(phi, &sin_phi, &cos_phi);
+  return make_float3(sin_phi * cos_theta, sin_theta, cos_phi * cos_theta);
 }
 
 /* Utility functions for elliptical cross-sections. */
@@ -189,7 +190,7 @@ ccl_device float3 sphg_dir(float theta, float gamma, float a, float b)
 
 /** \} */
 
-/* sample microfacets from a tilted mesonormal */
+/* Sample microfacets from a tilted mesonormal. */
 ccl_device_inline float3 sample_wh(KernelGlobals kg,
                                    const bool beckmann,
                                    const float roughness,
@@ -197,7 +198,7 @@ ccl_device_inline float3 sample_wh(KernelGlobals kg,
                                    const float3 wm,
                                    const float2 rand)
 {
-  /* Coordinate transformation for microfacet sampling */
+  /* Coordinate transformation for microfacet sampling. */
   float3 s, t;
   const float3 n = wm;
   make_orthonormals(n, &s, &t);
@@ -212,13 +213,13 @@ ccl_device_inline float3 sample_wh(KernelGlobals kg,
   return wh;
 }
 
-/* Check micronormal/mesonormal direct visiblity from v */
+/* Check micronormal/mesonormal direct visiblity from direction v. */
 ccl_device_inline bool microfacet_visible(const float3 v, const float3 m, const float3 h)
 {
   return (dot(v, h) > 0.0f && dot(v, m) > 0.0f);
 }
 
-/* Check micronormal/mesonormal direct visiblity from wi and wo */
+/* Check micronormal/mesonormal direct visiblity from directinos wi and wo. */
 ccl_device_inline bool microfacet_visible(const float3 wi,
                                           const float3 wo,
                                           const float3 m,
@@ -227,22 +228,22 @@ ccl_device_inline bool microfacet_visible(const float3 wi,
   return microfacet_visible(wi, m, h) && microfacet_visible(wo, m, h);
 }
 
-/* Check micronormal/mesonormal statistical visiblity from v: Smith's separable shadowing/masking
- * term */
+/* Smith's separable shadowing/masking term. */
 ccl_device_inline float smith_g1(
     const bool beckmann, const float roughness, const float3 v, const float3 m, const float3 h)
 {
   /* Assume consistent orientation (can't see the back of the microfacet from the front and vice
-   * versa) */
+   * versa). */
   float cos_vm = dot(v, m);
-  if (dot(v, h) <= 0.0f || cos_vm <= 0.0f)
+  if (dot(v, h) <= 0.0f || cos_vm <= 0.0f) {
     return 0.0f;
+  }
 
   return beckmann ? bsdf_beckmann_G1(roughness, cos_vm) :
                     2.0f / (1.0f + sqrtf(1.0f + sqr(roughness) * (1.0f / sqr(cos_vm) - 1.0f)));
 }
 
-/* Smith's separable shadowing-masking approximation */
+/* Geometry term. */
 ccl_device_inline float G(const bool beckmann,
                           const float roughness,
                           const float3 wi,
@@ -253,24 +254,20 @@ ccl_device_inline float G(const bool beckmann,
   return smith_g1(beckmann, roughness, wi, m, h) * smith_g1(beckmann, roughness, wo, m, h);
 }
 
-/* Normal Distribution Function */
+/* Normal Distribution Function. */
 ccl_device float D(const bool beckmann, const float roughness, const float3 m, const float3 h)
 {
-  float cos_theta = dot(h, m);
+  const float cos_theta = dot(h, m);
 
-  float result;
   const float roughness2 = sqr(roughness);
   const float cos_theta2 = sqr(cos_theta);
 
-  if (beckmann) {
-    result = expf((1.0f - 1.0f / cos_theta2) / roughness2) /
-             (M_PI_F * roughness2 * sqr(cos_theta2));
-  }
-  else { /* GGX */
-    result = roughness2 / (M_PI_F * sqr(1.0f + (roughness2 - 1.0f) * cos_theta2));
-  }
+  const float result = beckmann ?
+                           expf((1.0f - 1.0f / cos_theta2) / roughness2) /
+                               (M_PI_F * roughness2 * sqr(cos_theta2)) :
+                           roughness2 / (M_PI_F * sqr(1.0f + (roughness2 - 1.0f) * cos_theta2));
 
-  /* Prevent potential numerical issues in other stages of the model */
+  /* Prevent potential numerical issues in other stages of the model. */
   return (result * cos_theta > 1e-20f) ? result : 0.0f;
 }
 
@@ -292,7 +289,7 @@ ccl_device float fresnel(float cos_theta_i, float eta, ccl_private float *cos_th
 
   /* Using Snell's law, calculate the squared cosine of the angle between the surface normal and
    * the transmitted ray. */
-  float cos_theta_t_sqr = 1.0f - (1.0f - cos_theta_i * cos_theta_i) / (eta * eta);
+  const float cos_theta_t_sqr = 1.0f - (1.0f - cos_theta_i * cos_theta_i) / (eta * eta);
   *cos_theta_t = safe_sqrtf(cos_theta_t_sqr);
 
   if (cos_theta_t_sqr <= 0) {
@@ -301,17 +298,16 @@ ccl_device float fresnel(float cos_theta_i, float eta, ccl_private float *cos_th
   }
 
   /* Amplitudes of reflected waves. */
-  float a_s = (cos_theta_i - eta * (*cos_theta_t)) / (cos_theta_i + eta * (*cos_theta_t));
-  float a_p = (*cos_theta_t - eta * cos_theta_i) / (*cos_theta_t + eta * cos_theta_i);
-
-  float r = 0.5f * (sqr(a_s) + sqr(a_p));
+  const float a_s = (cos_theta_i - eta * (*cos_theta_t)) / (cos_theta_i + eta * (*cos_theta_t));
+  const float a_p = (*cos_theta_t - eta * cos_theta_i) / (*cos_theta_t + eta * cos_theta_i);
 
   /* Adjust the sign of the transmitted direction to be relative to the surface normal. */
   *cos_theta_t = -(*cos_theta_t);
 
-  return r;
+  return 0.5f * (sqr(a_s) + sqr(a_p));
 }
 
+/* Refract the incident ray, given the cosine of the refraction angle and the inverse IOR. */
 ccl_device_inline float3 refract_angle(const float3 incident,
                                        const float3 normal,
                                        const float cos_theta_t,
@@ -325,35 +321,39 @@ ccl_device float3 bsdf_microfacet_hair_eval_r_circular(ccl_private const ShaderC
                                                        const float3 wo)
 {
   ccl_private MicrofacetHairBSDF *bsdf = (ccl_private MicrofacetHairBSDF *)sc;
-  const float tilt = -bsdf->alpha;
+  const float tilt = -bsdf->tilt;
   const float roughness = bsdf->roughness;
   const float eta = bsdf->eta;
   const bool beckmann = (bsdf->distribution_type == NODE_MICROFACET_HAIR_BECKMANN);
 
   float3 R = zero_float3();
-  if (bsdf->extra->R <= 0.0f)
+  if (bsdf->extra->R <= 0.0f) {
     return R;
+  }
 
   const float3 wh = normalize(wi + wo);
   const float phi_o = dir_phi(wo);
 
   /* dot(wi, wmi) > 0 */
   const float tan_tilt = tanf(tilt);
-  float phi_m_max1 = acosf(fmaxf(-tan_tilt * tan_theta(wi), 0.0f));
-  if (isnan_safe(phi_m_max1))
+  const float phi_m_max1 = acosf(fmaxf(-tan_tilt * tan_theta(wi), 0.0f));
+  if (isnan_safe(phi_m_max1)) {
     return R;
+  }
   const float phi_m_min1 = -phi_m_max1;
 
   /* dot(wo, wmi) > 0 */
   const float phi_m_max2 = acosf(fmaxf(-tan_tilt * tan_theta(wo), 0.0f)) + phi_o;
-  if (isnan_safe(phi_m_max2))
+  if (isnan_safe(phi_m_max2)) {
     return R;
+  }
   const float phi_m_min2 = -phi_m_max2 + 2.0f * phi_o;
 
   const float phi_m_min = fmaxf(phi_m_min1, phi_m_min2) + 1e-5f;
   const float phi_m_max = fminf(phi_m_max1, phi_m_max2) - 1e-5f;
-  if (phi_m_min > phi_m_max)
+  if (phi_m_min > phi_m_max) {
     return R;
+  }
 
   float integral = 0.0f;
 
@@ -391,25 +391,27 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_circular(KernelGlobals kg,
                                                             uint rng_quadrature)
 {
   ccl_private MicrofacetHairBSDF *bsdf = (ccl_private MicrofacetHairBSDF *)sc;
-  const float tilt = -bsdf->alpha;
+  const float tilt = -bsdf->tilt;
   const float roughness = bsdf->roughness;
   const float eta = bsdf->eta;
   const bool beckmann = (bsdf->distribution_type == NODE_MICROFACET_HAIR_BECKMANN);
 
-  if (bsdf->extra->TT <= 0.0f && bsdf->extra->TRT <= 0.0f)
+  if (bsdf->extra->TT <= 0.0f && bsdf->extra->TRT <= 0.0f) {
     return zero_float3();
+  }
 
-  /* dot(wi, wmi) > 0 */
   const float tan_tilt = tanf(tilt);
   const float phi_m_max = acosf(fmaxf(-tan_tilt * tan_theta(wi), 0.0f)) - 1e-3f;
-  if (isnan_safe(phi_m_max))
+  if (isnan_safe(phi_m_max)) {
+    /* Early detection of dot(wi, wmi) < 0. */
     return zero_float3();
+  }
   const float phi_m_min = -phi_m_max;
 
-  /* dot(wo, wmo) < 0 */
-  float tmp1 = acosf(fminf(tan_tilt * tan_theta(wo), 0.0f));
-  if (isnan_safe(tmp1))
+  if (tan_tilt * tan_theta(wo) < -1.0f) {
+    /* Early detection of dot(wo, wmo) < 0. */
     return zero_float3();
+  }
 
   const float3 mu_a = bsdf->sigma;
   const float inv_eta = 1.0f / eta;
@@ -425,7 +427,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_circular(KernelGlobals kg,
     const float phi_mi = phi_m_min + i * res;
     const float3 wmi = sph_dir(tilt, phi_mi);
 
-    /* sample wh1 */
+    /* Sample wh1. */
     const float2 sample1 = make_float2(lcg_step_float(&rng_quadrature),
                                        lcg_step_float(&rng_quadrature));
 
@@ -438,7 +440,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_circular(KernelGlobals kg,
     float cos_theta_t1;
     const float T1 = 1.0f - fresnel(dot_wi_wh1, eta, &cos_theta_t1);
 
-    /* refraction at the first interface */
+    /* Refract at the first interface. */
     const float3 wt = -refract_angle(wi, wh1, cos_theta_t1, inv_eta);
     const float phi_t = dir_phi(wt);
     const float phi_mt = 2.0f * phi_t - phi_mi;
@@ -449,7 +451,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_circular(KernelGlobals kg,
       continue;
     }
 
-    /* Simpson's rule weight */
+    /* Simpson's rule weight. */
     float weight = (i == 0 || i == intervals) ? 0.5f : (i % 2 + 1);
 
     float3 A_t = exp(mu_a * 2.0f * cosf(phi_t - phi_mi) / cos_theta(wt));
@@ -457,10 +459,10 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_circular(KernelGlobals kg,
     /* TT */
     if (bsdf->extra->TT > 0.0f) {
 
-      /* total internal reflection */
+      /* Total internal reflection. */
       if (dot(wo, wt) >= inv_eta - 1e-5f) {
 
-        /* microfacet visiblity from macronormal */
+        /* Microfacet visiblity from macronormal. */
         float3 wh2 = -wt + inv_eta * wo;
         if (dot(wmt, wh2) >= 0.0f) {
 
@@ -476,8 +478,9 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_circular(KernelGlobals kg,
                                 sqr(rcp_norm_wh2) / dot(wt, wmi) * weight *
                                 smith_g1(beckmann, roughness, -wt, wmi, wh1) * dot(wi, wmi);
 
-          if (isfinite_safe(result))
+          if (isfinite_safe(result)) {
             S_tt += bsdf->extra->TT * result;
+          }
         }
       }
     }
@@ -485,7 +488,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_circular(KernelGlobals kg,
     /* TRT */
     if (bsdf->extra->TRT > 0.0f) {
 
-      /* sample wh2 */
+      /* Sample wh2. */
       const float2 sample2 = make_float2(lcg_step_float(&rng_quadrature),
                                          lcg_step_float(&rng_quadrature));
 
@@ -606,7 +609,7 @@ ccl_device int bsdf_microfacet_hair_sample_circular(const KernelGlobals kg,
   /* Get local wi (convention is reversed from other hair bcsdfs). */
   const float3 wi = make_float3(dot(sd->I, X), dot(sd->I, Y), dot(sd->I, Z));
 
-  const float tilt = -bsdf->alpha;
+  const float tilt = -bsdf->tilt;
   const float roughness = bsdf->roughness;
   const bool beckmann = (bsdf->distribution_type == NODE_MICROFACET_HAIR_BECKMANN);
 
@@ -786,7 +789,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_r_elliptic(ccl_private const ShaderC
                                                        const float3 wo_)
 {
   ccl_private MicrofacetHairBSDF *bsdf = (ccl_private MicrofacetHairBSDF *)sc;
-  const float tilt = -bsdf->alpha;
+  const float tilt = -bsdf->tilt;
   const float roughness = bsdf->roughness;
   const float eta = bsdf->eta;
   const bool beckmann = (bsdf->distribution_type == NODE_MICROFACET_HAIR_BECKMANN);
@@ -886,7 +889,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_elliptic(KernelGlobals kg,
                                                             uint rng_quadrature)
 {
   ccl_private MicrofacetHairBSDF *bsdf = (ccl_private MicrofacetHairBSDF *)sc;
-  const float tilt = -bsdf->alpha;
+  const float tilt = -bsdf->tilt;
   const float roughness = bsdf->roughness;
   const float eta = bsdf->eta;
   const bool beckmann = (bsdf->distribution_type == NODE_MICROFACET_HAIR_BECKMANN);
@@ -902,17 +905,16 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_elliptic(KernelGlobals kg,
   const float phi_i = dir_phi(wi);
   const float phi_o = dir_phi(wo);
 
-  /* dot(wi, wmi) > 0 */
   const float tan_tilt = tanf(tilt);
-  float phi_m_max = acosf(fmaxf(-tan_tilt * tan_theta(wi), 0.0f)) + phi_i;
+  const float phi_m_max = acosf(fmaxf(-tan_tilt * tan_theta(wi), 0.0f)) + phi_i;
   if (isnan_safe(phi_m_max)) {
+    /* Early detection of dot(wi, wmi) < 0. */
     return zero_float3();
   }
-  float phi_m_min = -phi_m_max + 2.0f * phi_i;
+  const float phi_m_min = -phi_m_max + 2.0f * phi_i;
 
-  /* dot(wo, wmo) < 0 */
-  float tmp1 = acosf(fminf(tan_tilt * tan_theta(wo), 0.0f));
-  if (isnan_safe(tmp1)) {
+  if (tan_tilt * tan_theta(wo) < -1.0f) {
+    /* Early detection of dot(wo, wmo) < 0. */
     return zero_float3();
   }
 
@@ -924,7 +926,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_elliptic(KernelGlobals kg,
   const float b = bsdf->extra->aspect_ratio;
   const float e2 = 1.0f - sqr(b / a); /* Squared Eccentricity. */
 
-  float gamma_m_min = to_gamma(phi_m_min, a, b) + 1e-3f;
+  const float gamma_m_min = to_gamma(phi_m_min, a, b) + 1e-3f;
   float gamma_m_max = to_gamma(phi_m_max, a, b) - 1e-3f;
   if (gamma_m_max < gamma_m_min) {
     gamma_m_max += M_2PI_F;
@@ -1157,7 +1159,7 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
     return LABEL_NONE;
   }
 
-  const float tilt = -bsdf->alpha;
+  const float tilt = -bsdf->tilt;
   const float roughness = bsdf->roughness;
   const bool beckmann = (bsdf->distribution_type == NODE_MICROFACET_HAIR_BECKMANN);
 
@@ -1343,8 +1345,7 @@ ccl_device Spectrum bsdf_microfacet_hair_eval(KernelGlobals kg,
 {
   ccl_private MicrofacetHairBSDF *bsdf = (ccl_private MicrofacetHairBSDF *)sc;
 
-  if (bsdf->cross_section_type == NODE_MICROFACET_HAIR_CIRCULAR ||
-      bsdf->extra->aspect_ratio == 1.0f) {
+  if (bsdf->cross_section == NODE_MICROFACET_HAIR_CIRCULAR || bsdf->extra->aspect_ratio == 1.0f) {
     return bsdf_microfacet_hair_eval_circular(kg, sd, sc, omega_in, pdf);
   }
 
@@ -1364,8 +1365,7 @@ ccl_device int bsdf_microfacet_hair_sample(KernelGlobals kg,
 {
   ccl_private MicrofacetHairBSDF *bsdf = (ccl_private MicrofacetHairBSDF *)sc;
 
-  if (bsdf->cross_section_type == NODE_MICROFACET_HAIR_CIRCULAR ||
-      bsdf->extra->aspect_ratio == 1.0f) {
+  if (bsdf->cross_section == NODE_MICROFACET_HAIR_CIRCULAR || bsdf->extra->aspect_ratio == 1.0f) {
     return bsdf_microfacet_hair_sample_circular(
         kg, sc, sd, randu, randv, eval, omega_in, pdf, sampled_roughness, eta);
   }

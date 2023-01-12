@@ -107,7 +107,7 @@ static void node_declare(NodeDeclarationBuilder &b)
 static void node_shader_buts_microfacet_hair(uiLayout *layout, bContext * /*C*/, PointerRNA *ptr)
 {
   uiItemR(layout, ptr, "parametrization", UI_ITEM_R_SPLIT_EMPTY_NAME, "", ICON_NONE);
-  uiItemR(layout, ptr, "cross_section_type", UI_ITEM_R_SPLIT_EMPTY_NAME, "", ICON_NONE);
+  uiItemR(layout, ptr, "cross_section", UI_ITEM_R_SPLIT_EMPTY_NAME, "", ICON_NONE);
   uiItemR(layout, ptr, "distribution_type", UI_ITEM_R_SPLIT_EMPTY_NAME, "", ICON_NONE);
 }
 
@@ -129,7 +129,6 @@ static void node_shader_update_hair_microfacet(bNodeTree *ntree, bNode *node)
   NodeShaderHairMicrofacet *data = static_cast<NodeShaderHairMicrofacet *>(node->storage);
 
   int parametrization = data->parametrization;
-  bool elliptical = (data->cross_section == SHD_MICROFACET_HAIR_ELLIPTIC);
 
   LISTBASE_FOREACH (bNodeSocket *, sock, &node->inputs) {
     if (STREQ(sock->name, "Color")) {
@@ -156,7 +155,7 @@ static void node_shader_update_hair_microfacet(bNodeTree *ntree, bNode *node)
           ntree, sock, parametrization == SHD_MICROFACET_HAIR_PIGMENT_CONCENTRATION);
     }
     else if (STREQ(sock->name, "Aspect Ratio")) {
-      nodeSetSocketAvailability(ntree, sock, elliptical);
+      nodeSetSocketAvailability(ntree, sock, data->cross_section == SHD_MICROFACET_HAIR_ELLIPTIC);
     }
   }
 }
