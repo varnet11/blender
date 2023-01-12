@@ -914,8 +914,6 @@ class MicrofacetHairBsdfNode : public BsdfBaseNode {
   NODE_SOCKET_API(float, TT)
   NODE_SOCKET_API(float, TRT)
 
-  NODE_SOCKET_API(float, Blur)
-
   NODE_SOCKET_API(float3, normal)
   NODE_SOCKET_API(float, surface_mix_weight)
   /* If linked, here will be the given random number. */

@@ -892,12 +892,9 @@ ccl_device_noinline int svm_node_closure_bsdf(KernelGlobals kg,
       float alpha = stack_load_float_default(stack, offset_ofs, data_node.z);
       float ior = stack_load_float_default(stack, ior_ofs, data_node.w);
 
-      uint Blur_ofs, melanin_ofs, melanin_redness_ofs, absorption_coefficient_ofs;
-      svm_unpack_node_uchar4(data_node2.x,
-                             &Blur_ofs,
-                             &melanin_ofs,
-                             &melanin_redness_ofs,
-                             &absorption_coefficient_ofs);
+      uint melanin_ofs, melanin_redness_ofs, absorption_coefficient_ofs, temp;
+      svm_unpack_node_uchar4(
+          data_node2.x, &temp, &melanin_ofs, &melanin_redness_ofs, &absorption_coefficient_ofs);
 
       uint tint_ofs, random_ofs, random_color_ofs, cross_section_type;
       svm_unpack_node_uchar4(
@@ -917,7 +914,6 @@ ccl_device_noinline int svm_node_closure_bsdf(KernelGlobals kg,
       float R = stack_load_float_default(stack, R_ofs, data_node4.y);
       float TT = stack_load_float_default(stack, TT_ofs, data_node4.z);
       float TRT = stack_load_float_default(stack, TRT_ofs, data_node4.w);
-      float blur = stack_load_float_default(stack, Blur_ofs, data_node2.y);
 
       ccl_private MicrofacetHairBSDF *bsdf = (ccl_private MicrofacetHairBSDF *)bsdf_alloc(
           sd, sizeof(MicrofacetHairBSDF), weight);
@@ -932,7 +928,6 @@ ccl_device_noinline int svm_node_closure_bsdf(KernelGlobals kg,
         bsdf->extra->R = fmaxf(0.0f, R);
         bsdf->extra->TT = fmaxf(0.0f, TT);
         bsdf->extra->TRT = fmaxf(0.0f, TRT);
-        bsdf->blur = clamp(blur, 0.0f, 1.0f);
 
         /* Random factors range: [-randomization/2, +randomization/2]. */
         float random_roughness = param2;

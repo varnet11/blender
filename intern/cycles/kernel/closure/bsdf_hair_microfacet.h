@@ -34,9 +34,6 @@ typedef struct MicrofacetHairBSDF {
   /* IOR. */
   float eta;
 
-  /* Blur. */
-  float blur;
-
   /* GGX/Beckmann. */
   int distribution_type;
 
@@ -1382,9 +1379,7 @@ ccl_device void bsdf_microfacet_hair_blur(ccl_private ShaderClosure *sc, float r
 {
   ccl_private MicrofacetHairBSDF *bsdf = (ccl_private MicrofacetHairBSDF *)sc;
 
-  if (bsdf->blur > 0) {
-    bsdf->roughness = fmaxf(roughness, bsdf->roughness);
-  }
+  bsdf->roughness = fmaxf(roughness, bsdf->roughness);
 }
 
 /* Hair Albedo */

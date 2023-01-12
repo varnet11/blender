@@ -87,11 +87,6 @@ static void node_declare(NodeDeclarationBuilder &b)
       .description(
           "The tilt angle of the cuticle scales (the outermost part of the hair). They are always "
           "tilted towards the hair root. The value is usually between 2 and 4 for human hair");
-  b.add_input<decl::Float>(N_("Blur"))
-      .default_value(1.0f)
-      .min(0.0f)
-      .max(1.0f)
-      .subtype(PROP_FACTOR);
   b.add_input<decl::Float>(N_("Random Color"))
       .default_value(0.0f)
       .min(0.0f)

@@ -3680,8 +3680,6 @@ NODE_DEFINE(MicrofacetHairBsdfNode)
   SOCKET_IN_FLOAT(TT, "Transmission", 1.0f);
   SOCKET_IN_FLOAT(TRT, "Secondary Reflection", 1.0f);
 
-  SOCKET_IN_FLOAT(Blur, "Blur", 1.0f);
-
   SOCKET_IN_FLOAT(random_roughness, "Random Roughness", 0.0f);
   SOCKET_IN_FLOAT(random_color, "Random Color", 0.0f);
   SOCKET_IN_FLOAT(random, "Random", 0.0f);
@@ -3730,7 +3728,6 @@ void MicrofacetHairBsdfNode::compile(SVMCompiler &compiler)
   ShaderInput *R_in = input("Reflection");
   ShaderInput *TT_in = input("Transmission");
   ShaderInput *TRT_in = input("Secondary Reflection");
-  ShaderInput *Blur_in = input("Blur");
 
   ShaderInput *aspect_ratio_in = input("Aspect Ratio");
 
@@ -3772,13 +3769,11 @@ void MicrofacetHairBsdfNode::compile(SVMCompiler &compiler)
                     __float_as_uint(ior));
 
   /* data node 2 */
-  compiler.add_node(compiler.encode_uchar4(compiler.stack_assign_if_linked(Blur_in),
-                                           melanin_ofs,
-                                           melanin_redness_ofs,
-                                           absorption_coefficient_ofs),
-                    __float_as_uint(Blur),
-                    __float_as_uint(melanin),
-                    __float_as_uint(melanin_redness));
+  compiler.add_node(
+      compiler.encode_uchar4(0, melanin_ofs, melanin_redness_ofs, absorption_coefficient_ofs),
+      0,
+      __float_as_uint(melanin),
+      __float_as_uint(melanin_redness));
 
   /* data node 3 */
   compiler.add_node(
