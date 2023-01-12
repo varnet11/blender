@@ -6224,34 +6224,27 @@ static void def_hair_microfacet(StructRNA *srna)
 {
   PropertyRNA *prop;
 
+  RNA_def_struct_sdna_from(srna, "NodeShaderHairMicrofacet", "storage");
+
   prop = RNA_def_property(srna, "parametrization", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_sdna(prop, NULL, "custom0");
+  RNA_def_property_enum_sdna(prop, NULL, "parametrization");
   RNA_def_property_ui_text(
       prop, "Color Parametrization", "Select the shader's color parametrization");
   RNA_def_property_enum_items(prop, node_microfacet_hair_parametrization_items);
-  RNA_def_property_enum_default(prop, SHD_MICROFACET_HAIR_REFLECTANCE);
-  /* Upon editing, update both the node data AND the UI representation */
-  /* (This effectively shows/hides the relevant sockets) */
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_ShaderNode_socket_update");
 
   prop = RNA_def_property(srna, "cross_section_type", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_sdna(prop, NULL, "custom1");
+  RNA_def_property_enum_sdna(prop, NULL, "cross_section");
   RNA_def_property_ui_text(
       prop, "Hair Cross Section Shape", "Select the hair's cross section shape");
   RNA_def_property_enum_items(prop, node_microfacet_hair_cross_section_items);
-  RNA_def_property_enum_default(prop, SHD_MICROFACET_HAIR_CIRCULAR);
-  /* Upon editing, update both the node data AND the UI representation */
-  /* (This effectively shows/hides the relevant sockets) */
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_ShaderNode_socket_update");
 
   prop = RNA_def_property(srna, "distribution_type", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_sdna(prop, NULL, "custom2");
+  RNA_def_property_enum_sdna(prop, NULL, "distribution");
   RNA_def_property_ui_text(
       prop, "Microfacet Distribution", "Select the microfacet distribution of the hair surface");
   RNA_def_property_enum_items(prop, node_microfacet_hair_distribution_items);
-  RNA_def_property_enum_default(prop, SHD_MICROFACET_HAIR_GGX);
-  /* Upon editing, update both the node data AND the UI representation */
-  /* (This effectively shows/hides the relevant sockets) */
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_ShaderNode_socket_update");
 }
 

@@ -322,8 +322,10 @@ typedef struct bNode {
    */
   int16_t type;
 
+  char _pad1[2];
+
   /** Used for some builtin nodes that store properties but don't have a storage struct . */
-  int16_t custom0, custom1, custom2;
+  int16_t custom1, custom2;
   float custom3, custom4;
 
   /** Optional link to libdata. */
@@ -1145,6 +1147,13 @@ typedef struct NodeShaderPrincipled {
   char use_subsurface_auto_radius;
   char _pad[3];
 } NodeShaderPrincipled;
+
+typedef struct NodeShaderHairMicrofacet {
+  short parametrization;
+  short cross_section;
+  short distribution;
+  char _pad[2];
+} NodeShaderHairMicrofacet;
 
 /** TEX_output. */
 typedef struct TexNodeOutput {

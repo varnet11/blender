@@ -119,18 +119,22 @@ static void node_shader_buts_microfacet_hair(uiLayout *layout, bContext * /*C*/,
 /* Initialize the custom Parametrization property to Color. */
 static void node_shader_init_hair_microfacet(bNodeTree * /*ntree*/, bNode *node)
 {
-  node->custom0 = SHD_MICROFACET_HAIR_REFLECTANCE;
-  node->custom1 = SHD_MICROFACET_HAIR_CIRCULAR;
-  node->custom2 = SHD_MICROFACET_HAIR_GGX;
+  NodeShaderHairMicrofacet *data = MEM_cnew<NodeShaderHairMicrofacet>(__func__);
+
+  data->parametrization = SHD_MICROFACET_HAIR_REFLECTANCE;
+  data->cross_section = SHD_MICROFACET_HAIR_CIRCULAR;
+  data->distribution = SHD_MICROFACET_HAIR_GGX;
+
+  node->storage = data;
 }
 
 /* Triggers (in)visibility of some sockets when changing Parametrization. */
 static void node_shader_update_hair_microfacet(bNodeTree *ntree, bNode *node)
 {
-  int parametrization = node->custom0;
-  int cross_section_type = node->custom1;
+  NodeShaderHairMicrofacet *data = static_cast<NodeShaderHairMicrofacet *>(node->storage);
 
-  bool elliptical = (cross_section_type == SHD_MICROFACET_HAIR_ELLIPTIC);
+  int parametrization = data->parametrization;
+  bool elliptical = (data->cross_section == SHD_MICROFACET_HAIR_ELLIPTIC);
 
   LISTBASE_FOREACH (bNodeSocket *, sock, &node->inputs) {
     if (STREQ(sock->name, "Color")) {
@@ -188,6 +192,8 @@ void register_node_type_sh_bsdf_hair_microfacet()
   ntype.initfunc = file_ns::node_shader_init_hair_microfacet;
   ntype.updatefunc = file_ns::node_shader_update_hair_microfacet;
   ntype.gpu_fn = file_ns::node_shader_gpu_hair_microfacet;
+  node_type_storage(
+      &ntype, "NodeShaderHairMicrofacet", node_free_standard_storage, node_copy_standard_storage);
 
   nodeRegisterType(&ntype);
 }
