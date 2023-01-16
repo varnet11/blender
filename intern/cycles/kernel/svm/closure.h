@@ -1002,27 +1002,16 @@ ccl_device_noinline int svm_node_closure_bsdf(KernelGlobals kg,
         }
 
         if (cross_section == NODE_MICROFACET_HAIR_ELLIPTIC) {
-
           uint aspect_ratio_ofs, temp;
           svm_unpack_node_uchar4(data_node5.x, &aspect_ratio_ofs, &temp, &temp, &temp);
 
-          float aspect_ratio = stack_load_float_default(stack, aspect_ratio_ofs, data_node5.y);
-
-          /* Aspect Ratio */
-          bsdf->extra->aspect_ratio = (aspect_ratio > 1.0f) ? 1.0f / aspect_ratio : aspect_ratio;
+          bsdf->aspect_ratio = stack_load_float_default(stack, aspect_ratio_ofs, data_node5.y);
 
           const AttributeDescriptor attr_descr_normal = find_attribute(kg, sd, data_node5.z);
-          const float3 normal = curve_attribute_float3(kg, sd, attr_descr_normal, NULL, NULL);
-          const float3 binormal = safe_normalize(cross(sd->dPdu, normal));
+          const float3 major_axis = curve_attribute_float3(kg, sd, attr_descr_normal, NULL, NULL);
 
-          /* Align X axis with the ellipse major axis. */
-          if (aspect_ratio > 1.0f) {
-            const float3 normal = safe_normalize(cross(binormal, sd->dPdu));
-            bsdf->extra->geom = make_float4(normal.x, normal.y, normal.z, 0.0f);
-          }
-          else {
-            bsdf->extra->geom = make_float4(binormal.x, binormal.y, binormal.z, 0.0f);
-          }
+          /* Align ellipse major axis with the curve normal direction. */
+          bsdf->extra->geom = make_float4(major_axis.x, major_axis.y, major_axis.z, 0.0f);
         }
 
         sd->flag |= bsdf_microfacet_hair_setup(sd, bsdf);

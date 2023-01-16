@@ -3653,8 +3653,8 @@ NODE_DEFINE(MicrofacetHairBsdfNode)
 
   /* Hair cross-section type specified as enum. */
   static NodeEnum cross_section_enum;
-  distribution_type_enum.insert("Circular", NODE_MICROFACET_HAIR_CIRCULAR);
-  distribution_type_enum.insert("Elliptical", NODE_MICROFACET_HAIR_ELLIPTIC);
+  cross_section_enum.insert("Circular", NODE_MICROFACET_HAIR_CIRCULAR);
+  cross_section_enum.insert("Elliptical", NODE_MICROFACET_HAIR_ELLIPTIC);
   SOCKET_ENUM(cross_section, "Cross Section", cross_section_enum, NODE_MICROFACET_HAIR_CIRCULAR);
 
   /* Initialize sockets to their default values. */

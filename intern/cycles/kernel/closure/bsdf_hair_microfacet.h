@@ -17,8 +17,6 @@ typedef struct MicrofacetHairExtra {
   float TT;
   float TRT;
 
-  float aspect_ratio;
-
   /* Geometry data. */
   float4 geom;
 } MicrofacetHairExtra;
@@ -40,6 +38,9 @@ typedef struct MicrofacetHairBSDF {
 
   /* Circular/Elliptical */
   int cross_section;
+
+  /* The ratio of the minor axis to the major axis. */
+  float aspect_ratio;
 
   /* Extra closure. */
   ccl_private MicrofacetHairExtra *extra;
@@ -74,8 +75,20 @@ ccl_device int bsdf_microfacet_hair_setup(ccl_private ShaderData *sd,
   kernel_assert(isfinite_safe(h));
 
   if (bsdf->cross_section == NODE_MICROFACET_HAIR_ELLIPTIC) {
-    /* Local frame is independent of the ray direction for elliptical hairs. */
-    bsdf->extra->geom.w = h;
+    if (bsdf->aspect_ratio > 1.0f) {
+      bsdf->aspect_ratio = 1.0f / bsdf->aspect_ratio;
+
+      /* Switch major and minor axis. */
+      const float3 minor_axis = safe_normalize(cross(
+          sd->dPdu, make_float3(bsdf->extra->geom.x, bsdf->extra->geom.y, bsdf->extra->geom.z)));
+      const float3 major_axis = safe_normalize(cross(minor_axis, sd->dPdu));
+
+      /* Local frame is independent of the ray direction for elliptical hairs. */
+      bsdf->extra->geom = make_float4(major_axis.x, major_axis.y, major_axis.z, h);
+    }
+    else {
+      bsdf->extra->geom.w = h;
+    }
   }
   else {
     bsdf->extra->geom = make_float4(X.x, X.y, X.z, h);
@@ -802,7 +815,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_r_elliptic(ccl_private const ShaderC
   /* get elliptical cross section characteristic */
   const float a = 1.0f;
   /* TODO: rename this as aspect ratio? e is in [0, 0.85], b is in [0.52, 1]. */
-  const float b = bsdf->extra->aspect_ratio;
+  const float b = bsdf->aspect_ratio;
   const float e2 = 1.0f - sqr(b / a);
 
   /* this follows blender's convention (unlike the circular case?) */
@@ -898,7 +911,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_elliptic(KernelGlobals kg,
     return zero_float3();
   }
 
-  /* this follows blender's convention (unlike the circular case?) */
+  /* TODO: switch wi and wo? */
   const float3 wo = wi_;
   const float3 wi = wo_;
 
@@ -923,7 +936,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_elliptic(KernelGlobals kg,
 
   /* get elliptical cross section characteristic */
   const float a = 1.0f;
-  const float b = bsdf->extra->aspect_ratio;
+  const float b = bsdf->aspect_ratio;
   const float e2 = 1.0f - sqr(b / a); /* Squared Eccentricity. */
 
   const float gamma_m_min = to_gamma(phi_m_min, a, b) + 1e-3f;
@@ -1094,7 +1107,7 @@ ccl_device Spectrum bsdf_microfacet_hair_eval_elliptic(KernelGlobals kg,
   const float3 wo = make_float3(dot(omega_in, X), dot(omega_in, Y), dot(omega_in, Z));
 
   /* Treat as transparent material if intersection lies outside of the projected radius. */
-  const float e2 = 1.0f - sqr(bsdf->extra->aspect_ratio);
+  const float e2 = 1.0f - sqr(bsdf->aspect_ratio);
   const float radius = sqrtf(1.0f - e2 * sqr(sin_phi(wi)));
   if (fabsf(bsdf->extra->geom.w) > radius) {
     *pdf = 0.0f;
@@ -1136,7 +1149,7 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
 
   /* get elliptical cross section characteristic */
   const float a = 1.0f;
-  const float b = bsdf->extra->aspect_ratio;
+  const float b = bsdf->aspect_ratio;
   const float e2 = 1.0f - sqr(b / a);
 
   /* macronormal */
@@ -1345,7 +1358,7 @@ ccl_device Spectrum bsdf_microfacet_hair_eval(KernelGlobals kg,
 {
   ccl_private MicrofacetHairBSDF *bsdf = (ccl_private MicrofacetHairBSDF *)sc;
 
-  if (bsdf->cross_section == NODE_MICROFACET_HAIR_CIRCULAR || bsdf->extra->aspect_ratio == 1.0f) {
+  if (bsdf->cross_section == NODE_MICROFACET_HAIR_CIRCULAR || bsdf->aspect_ratio == 1.0f) {
     return bsdf_microfacet_hair_eval_circular(kg, sd, sc, omega_in, pdf);
   }
 
@@ -1365,7 +1378,7 @@ ccl_device int bsdf_microfacet_hair_sample(KernelGlobals kg,
 {
   ccl_private MicrofacetHairBSDF *bsdf = (ccl_private MicrofacetHairBSDF *)sc;
 
-  if (bsdf->cross_section == NODE_MICROFACET_HAIR_CIRCULAR || bsdf->extra->aspect_ratio == 1.0f) {
+  if (bsdf->cross_section == NODE_MICROFACET_HAIR_CIRCULAR || bsdf->aspect_ratio == 1.0f) {
     return bsdf_microfacet_hair_sample_circular(
         kg, sc, sd, randu, randv, eval, omega_in, pdf, sampled_roughness, eta);
   }

@@ -51,6 +51,10 @@ shader node_microfacet_hair_bsdf(color Color = color(0.017513, 0.005763, 0.00205
                                  float IOR = 1.55,
                                  string AttrRandom = "geom:curve_random",
                                  float Random = 0.0,
+                                 float AspectRatio = 0.85,
+                                 float Reflection = 1.0,
+                                 float Transmission = 1.0,
+                                 float SecondaryReflection = 1.0,
 
                                  output closure color BSDF = 0)
 {
@@ -99,5 +103,26 @@ shader node_microfacet_hair_bsdf(color Color = color(0.017513, 0.005763, 0.00205
     sigma = m_sigma_from_concentration(0.0, 0.8054375);
   }
 
-  BSDF = microfacet_hair(Normal, sigma, roughness, Offset, IOR);
+  int distribution_type_enum = (distribution_type == "GGX") ? 0 : 1;
+  int cross_section_enum = 0;
+  normal major_axis = 0.0;
+
+  if (cross_section == "Elliptical") {
+    cross_section_enum = 1;
+    major_axis = 1.0;
+    getattribute("geom:N", major_axis);
+  }
+
+  BSDF = microfacet_hair(Normal,
+                         sigma,
+                         roughness,
+                         Offset,
+                         IOR,
+                         distribution_type_enum,
+                         cross_section_enum,
+                         AspectRatio,
+                         Reflection,
+                         Transmission,
+                         SecondaryReflection,
+                         major_axis);
 }

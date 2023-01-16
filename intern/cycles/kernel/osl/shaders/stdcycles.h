@@ -60,8 +60,18 @@ closure color principled_hair(normal N,
                               float coat,
                               float alpha,
                               float eta) BUILTIN;
-closure color
-microfacet_hair(normal N, color sigma, float roughness, float tilt, float eta) BUILTIN;
+closure color microfacet_hair(normal N,
+                              color sigma,
+                              float roughness,
+                              float tilt,
+                              float eta,
+                              int distribution_type,
+                              int cross_section,
+                              float aspect_ratio,
+                              float reflection,
+                              float transmission,
+                              float secondary_reflection,
+                              normal major_axis) BUILTIN;
 
 // Volume
 closure color henyey_greenstein(float g) BUILTIN;

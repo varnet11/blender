@@ -23,6 +23,7 @@
 #include "kernel/closure/bsdf_toon.h"
 #include "kernel/closure/bsdf_hair.h"
 #include "kernel/closure/bsdf_hair_principled.h"
+#include "kernel/closure/bsdf_hair_microfacet.h"
 #include "kernel/closure/bsdf_principled_diffuse.h"
 #include "kernel/closure/bsdf_principled_sheen.h"
 #include "kernel/closure/volume.h"
@@ -1118,6 +1119,49 @@ ccl_device void osl_closure_principled_hair_setup(KernelGlobals kg,
   bsdf->extra = extra;
 
   sd->flag |= bsdf_principled_hair_setup(sd, bsdf);
+#endif
+}
+
+ccl_device void osl_closure_microfacet_hair_setup(KernelGlobals kg,
+                                                  ccl_private ShaderData *sd,
+                                                  uint32_t path_flag,
+                                                  float3 weight,
+                                                  ccl_private const MicrofacetHairClosure *closure)
+{
+#ifdef __HAIR__
+  if (osl_closure_skip(kg, sd, path_flag, LABEL_GLOSSY)) {
+    return;
+  }
+
+  ccl_private MicrofacetHairBSDF *bsdf = (ccl_private MicrofacetHairBSDF *)bsdf_alloc(
+      sd, sizeof(MicrofacetHairBSDF), rgb_to_spectrum(weight));
+  if (!bsdf) {
+    return;
+  }
+
+  ccl_private MicrofacetHairExtra *extra = (ccl_private MicrofacetHairExtra *)closure_alloc_extra(
+      sd, sizeof(MicrofacetHairExtra));
+  if (!extra) {
+    return;
+  }
+
+  bsdf->N = ensure_valid_reflection(sd->Ng, sd->I, closure->N);
+  bsdf->sigma = closure->sigma;
+  bsdf->roughness = closure->roughness;
+  bsdf->tilt = closure->tilt;
+  bsdf->eta = closure->eta;
+  bsdf->cross_section = closure->cross_section;
+  bsdf->distribution_type = closure->distribution_type;
+  bsdf->aspect_ratio = closure->aspect_ratio;
+
+  bsdf->extra = extra;
+  bsdf->extra->R = closure->reflection;
+  bsdf->extra->TT = closure->transmission;
+  bsdf->extra->TRT = closure->secondary_reflection;
+  bsdf->extra->geom = make_float4(
+      closure->major_axis.x, closure->major_axis.y, closure->major_axis.z, 0.0f);
+
+  sd->flag |= bsdf_microfacet_hair_setup(sd, bsdf);
 #endif
 }
 
