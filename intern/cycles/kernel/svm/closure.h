@@ -850,27 +850,26 @@ ccl_device_noinline int svm_node_closure_bsdf(KernelGlobals kg,
             /* Benedikt Bitterli's melanin ratio remapping. */
             float eumelanin = melanin * (1.0f - melanin_redness);
             float pheomelanin = melanin * melanin_redness;
-            Spectrum melanin_sigma = bsdf_principled_hair_sigma_from_concentration(eumelanin,
-                                                                                   pheomelanin);
+            Spectrum melanin_sigma = bsdf_hair_sigma_from_concentration(eumelanin, pheomelanin);
 
             /* Optional tint. */
             float3 tint = stack_load_float3(stack, tint_ofs);
-            Spectrum tint_sigma = bsdf_principled_hair_sigma_from_reflectance(
-                rgb_to_spectrum(tint), radial_roughness);
+            Spectrum tint_sigma = bsdf_hair_sigma_from_reflectance(rgb_to_spectrum(tint),
+                                                                   radial_roughness);
 
             bsdf->sigma = melanin_sigma + tint_sigma;
             break;
           }
           case NODE_PRINCIPLED_HAIR_REFLECTANCE: {
             float3 color = stack_load_float3(stack, color_ofs);
-            bsdf->sigma = bsdf_principled_hair_sigma_from_reflectance(rgb_to_spectrum(color),
-                                                                      radial_roughness);
+            bsdf->sigma = bsdf_hair_sigma_from_reflectance(rgb_to_spectrum(color),
+                                                           radial_roughness);
             break;
           }
           default: {
             /* Fallback to brownish hair, same as defaults for melanin. */
             kernel_assert(!"Invalid Principled Hair parametrization!");
-            bsdf->sigma = bsdf_principled_hair_sigma_from_concentration(0.0f, 0.8054375f);
+            bsdf->sigma = bsdf_hair_sigma_from_concentration(0.0f, 0.8054375f);
             break;
           }
         }
@@ -968,27 +967,25 @@ ccl_device_noinline int svm_node_closure_bsdf(KernelGlobals kg,
             /* Benedikt Bitterli's melanin ratio remapping. */
             float eumelanin = melanin * (1.0f - melanin_redness);
             float pheomelanin = melanin * melanin_redness;
-            Spectrum melanin_sigma = bsdf_microfacet_hair_sigma_from_concentration(eumelanin,
-                                                                                   pheomelanin);
+            Spectrum melanin_sigma = bsdf_hair_sigma_from_concentration(eumelanin, pheomelanin);
 
             /* Optional tint. */
             float3 tint = stack_load_float3(stack, tint_ofs);
-            Spectrum tint_sigma = bsdf_microfacet_hair_sigma_from_reflectance(
-                rgb_to_spectrum(tint), roughness);
+            Spectrum tint_sigma = bsdf_hair_sigma_from_reflectance(rgb_to_spectrum(tint),
+                                                                   roughness);
 
             bsdf->sigma = melanin_sigma + tint_sigma;
             break;
           }
           case NODE_MICROFACET_HAIR_REFLECTANCE: {
             float3 color = stack_load_float3(stack, color_ofs);
-            bsdf->sigma = bsdf_microfacet_hair_sigma_from_reflectance(rgb_to_spectrum(color),
-                                                                      roughness);
+            bsdf->sigma = bsdf_hair_sigma_from_reflectance(rgb_to_spectrum(color), roughness);
             break;
           }
           default: {
             /* Fallback to brownish hair, same as defaults for melanin. */
             kernel_assert(!"Invalid Microfacet Hair parametrization!");
-            bsdf->sigma = bsdf_microfacet_hair_sigma_from_concentration(0.0f, 0.8054375f);
+            bsdf->sigma = bsdf_hair_sigma_from_concentration(0.0f, 0.8054375f);
             break;
           }
         }

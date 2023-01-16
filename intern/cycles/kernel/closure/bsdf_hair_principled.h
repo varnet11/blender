@@ -473,10 +473,9 @@ ccl_device void bsdf_principled_hair_blur(ccl_private ShaderClosure *sc, float r
   bsdf->m0_roughness = fmaxf(roughness, bsdf->m0_roughness);
 }
 
-/* Hair Albedo */
+/* Hair Albedo. Also used by `bsdf_hair_microfacet.h` */
 
-ccl_device_inline float bsdf_principled_hair_albedo_roughness_scale(
-    const float azimuthal_roughness)
+ccl_device_inline float bsdf_hair_albedo_roughness_scale(const float azimuthal_roughness)
 {
   const float x = azimuthal_roughness;
   return (((((0.245f * x) + 5.574f) * x - 10.73f) * x + 2.532f) * x - 0.215f) * x + 5.969f;
@@ -485,19 +484,18 @@ ccl_device_inline float bsdf_principled_hair_albedo_roughness_scale(
 ccl_device Spectrum bsdf_principled_hair_albedo(ccl_private const ShaderClosure *sc)
 {
   ccl_private PrincipledHairBSDF *bsdf = (ccl_private PrincipledHairBSDF *)sc;
-  return exp(-sqrt(bsdf->sigma) * bsdf_principled_hair_albedo_roughness_scale(bsdf->v));
+  return exp(-sqrt(bsdf->sigma) * bsdf_hair_albedo_roughness_scale(bsdf->v));
 }
 
-ccl_device_inline Spectrum
-bsdf_principled_hair_sigma_from_reflectance(const Spectrum color, const float azimuthal_roughness)
+ccl_device_inline Spectrum bsdf_hair_sigma_from_reflectance(const Spectrum color,
+                                                            const float azimuthal_roughness)
 {
-  const Spectrum sigma = log(color) /
-                         bsdf_principled_hair_albedo_roughness_scale(azimuthal_roughness);
+  const Spectrum sigma = log(color) / bsdf_hair_albedo_roughness_scale(azimuthal_roughness);
   return sigma * sigma;
 }
 
-ccl_device_inline Spectrum bsdf_principled_hair_sigma_from_concentration(const float eumelanin,
-                                                                         const float pheomelanin)
+ccl_device_inline Spectrum bsdf_hair_sigma_from_concentration(const float eumelanin,
+                                                              const float pheomelanin)
 {
   const float3 eumelanin_color = make_float3(0.506f, 0.841f, 1.653f);
   const float3 pheomelanin_color = make_float3(0.343f, 0.733f, 1.924f);

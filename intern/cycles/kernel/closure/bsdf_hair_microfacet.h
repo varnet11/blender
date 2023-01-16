@@ -1397,32 +1397,10 @@ ccl_device void bsdf_microfacet_hair_blur(ccl_private ShaderClosure *sc, float r
 
 /* Hair Albedo */
 
-ccl_device_inline float bsdf_microfacet_hair_albedo_roughness_scale(
-    const float azimuthal_roughness)
-{
-  const float x = azimuthal_roughness;
-  return (((((0.245f * x) + 5.574f) * x - 10.73f) * x + 2.532f) * x - 0.215f) * x + 5.969f;
-}
-
 ccl_device float3 bsdf_microfacet_hair_albedo(ccl_private const ShaderClosure *sc)
 {
   ccl_private MicrofacetHairBSDF *bsdf = (ccl_private MicrofacetHairBSDF *)sc;
-  return exp(-sqrt(bsdf->sigma) * bsdf_microfacet_hair_albedo_roughness_scale(bsdf->roughness));
-}
-
-ccl_device_inline float3
-bsdf_microfacet_hair_sigma_from_reflectance(const float3 color, const float azimuthal_roughness)
-{
-  const float3 sigma = log(color) /
-                       bsdf_microfacet_hair_albedo_roughness_scale(azimuthal_roughness);
-  return sigma * sigma;
-}
-
-ccl_device_inline float3 bsdf_microfacet_hair_sigma_from_concentration(const float eumelanin,
-                                                                       const float pheomelanin)
-{
-  return eumelanin * make_float3(0.506f, 0.841f, 1.653f) +
-         pheomelanin * make_float3(0.343f, 0.733f, 1.924f);
+  return exp(-sqrt(bsdf->sigma) * bsdf_hair_albedo_roughness_scale(bsdf->roughness));
 }
 
 CCL_NAMESPACE_END
