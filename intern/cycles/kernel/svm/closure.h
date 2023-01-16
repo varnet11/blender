@@ -940,14 +940,6 @@ ccl_device_noinline int svm_node_closure_bsdf(KernelGlobals kg,
         bsdf->distribution_type = clamp(
             distribution_type, NODE_MICROFACET_HAIR_GGX, NODE_MICROFACET_HAIR_BECKMANN);
 
-        /* Empirical equivalences compared with principled hair BSDF. */
-        if (bsdf->distribution_type == NODE_MICROFACET_HAIR_GGX) {
-          roughness *= 0.5f;
-        }
-        else { /* bsdf->distribution_type == NODE_MICROFACET_HAIR_BECKMANN*/
-          roughness *= 2.f / 3.f;
-        }
-
         bsdf->N = N;
         bsdf->roughness = roughness;
         bsdf->tilt = tilt;
