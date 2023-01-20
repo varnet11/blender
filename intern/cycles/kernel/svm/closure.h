@@ -882,7 +882,6 @@ ccl_device_noinline int svm_node_closure_bsdf(KernelGlobals kg,
       uint4 data_node2 = read_node(kg, &offset);
       uint4 data_node3 = read_node(kg, &offset);
       uint4 data_node4 = read_node(kg, &offset);
-      uint4 data_node5 = read_node(kg, &offset);
 
       Spectrum weight = sd->svm_closure_weight * mix_weight;
 
@@ -891,13 +890,16 @@ ccl_device_noinline int svm_node_closure_bsdf(KernelGlobals kg,
       float tilt = stack_load_float_default(stack, offset_ofs, data_node.z);
       float ior = stack_load_float_default(stack, ior_ofs, data_node.w);
 
-      uint melanin_ofs, melanin_redness_ofs, absorption_coefficient_ofs, temp;
-      svm_unpack_node_uchar4(
-          data_node2.x, &temp, &melanin_ofs, &melanin_redness_ofs, &absorption_coefficient_ofs);
+      uint aspect_ratio_ofs, melanin_ofs, melanin_redness_ofs, absorption_coefficient_ofs;
+      svm_unpack_node_uchar4(data_node2.x,
+                             &aspect_ratio_ofs,
+                             &melanin_ofs,
+                             &melanin_redness_ofs,
+                             &absorption_coefficient_ofs);
 
-      uint tint_ofs, random_ofs, random_color_ofs, cross_section;
+      uint tint_ofs, random_ofs, random_color_ofs, attr_normal;
       svm_unpack_node_uchar4(
-          data_node3.x, &tint_ofs, &random_ofs, &random_color_ofs, &cross_section);
+          data_node3.x, &tint_ofs, &random_ofs, &random_color_ofs, &attr_normal);
 
       const AttributeDescriptor attr_descr_random = find_attribute(kg, sd, data_node3.w);
       float random = 0.0f;
@@ -920,21 +922,29 @@ ccl_device_noinline int svm_node_closure_bsdf(KernelGlobals kg,
         ccl_private MicrofacetHairExtra *extra = (ccl_private MicrofacetHairExtra *)
             closure_alloc_extra(sd, sizeof(MicrofacetHairExtra));
 
-        if (!extra)
+        if (!extra) {
           break;
+        }
 
         bsdf->extra = extra;
         bsdf->extra->R = fmaxf(0.0f, R);
         bsdf->extra->TT = fmaxf(0.0f, TT);
         bsdf->extra->TRT = fmaxf(0.0f, TRT);
 
+        bsdf->aspect_ratio = stack_load_float_default(stack, aspect_ratio_ofs, data_node2.y);
+
+        if (bsdf->aspect_ratio != 1.0f) {
+          const AttributeDescriptor attr_descr_normal = find_attribute(kg, sd, attr_normal);
+          const float3 major_axis = curve_attribute_float3(kg, sd, attr_descr_normal, NULL, NULL);
+
+          /* Align ellipse major axis with the curve normal direction. */
+          bsdf->extra->geom = make_float4(major_axis.x, major_axis.y, major_axis.z, 0.0f);
+        }
+
         /* Random factors range: [-randomization/2, +randomization/2]. */
         float random_roughness = param2;
         float factor_random_roughness = 1.0f + 2.0f * (random - 0.5f) * random_roughness;
         float roughness = param1 * factor_random_roughness;
-
-        bsdf->cross_section = clamp(
-            cross_section, NODE_MICROFACET_HAIR_CIRCULAR, NODE_MICROFACET_HAIR_ELLIPTIC);
 
         bsdf->distribution_type = clamp(
             distribution_type, NODE_MICROFACET_HAIR_GGX, NODE_MICROFACET_HAIR_BECKMANN);
@@ -988,19 +998,6 @@ ccl_device_noinline int svm_node_closure_bsdf(KernelGlobals kg,
             bsdf->sigma = bsdf_hair_sigma_from_concentration(0.0f, 0.8054375f);
             break;
           }
-        }
-
-        if (cross_section == NODE_MICROFACET_HAIR_ELLIPTIC) {
-          uint aspect_ratio_ofs, temp;
-          svm_unpack_node_uchar4(data_node5.x, &aspect_ratio_ofs, &temp, &temp, &temp);
-
-          bsdf->aspect_ratio = stack_load_float_default(stack, aspect_ratio_ofs, data_node5.y);
-
-          const AttributeDescriptor attr_descr_normal = find_attribute(kg, sd, data_node5.z);
-          const float3 major_axis = curve_attribute_float3(kg, sd, attr_descr_normal, NULL, NULL);
-
-          /* Align ellipse major axis with the curve normal direction. */
-          bsdf->extra->geom = make_float4(major_axis.x, major_axis.y, major_axis.z, 0.0f);
         }
 
         sd->flag |= bsdf_microfacet_hair_setup(sd, bsdf);

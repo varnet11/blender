@@ -408,12 +408,6 @@ typedef enum NodeMicrofacetHairDistributionType {
   NODE_MICROFACET_HAIR_DISTRIBUTION_TYPE_NUM,
 } NodeMicrofacetHairDistributionType;
 
-typedef enum NodeMicrofacetHairCrossSectionType {
-  NODE_MICROFACET_HAIR_CIRCULAR = 0,
-  NODE_MICROFACET_HAIR_ELLIPTIC = 1,
-  NODE_MICROFACET_HAIR_CROSS_SECTION_NUM,
-} NodeMicrofacetHairCrossSectionType;
-
 typedef enum NodeCombSepColorType {
   NODE_COMBSEP_COLOR_RGB,
   NODE_COMBSEP_COLOR_HSV,

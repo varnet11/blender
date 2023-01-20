@@ -668,11 +668,7 @@ static ShaderNode *add_node(Scene *scene,
                                                     "parametrization",
                                                     NODE_MICROFACET_HAIR_NUM,
                                                     NODE_MICROFACET_HAIR_REFLECTANCE));
-    microfacet_hair->set_cross_section(
-        (NodeMicrofacetHairCrossSectionType)get_enum(b_microfacet_hair_node.ptr,
-                                                     "cross_section",
-                                                     NODE_MICROFACET_HAIR_CROSS_SECTION_NUM,
-                                                     NODE_MICROFACET_HAIR_CIRCULAR));
+
     microfacet_hair->set_distribution_type(
         (NodeMicrofacetHairDistributionType)get_enum(b_microfacet_hair_node.ptr,
                                                      "distribution_type",

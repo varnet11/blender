@@ -43,7 +43,7 @@ static void node_declare(NodeDeclarationBuilder &b)
       .description(
           "For elliptical hair cross-section, the aspect ratio is the ratio of the minor axis to "
           "the major axis. Recommended values are 0.8~1 for Asian hair, 0.65~0.9 for Caucasian "
-          "hair, 0.5~0.65 for African hair");
+          "hair, 0.5~0.65 for African hair. Set this to 1 for circular cross-section");
   b.add_input<decl::Float>(N_("Roughness"))
       .default_value(0.3f)
       .min(0.0f)
@@ -107,7 +107,6 @@ static void node_declare(NodeDeclarationBuilder &b)
 static void node_shader_buts_microfacet_hair(uiLayout *layout, bContext * /*C*/, PointerRNA *ptr)
 {
   uiItemR(layout, ptr, "parametrization", UI_ITEM_R_SPLIT_EMPTY_NAME, "", ICON_NONE);
-  uiItemR(layout, ptr, "cross_section", UI_ITEM_R_SPLIT_EMPTY_NAME, "", ICON_NONE);
   uiItemR(layout, ptr, "distribution_type", UI_ITEM_R_SPLIT_EMPTY_NAME, "", ICON_NONE);
 }
 
@@ -117,7 +116,6 @@ static void node_shader_init_hair_microfacet(bNodeTree * /*ntree*/, bNode *node)
   NodeShaderHairMicrofacet *data = MEM_cnew<NodeShaderHairMicrofacet>(__func__);
 
   data->parametrization = SHD_MICROFACET_HAIR_REFLECTANCE;
-  data->cross_section = SHD_MICROFACET_HAIR_CIRCULAR;
   data->distribution = SHD_MICROFACET_HAIR_GGX;
 
   node->storage = data;
@@ -153,9 +151,6 @@ static void node_shader_update_hair_microfacet(bNodeTree *ntree, bNode *node)
     else if (STREQ(sock->name, "Random Color")) {
       nodeSetSocketAvailability(
           ntree, sock, parametrization == SHD_MICROFACET_HAIR_PIGMENT_CONCENTRATION);
-    }
-    else if (STREQ(sock->name, "Aspect Ratio")) {
-      nodeSetSocketAvailability(ntree, sock, data->cross_section == SHD_MICROFACET_HAIR_ELLIPTIC);
     }
   }
 }

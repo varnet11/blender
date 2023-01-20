@@ -43,7 +43,6 @@ shader node_microfacet_hair_bsdf(color Color = color(0.017513, 0.005763, 0.00205
                                  color AbsorptionCoefficient = color(0.245531, 0.52, 1.365),
                                  normal Normal = Ng,
                                  string parametrization = "Direct Coloring",
-                                 string cross_section = "Circular",
                                  string distribution_type = "GGX",
                                  float Offset = radians(2),
                                  float Roughness = 0.3,
@@ -104,12 +103,9 @@ shader node_microfacet_hair_bsdf(color Color = color(0.017513, 0.005763, 0.00205
   }
 
   int distribution_type_enum = (distribution_type == "GGX") ? 0 : 1;
-  int cross_section_enum = 0;
   normal major_axis = 0.0;
 
-  if (cross_section == "Elliptical") {
-    cross_section_enum = 1;
-    major_axis = 1.0;
+  if (AspectRatio != 1.0) {
     getattribute("geom:N", major_axis);
   }
 
@@ -119,7 +115,6 @@ shader node_microfacet_hair_bsdf(color Color = color(0.017513, 0.005763, 0.00205
                          Offset,
                          IOR,
                          distribution_type_enum,
-                         cross_section_enum,
                          AspectRatio,
                          Reflection,
                          Transmission,

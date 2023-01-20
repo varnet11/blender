@@ -1150,7 +1150,6 @@ ccl_device void osl_closure_microfacet_hair_setup(KernelGlobals kg,
   bsdf->roughness = closure->roughness;
   bsdf->tilt = closure->tilt;
   bsdf->eta = closure->eta;
-  bsdf->cross_section = closure->cross_section;
   bsdf->distribution_type = closure->distribution_type;
   bsdf->aspect_ratio = closure->aspect_ratio;
 

@@ -922,8 +922,6 @@ class MicrofacetHairBsdfNode : public BsdfBaseNode {
   NODE_SOCKET_API(float, random)
   /* Selected coloring parametrization. */
   NODE_SOCKET_API(NodeMicrofacetHairParametrization, parametrization)
-  /* Selected cross-section type. */
-  NODE_SOCKET_API(NodeMicrofacetHairCrossSectionType, cross_section)
   /* Selected microfacet distribution type. */
   NODE_SOCKET_API(NodeMicrofacetHairDistributionType, distribution_type)
 };

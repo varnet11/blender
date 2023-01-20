@@ -4666,20 +4666,6 @@ static const EnumPropertyItem node_microfacet_hair_parametrization_items[] = {
     {0, NULL, 0, NULL, NULL},
 };
 
-static const EnumPropertyItem node_microfacet_hair_cross_section_items[] = {
-    {SHD_MICROFACET_HAIR_CIRCULAR,
-     "HAIR_MICROFACET_CIRCULAR",
-     0,
-     "Circular",
-     "Microfacet-based hair scattering model with circular cross section"},
-    {SHD_MICROFACET_HAIR_ELLIPTIC,
-     "HAIR_MICROFACET_CIRCULAR_ELLIPTIC",
-     0,
-     "Elliptical",
-     "Microfacet-based hair scattering model with elliptical cross section fiber"},
-    {0, NULL, 0, NULL, NULL},
-};
-
 static const EnumPropertyItem node_microfacet_hair_distribution_items[] = {
     {SHD_MICROFACET_HAIR_GGX,
      "HAIR_MICROFACET_GGX",
@@ -4687,7 +4673,7 @@ static const EnumPropertyItem node_microfacet_hair_distribution_items[] = {
      "GGX",
      "Microfacet-based hair scattering model with GGX distribution"},
     {SHD_MICROFACET_HAIR_BECKMANN,
-     "HAIR_MICROFACET_ELLIPTIC_BECKMANN",
+     "HAIR_MICROFACET_BECKMANN",
      0,
      "Beckmann",
      "Microfacet-based hair scattering model with Beckmann distribution"},
@@ -6226,13 +6212,6 @@ static void def_hair_microfacet(StructRNA *srna)
   RNA_def_property_ui_text(
       prop, "Color Parametrization", "Select the shader's color parametrization");
   RNA_def_property_enum_items(prop, node_microfacet_hair_parametrization_items);
-  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_ShaderNode_socket_update");
-
-  prop = RNA_def_property(srna, "cross_section", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_sdna(prop, NULL, "cross_section");
-  RNA_def_property_ui_text(
-      prop, "Hair Cross Section Shape", "Select the hair's cross section shape");
-  RNA_def_property_enum_items(prop, node_microfacet_hair_cross_section_items);
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_ShaderNode_socket_update");
 
   prop = RNA_def_property(srna, "distribution_type", PROP_ENUM, PROP_NONE);

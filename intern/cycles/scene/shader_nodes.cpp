@@ -3713,12 +3713,6 @@ NODE_DEFINE(MicrofacetHairBsdfNode)
   SOCKET_ENUM(
       distribution_type, "Distribution Type", distribution_type_enum, NODE_MICROFACET_HAIR_GGX);
 
-  /* Hair cross-section type specified as enum. */
-  static NodeEnum cross_section_enum;
-  cross_section_enum.insert("Circular", NODE_MICROFACET_HAIR_CIRCULAR);
-  cross_section_enum.insert("Elliptical", NODE_MICROFACET_HAIR_ELLIPTIC);
-  SOCKET_ENUM(cross_section, "Cross Section", cross_section_enum, NODE_MICROFACET_HAIR_CIRCULAR);
-
   /* Initialize sockets to their default values. */
   SOCKET_IN_COLOR(color, "Color", make_float3(0.017513f, 0.005763f, 0.002059f));
   SOCKET_IN_FLOAT(melanin, "Melanin", 0.8f);
@@ -3760,7 +3754,7 @@ MicrofacetHairBsdfNode::MicrofacetHairBsdfNode() : BsdfBaseNode(get_node_type())
 void MicrofacetHairBsdfNode::attributes(Shader *shader, AttributeRequestSet *attributes)
 {
   /* Make sure we have the normal for elliptical cross section tracking */
-  if (cross_section == NODE_MICROFACET_HAIR_ELLIPTIC) {
+  if (aspect_ratio != 1.0f) {
     attributes->add(ATTR_STD_VERTEX_NORMAL);
   }
 
@@ -3828,15 +3822,18 @@ void MicrofacetHairBsdfNode::compile(SVMCompiler &compiler)
                     __float_as_uint(ior));
 
   /* data node 2 */
-  compiler.add_node(
-      compiler.encode_uchar4(0, melanin_ofs, melanin_redness_ofs, absorption_coefficient_ofs),
-      0,
-      __float_as_uint(melanin),
-      __float_as_uint(melanin_redness));
+  compiler.add_node(compiler.encode_uchar4(compiler.stack_assign_if_linked(aspect_ratio_in),
+                                           melanin_ofs,
+                                           melanin_redness_ofs,
+                                           absorption_coefficient_ofs),
+                    __float_as_uint(aspect_ratio),
+                    __float_as_uint(melanin),
+                    __float_as_uint(melanin_redness));
 
   /* data node 3 */
   compiler.add_node(
-      compiler.encode_uchar4(tint_ofs, random_in_ofs, random_color_ofs, cross_section),
+      compiler.encode_uchar4(
+          tint_ofs, random_in_ofs, random_color_ofs, compiler.attribute(ATTR_STD_VERTEX_NORMAL)),
       __float_as_uint(random),
       __float_as_uint(random_color),
       attr_random);
@@ -3849,22 +3846,12 @@ void MicrofacetHairBsdfNode::compile(SVMCompiler &compiler)
                     __float_as_uint(R),
                     __float_as_uint(TT),
                     __float_as_uint(TRT));
-
-  /* data node 5 */
-  compiler.add_node(compiler.encode_uchar4(compiler.stack_assign_if_linked(aspect_ratio_in),
-                                           SVM_STACK_INVALID,
-                                           SVM_STACK_INVALID,
-                                           SVM_STACK_INVALID),
-                    __float_as_uint(aspect_ratio),
-                    compiler.attribute(ATTR_STD_VERTEX_NORMAL),
-                    0);
 }
 
 /* Prepares the input data for the OSL shader. */
 void MicrofacetHairBsdfNode::compile(OSLCompiler &compiler)
 {
   compiler.parameter(this, "parametrization");
-  compiler.parameter(this, "cross_section");
   compiler.parameter(this, "distribution_type");
   compiler.add(this, "node_microfacet_hair_bsdf");
 }

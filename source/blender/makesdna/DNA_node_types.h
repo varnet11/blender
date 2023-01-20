@@ -1692,10 +1692,6 @@ enum {
 #define SHD_MICROFACET_HAIR_PIGMENT_CONCENTRATION 1
 #define SHD_MICROFACET_HAIR_DIRECT_ABSORPTION 2
 
-/* microfacet hair cross-section */
-#define SHD_MICROFACET_HAIR_CIRCULAR 0
-#define SHD_MICROFACET_HAIR_ELLIPTIC 1
-
 /* microfacet hair distribution */
 #define SHD_MICROFACET_HAIR_GGX 0
 #define SHD_MICROFACET_HAIR_BECKMANN 1
