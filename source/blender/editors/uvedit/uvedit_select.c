@@ -22,11 +22,14 @@
 #include "BLI_alloca.h"
 #include "BLI_blenlib.h"
 #include "BLI_hash.h"
+#include "BLI_heap.h"
 #include "BLI_kdopbvh.h"
 #include "BLI_kdtree.h"
 #include "BLI_lasso_2d.h"
 #include "BLI_math.h"
+#include "BLI_memarena.h"
 #include "BLI_polyfill_2d.h"
+#include "BLI_polyfill_2d_beautify.h"
 #include "BLI_utildefines.h"
 
 #include "BKE_context.h"
@@ -754,7 +757,7 @@ static BMLoop *uvedit_loop_find_other_radial_loop_with_visible_face(const Scene 
     do {
       if (uvedit_face_visible_test(scene, l_iter->f) &&
           BM_loop_uv_share_edge_check(l_src, l_iter, offsets.uv)) {
-        /* Check UV's are contiguous. */
+        /* Check UVs are contiguous. */
         if (l_other == NULL) {
           l_other = l_iter;
         }
@@ -1107,7 +1110,7 @@ bool ED_uvedit_nearest_uv_multi(const View2D *v2d,
  *
  * These functions are quite specialized, useful when sync select is enabled
  * and we want to pick an active UV vertex/edge from the active element which may
- * have multiple UV's split out.
+ * have multiple UVs split out.
  * \{ */
 
 BMLoop *uv_find_nearest_loop_from_vert(struct Scene *scene,
@@ -1830,7 +1833,7 @@ static void uv_select_linked_multi(Scene *scene,
                   /* Special case, vertex/edge & sync select being enabled.
                    *
                    * Without this, a second linked select will 'grow' each time as each new
-                   * selection reaches the boundaries of islands that share vertices but not UV's.
+                   * selection reaches the boundaries of islands that share vertices but not UVs.
                    *
                    * Rules applied here:
                    * - This loops face isn't selected.
@@ -3368,7 +3371,7 @@ static void uv_select_flush_from_tag_loop(const Scene *scene, Object *obedit, co
 
   if ((ts->uv_flag & UV_SYNC_SELECTION) == 0 && ts->uv_sticky == SI_STICKY_VERTEX) {
     /* Tag all verts as untouched, then touch the ones that have a face center
-     * in the loop and select all UV's that use a touched vert. */
+     * in the loop and select all UVs that use a touched vert. */
     BM_mesh_elem_hflag_disable_all(em->bm, BM_VERT, BM_ELEM_TAG, false);
 
     BM_ITER_MESH (efa, &iter, em->bm, BM_FACES_OF_MESH) {
@@ -4160,7 +4163,7 @@ void UV_OT_select_lasso(wmOperatorType *ot)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Select Pinned UV's Operator
+/** \name Select Pinned UVs Operator
  * \{ */
 
 static int uv_select_pinned_exec(bContext *C, wmOperator *op)
@@ -4359,6 +4362,9 @@ static int uv_select_overlap(bContext *C, const bool extend)
   float(*uv_verts)[2] = MEM_mallocN(sizeof(*uv_verts) * face_len_alloc, "UvOverlapCoords");
   uint(*indices)[3] = MEM_mallocN(sizeof(*indices) * (face_len_alloc - 2), "UvOverlapTris");
 
+  MemArena *arena = BLI_memarena_new(BLI_MEMARENA_STD_BUFSIZE, __func__);
+  Heap *heap = BLI_heap_new_ex(BLI_POLYFILL_ALLOC_NGON_RESERVE);
+
   for (uint ob_index = 0; ob_index < objects_len; ob_index++) {
     Object *obedit = objects[ob_index];
     BMEditMesh *em = BKE_editmesh_from_object(obedit);
@@ -4393,7 +4399,14 @@ static int uv_select_overlap(bContext *C, const bool extend)
         copy_v2_v2(uv_verts[vert_index], luv);
       }
 
-      BLI_polyfill_calc(uv_verts, face_len, 0, indices);
+      /* The UV coordinates winding could be positive of negative,
+       * determine it automatically. */
+      const int coords_sign = 0;
+      BLI_polyfill_calc_arena(uv_verts, face_len, coords_sign, indices, arena);
+
+      /* A beauty fill is necessary to remove degenerate triangles that may be produced from the
+       * above poly-fill (see T103913), otherwise the overlap tests can fail. */
+      BLI_polyfill_beautify(uv_verts, face_len, indices, arena, heap);
 
       for (int t = 0; t < tri_len; t++) {
         overlap_data[data_index].ob_index = ob_index;
@@ -4413,10 +4426,15 @@ static int uv_select_overlap(bContext *C, const bool extend)
         BLI_bvhtree_insert(uv_tree, data_index, &tri[0][0], 3);
         data_index++;
       }
+
+      BLI_memarena_clear(arena);
+      BLI_heap_clear(heap, NULL);
     }
   }
   BLI_assert(data_index == uv_tri_len);
 
+  BLI_memarena_free(arena);
+  BLI_heap_free(heap, NULL);
   MEM_freeN(uv_verts);
   MEM_freeN(indices);
 

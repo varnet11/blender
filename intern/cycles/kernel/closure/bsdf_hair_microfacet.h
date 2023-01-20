@@ -64,7 +64,7 @@ ccl_device int bsdf_microfacet_hair_setup(ccl_private ShaderData *sd,
    to the ray direction for circular cross-sections, or aligned with the major axis for elliptical
    cross-sections. */
   const float3 Y = safe_normalize(sd->dPdu);
-  const float3 X = safe_normalize(cross(Y, sd->I));
+  const float3 X = safe_normalize(cross(Y, sd->wi));
 
   /* h -1..0..1 means the rays goes from grazing the hair, to hitting it at the center, to grazing
    * the other edge. This is the cosine of the angle between sd->N and X. */
@@ -204,12 +204,9 @@ ccl_device float3 sphg_dir(float theta, float gamma, float a, float b)
 /** \} */
 
 /* Sample microfacets from a tilted mesonormal. */
-ccl_device_inline float3 sample_wh(KernelGlobals kg,
-                                   const bool beckmann,
-                                   const float roughness,
-                                   const float3 wi,
-                                   const float3 wm,
-                                   const float2 rand)
+template<MicrofacetType m_type>
+ccl_device_inline float3 sample_wh(
+    KernelGlobals kg, const float roughness, const float3 wi, const float3 wm, const float2 rand)
 {
   /* Coordinate transformation for microfacet sampling. */
   float3 s, t;
@@ -218,9 +215,9 @@ ccl_device_inline float3 sample_wh(KernelGlobals kg,
 
   const float3 wi_wm = make_float3(dot(wi, s), dot(wi, t), dot(wi, n));
 
-  float G1o;
-  const float3 wh_wm = microfacet_sample_stretched(
-      kg, wi_wm, roughness, roughness, rand.x, rand.y, beckmann, &G1o);
+  float G1i;
+  const float3 wh_wm = microfacet_sample_stretched<m_type>(
+      kg, wi_wm, roughness, roughness, rand.x, rand.y, &G1i);
 
   const float3 wh = wh_wm.x * s + wh_wm.y * t + wh_wm.z * n;
   return wh;
@@ -252,7 +249,7 @@ ccl_device_inline float smith_g1(
     return 0.0f;
   }
 
-  return beckmann ? bsdf_beckmann_G1(roughness, cos_vm) :
+  return beckmann ? bsdf_G1<MicrofacetType::BECKMANN>(sqr(roughness), cos_vm) :
                     2.0f / (1.0f + sqrtf(1.0f + sqr(roughness) * (1.0f / sqr(cos_vm) - 1.0f)));
 }
 
@@ -329,6 +326,7 @@ ccl_device_inline float3 refract_angle(const float3 incident,
   return inv_eta * incident - (inv_eta * dot(normal, incident) + cos_theta_t) * normal;
 }
 
+template<MicrofacetType m_type>
 ccl_device float3 bsdf_microfacet_hair_eval_r_circular(ccl_private const ShaderClosure *sc,
                                                        const float3 wi,
                                                        const float3 wo)
@@ -397,6 +395,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_r_circular(ccl_private const ShaderC
   return R;
 }
 
+template<MicrofacetType m_type>
 ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_circular(KernelGlobals kg,
                                                             ccl_private const ShaderClosure *sc,
                                                             const float3 wi,
@@ -444,7 +443,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_circular(KernelGlobals kg,
     const float2 sample1 = make_float2(lcg_step_float(&rng_quadrature),
                                        lcg_step_float(&rng_quadrature));
 
-    const float3 wh1 = sample_wh(kg, beckmann, roughness, wi, wmi, sample1);
+    const float3 wh1 = sample_wh<m_type>(kg, roughness, wi, wmi, sample1);
     const float dot_wi_wh1 = dot(wi, wh1);
     if (!(dot_wi_wh1 > 0)) {
       continue;
@@ -505,7 +504,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_circular(KernelGlobals kg,
       const float2 sample2 = make_float2(lcg_step_float(&rng_quadrature),
                                          lcg_step_float(&rng_quadrature));
 
-      float3 wh2 = sample_wh(kg, beckmann, roughness, -wt, wmt, sample2);
+      float3 wh2 = sample_wh<m_type>(kg, roughness, -wt, wmt, sample2);
 
       const float cos_th2 = dot(-wt, wh2);
       if (!(cos_th2 > 0)) {
@@ -563,39 +562,49 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_circular(KernelGlobals kg,
 ccl_device Spectrum bsdf_microfacet_hair_eval_circular(KernelGlobals kg,
                                                        ccl_private const ShaderData *sd,
                                                        ccl_private const ShaderClosure *sc,
-                                                       const float3 O,
+                                                       const float3 wo,
                                                        ccl_private float *pdf)
 {
   /* Get local coordinate system:
-   * . X along the hair fiber width & perpendicular to the incoming ray (sd->I).
+   * . X along the hair fiber width & perpendicular to the incoming ray (sd->wi).
    * . Y along the hair fiber tangent.
-   * . Z = X ^ Y (facing the incoming ray (sd->I) as much as possible). */
+   * . Z = X ^ Y (facing the incoming ray (sd->wi) as much as possible). */
   ccl_private MicrofacetHairBSDF *bsdf = (ccl_private MicrofacetHairBSDF *)sc;
   const float3 X = float4_to_float3(bsdf->extra->geom);
   const float3 Y = safe_normalize(sd->dPdu);
   const float3 Z = safe_normalize(cross(X, Y));
 
   /* Transform wi/wo from global coordinate system to local. */
-  const float3 wi = make_float3(dot(sd->I, X), dot(sd->I, Y), dot(sd->I, Z));
-  const float3 wo = make_float3(dot(O, X), dot(O, Y), dot(O, Z));
+  const float3 local_I = make_float3(dot(sd->wi, X), dot(sd->wi, Y), dot(sd->wi, Z));
+  const float3 local_O = make_float3(dot(wo, X), dot(wo, Y), dot(wo, Z));
 
   /* Evaluate R, TT, TRT terms. */
-  const float3 R = bsdf_microfacet_hair_eval_r_circular(sc, wi, wo) +
-                   bsdf_microfacet_hair_eval_tt_trt_circular(kg, sc, wi, wo, sd->lcg_state);
+  float3 R;
+  if (bsdf->distribution_type == NODE_MICROFACET_HAIR_BECKMANN) {
+    R = bsdf_microfacet_hair_eval_r_circular<MicrofacetType::BECKMANN>(sc, local_I, local_O) +
+        bsdf_microfacet_hair_eval_tt_trt_circular<MicrofacetType::BECKMANN>(
+            kg, sc, local_I, local_O, sd->lcg_state);
+  }
+  else {
+    R = bsdf_microfacet_hair_eval_r_circular<MicrofacetType::GGX>(sc, local_I, local_O) +
+        bsdf_microfacet_hair_eval_tt_trt_circular<MicrofacetType::GGX>(
+            kg, sc, local_I, local_O, sd->lcg_state);
+  }
 
   /* TODO: better estimation of the pdf */
   *pdf = 1.0f;
 
-  return rgb_to_spectrum(R / cos_theta(wi));
+  return rgb_to_spectrum(R / cos_theta(local_I));
 }
 
+template<MicrofacetType m_type>
 ccl_device int bsdf_microfacet_hair_sample_circular(const KernelGlobals kg,
                                                     ccl_private const ShaderClosure *sc,
                                                     ccl_private ShaderData *sd,
                                                     float randu,
                                                     float randv,
                                                     ccl_private Spectrum *eval,
-                                                    ccl_private float3 *O,
+                                                    ccl_private float3 *wo,
                                                     ccl_private float *pdf,
                                                     ccl_private float2 *sampled_roughness,
                                                     ccl_private float *eta)
@@ -612,19 +621,19 @@ ccl_device int bsdf_microfacet_hair_sample_circular(const KernelGlobals kg,
   }
 
   /* Get local coordinate system:
-   * . X along the hair fiber width & perpendicular to the incoming ray (sd->I).
+   * . X along the hair fiber width & perpendicular to the incoming ray (sd->wi).
    * . Y along the hair fiber tangent.
-   * . Z = X ^ Y (facing the incoming ray (sd->I) as much as possible). */
+   * . Z = X ^ Y (facing the incoming ray (sd->wi) as much as possible). */
   const float3 X = float4_to_float3(bsdf->extra->geom);
   const float3 Y = safe_normalize(sd->dPdu);
   const float3 Z = safe_normalize(cross(X, Y));
 
   /* Transform wi from global coordinate system to local. */
-  const float3 wi = make_float3(dot(sd->I, X), dot(sd->I, Y), dot(sd->I, Z));
+  const float3 wi = make_float3(dot(sd->wi, X), dot(sd->wi, Y), dot(sd->wi, Z));
 
   const float tilt = -bsdf->tilt;
   const float roughness = bsdf->roughness;
-  const bool beckmann = (bsdf->distribution_type == NODE_MICROFACET_HAIR_BECKMANN);
+  const bool beckmann = (m_type == MicrofacetType::BECKMANN);
 
   /* generate sample */
   float sample_lobe = randu;
@@ -653,7 +662,7 @@ ccl_device int bsdf_microfacet_hair_sample_circular(const KernelGlobals kg,
   }
 
   /* sample R lobe */
-  const float3 wh1 = sample_wh(kg, beckmann, roughness, wi, wmi, sample_h1);
+  const float3 wh1 = sample_wh<m_type>(kg, roughness, wi, wmi, sample_h1);
   const float3 wr = -reflect(wi, wh1);
 
   /* ensure that this is a valid sample */
@@ -679,7 +688,7 @@ ccl_device int bsdf_microfacet_hair_sample_circular(const KernelGlobals kg,
   const float3 wmt = sph_dir(-tilt, phi_mt);
   const float3 wmt_ = sph_dir(0.0f, phi_mt);
 
-  const float3 wh2 = sample_wh(kg, beckmann, roughness, -wt, wmt, sample_h2);
+  const float3 wh2 = sample_wh<m_type>(kg, roughness, -wt, wmt, sample_h2);
   const float3 wtr = -reflect(wt, wh2);
 
   float3 wh3;
@@ -710,7 +719,7 @@ ccl_device int bsdf_microfacet_hair_sample_circular(const KernelGlobals kg,
     wmtr = sph_dir(-tilt, phi_mtr);
     wmtr_ = sph_dir(0.0f, phi_mtr);
 
-    wh3 = sample_wh(kg, beckmann, roughness, wtr, wmtr, sample_h3);
+    wh3 = sample_wh<m_type>(kg, roughness, wtr, wmtr, sample_h3);
 
     float cos_theta_t3;
     const float R3 = fresnel(dot(wtr, wh3), inv_eta, &cos_theta_t3);
@@ -741,13 +750,13 @@ ccl_device int bsdf_microfacet_hair_sample_circular(const KernelGlobals kg,
     return LABEL_NONE;
   }
 
-  float3 wo;
+  float3 local_O;
   float visibility = 0.0f;
   int label = LABEL_GLOSSY;
 
   sample_lobe *= total_energy;
   if (sample_lobe < r) {
-    wo = wr;
+    local_O = wr;
     *eval = rgb_to_spectrum(R / r * total_energy);
 
     if (microfacet_visible(wi, wr, wmi_, wh1)) {
@@ -757,7 +766,7 @@ ccl_device int bsdf_microfacet_hair_sample_circular(const KernelGlobals kg,
     label |= LABEL_REFLECT;
   }
   else if (sample_lobe < (r + tt)) {
-    wo = wtt;
+    local_O = wtt;
     *eval = rgb_to_spectrum(TT / tt * total_energy);
 
     if (microfacet_visible(wi, -wt, wmi_, wh1) && microfacet_visible(-wt, -wtt, wmt_, wh2)) {
@@ -768,7 +777,7 @@ ccl_device int bsdf_microfacet_hair_sample_circular(const KernelGlobals kg,
     label |= LABEL_TRANSMIT;
   }
   else { /* if (sample_lobe >= (r + tt)) */
-    wo = wtrt;
+    local_O = wtrt;
     *eval = rgb_to_spectrum(TRT / trt * total_energy);
 
     if (microfacet_visible(wi, -wt, wmi_, wh1) && microfacet_visible(-wt, -wtr, wmt_, wh2) &&
@@ -783,20 +792,20 @@ ccl_device int bsdf_microfacet_hair_sample_circular(const KernelGlobals kg,
 
   *eval *= visibility;
 
-  *O = wo.x * X + wo.y * Y + wo.z * Z;
+  *wo = local_O.x * X + local_O.y * Y + local_O.z * Z;
 
   /* correction of the cosine foreshortening term
    *eval *= dot(wi, wmi) / dot(wi, wmi_); */
 
-  /* ensure the same pdf is returned for BSDF and emitter sampling. The importance sampling pdf is
-   * already factored in the value so this value is only used for mis */
+  /* ensure the same pdf is returned for BSDF and emitter sampling. The importance sampling pdf
+   * is already factored in the value so this value is only used for MIS */
   *pdf = 1.0f;
 
   return label;
 }
 
 /* Elliptic specific */
-
+template<MicrofacetType m_type>
 ccl_device float3 bsdf_microfacet_hair_eval_r_elliptic(ccl_private const ShaderClosure *sc,
                                                        const float3 wi,
                                                        const float3 wo)
@@ -891,6 +900,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_r_elliptic(ccl_private const ShaderC
   return R;
 }
 
+template<MicrofacetType m_type>
 ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_elliptic(KernelGlobals kg,
                                                             ccl_private const ShaderClosure *sc,
                                                             const float3 wi,
@@ -953,7 +963,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_elliptic(KernelGlobals kg,
     const float2 sample1 = make_float2(lcg_step_float(&rng_quadrature),
                                        lcg_step_float(&rng_quadrature));
 
-    const float3 wh1 = sample_wh(kg, beckmann, roughness, wi, wmi, sample1);
+    const float3 wh1 = sample_wh<m_type>(kg, roughness, wi, wmi, sample1);
     const float dot_wi_wh1 = dot(wi, wh1);
     if (!(dot_wi_wh1 > 0)) {
       continue;
@@ -1020,7 +1030,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_elliptic(KernelGlobals kg,
       const float2 sample2 = make_float2(lcg_step_float(&rng_quadrature),
                                          lcg_step_float(&rng_quadrature));
 
-      const float3 wh2 = sample_wh(kg, beckmann, roughness, -wt, wmt, sample2);
+      const float3 wh2 = sample_wh<m_type>(kg, roughness, -wt, wmt, sample2);
 
       const float cos_th2 = dot(-wt, wh2);
       if (!(cos_th2 > 0)) {
@@ -1084,7 +1094,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt_elliptic(KernelGlobals kg,
 ccl_device Spectrum bsdf_microfacet_hair_eval_elliptic(KernelGlobals kg,
                                                        ccl_private const ShaderData *sd,
                                                        ccl_private const ShaderClosure *sc,
-                                                       const float3 O,
+                                                       const float3 wo,
                                                        ccl_private float *pdf)
 {
   ccl_private MicrofacetHairBSDF *bsdf = (ccl_private MicrofacetHairBSDF *)sc;
@@ -1098,33 +1108,43 @@ ccl_device Spectrum bsdf_microfacet_hair_eval_elliptic(KernelGlobals kg,
   const float3 Y = safe_normalize(cross(Z, X));
 
   /* Transform wi/wo from global coordinate system to local. */
-  const float3 wi = make_float3(dot(sd->I, X), dot(sd->I, Y), dot(sd->I, Z));
-  const float3 wo = make_float3(dot(O, X), dot(O, Y), dot(O, Z));
+  const float3 local_I = make_float3(dot(sd->wi, X), dot(sd->wi, Y), dot(sd->wi, Z));
+  const float3 local_O = make_float3(dot(wo, X), dot(wo, Y), dot(wo, Z));
 
   /* Treat as transparent material if intersection lies outside of the projected radius. */
   const float e2 = 1.0f - sqr(bsdf->aspect_ratio);
-  const float radius = sqrtf(1.0f - e2 * sqr(sin_phi(wi)));
+  const float radius = sqrtf(1.0f - e2 * sqr(sin_phi(local_I)));
   if (fabsf(bsdf->extra->geom.w) > radius) {
     *pdf = 0.0f;
     return zero_spectrum();
   }
 
   /* evaluate */
-  const float3 R = bsdf_microfacet_hair_eval_r_elliptic(sc, wi, wo) +
-                   bsdf_microfacet_hair_eval_tt_trt_elliptic(kg, sc, wi, wo, sd->lcg_state);
+  float3 R;
+  if (bsdf->distribution_type == NODE_MICROFACET_HAIR_BECKMANN) {
+    R = bsdf_microfacet_hair_eval_r_elliptic<MicrofacetType::BECKMANN>(sc, local_I, local_O) +
+        bsdf_microfacet_hair_eval_tt_trt_elliptic<MicrofacetType::BECKMANN>(
+            kg, sc, local_I, local_O, sd->lcg_state);
+  }
+  else {
+    R = bsdf_microfacet_hair_eval_r_elliptic<MicrofacetType::GGX>(sc, local_I, local_O) +
+        bsdf_microfacet_hair_eval_tt_trt_elliptic<MicrofacetType::GGX>(
+            kg, sc, local_I, local_O, sd->lcg_state);
+  }
 
   *pdf = 1.0f;
 
-  return rgb_to_spectrum(R / cos_theta(wi));
+  return rgb_to_spectrum(R / cos_theta(local_I));
 }
 
+template<MicrofacetType m_type>
 ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
                                                     ccl_private const ShaderClosure *sc,
                                                     ccl_private ShaderData *sd,
                                                     float randu,
                                                     float randv,
                                                     ccl_private Spectrum *eval,
-                                                    ccl_private float3 *O,
+                                                    ccl_private float3 *wo,
                                                     ccl_private float *pdf,
                                                     ccl_private float2 *sampled_roughness,
                                                     ccl_private float *eta)
@@ -1144,7 +1164,7 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
   const float3 Y = safe_normalize(cross(Z, X));
 
   /* Transform wi from global coordinate system to local. */
-  const float3 wi = make_float3(dot(sd->I, X), dot(sd->I, Y), dot(sd->I, Z));
+  const float3 wi = make_float3(dot(sd->wi, X), dot(sd->wi, Y), dot(sd->wi, Z));
 
   /* get elliptical cross section characteristic */
   const float a = 1.0f;
@@ -1159,7 +1179,7 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
 
   /* Treat as transparent material if intersection lies outside of the projected radius. */
   if (fabsf(bsdf->extra->geom.w) > d_i) {
-    *O = -sd->I;
+    *wo = -sd->wi;
     *pdf = 1;
     *eval = one_spectrum();
     return LABEL_TRANSMIT | LABEL_TRANSPARENT;
@@ -1204,7 +1224,7 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
   }
 
   /* sample R lobe */
-  const float3 wh1 = sample_wh(kg, beckmann, roughness, wi, wmi, sample_h1);
+  const float3 wh1 = sample_wh<m_type>(kg, roughness, wi, wmi, sample_h1);
 
   const float3 wr = -reflect(wi, wh1);
 
@@ -1229,7 +1249,7 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
   const float3 wmt = sphg_dir(-tilt, gamma_mt, a, b);
   const float3 wmt_ = sphg_dir(0.0f, gamma_mt, a, b);
 
-  const float3 wh2 = sample_wh(kg, beckmann, roughness, -wt, wmt, sample_h2);
+  const float3 wh2 = sample_wh<m_type>(kg, roughness, -wt, wmt, sample_h2);
 
   const float3 wtr = -reflect(wt, wh2);
 
@@ -1262,7 +1282,7 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
     wmtr = sphg_dir(-tilt, gamma_mtr, a, b);
     wmtr_ = sphg_dir(0.0f, gamma_mtr, a, b);
 
-    wh3 = sample_wh(kg, beckmann, roughness, wtr, wmtr, sample_h3);
+    wh3 = sample_wh<m_type>(kg, roughness, wtr, wmtr, sample_h3);
 
     float cos_theta_t3;
     const float R3 = fresnel(dot(wtr, wh3), inv_eta, &cos_theta_t3);
@@ -1293,13 +1313,13 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
     return LABEL_NONE;
   }
 
-  float3 wo;
+  float3 local_O;
   float visibility = 0.0f;
   int label = LABEL_GLOSSY;
 
   sample_lobe *= total_energy;
   if (sample_lobe < r) {
-    wo = wr;
+    local_O = wr;
     *eval = rgb_to_spectrum(R / r * total_energy);
 
     if (microfacet_visible(wi, wr, wmi_, wh1)) {
@@ -1309,7 +1329,7 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
     label |= LABEL_REFLECT;
   }
   else if (sample_lobe < (r + tt)) {
-    wo = wtt;
+    local_O = wtt;
     *eval = rgb_to_spectrum(TT / tt * total_energy);
 
     if (microfacet_visible(wi, -wt, wmi_, wh1) && microfacet_visible(-wt, -wtt, wmt_, wh2)) {
@@ -1320,7 +1340,7 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
     label |= LABEL_TRANSMIT;
   }
   else { /* if (sample_lobe >= (r + tt)) */
-    wo = wtrt;
+    local_O = wtrt;
     *eval = rgb_to_spectrum(TRT / trt * total_energy);
 
     if (microfacet_visible(wi, -wt, wmi_, wh1) && microfacet_visible(-wt, -wtr, wmt_, wh2) &&
@@ -1334,7 +1354,7 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
   }
 
   *eval *= visibility;
-  *O = wo.x * X + wo.y * Y + wo.z * Z;
+  *wo = local_O.x * X + local_O.y * Y + local_O.z * Z;
 
   /* correction of the cosine foreshortening term
    *eval *= dot(wi, wmi) / dot(wi, wmi_); */
@@ -1352,16 +1372,16 @@ ccl_device int bsdf_microfacet_hair_sample_elliptic(const KernelGlobals kg,
 ccl_device Spectrum bsdf_microfacet_hair_eval(KernelGlobals kg,
                                               ccl_private const ShaderData *sd,
                                               ccl_private const ShaderClosure *sc,
-                                              const float3 O,
+                                              const float3 wo,
                                               ccl_private float *pdf)
 {
   ccl_private MicrofacetHairBSDF *bsdf = (ccl_private MicrofacetHairBSDF *)sc;
 
   if (bsdf->cross_section == NODE_MICROFACET_HAIR_CIRCULAR || bsdf->aspect_ratio == 1.0f) {
-    return bsdf_microfacet_hair_eval_circular(kg, sd, sc, O, pdf);
+    return bsdf_microfacet_hair_eval_circular(kg, sd, sc, wo, pdf);
   }
 
-  return bsdf_microfacet_hair_eval_elliptic(kg, sd, sc, O, pdf);
+  return bsdf_microfacet_hair_eval_elliptic(kg, sd, sc, wo, pdf);
 }
 
 ccl_device int bsdf_microfacet_hair_sample(KernelGlobals kg,
@@ -1370,20 +1390,30 @@ ccl_device int bsdf_microfacet_hair_sample(KernelGlobals kg,
                                            float randu,
                                            float randv,
                                            ccl_private Spectrum *eval,
-                                           ccl_private float3 *O,
+                                           ccl_private float3 *wo,
                                            ccl_private float *pdf,
                                            ccl_private float2 *sampled_roughness,
                                            ccl_private float *eta)
 {
   ccl_private MicrofacetHairBSDF *bsdf = (ccl_private MicrofacetHairBSDF *)sc;
+  const bool beckmann = (bsdf->distribution_type == NODE_MICROFACET_HAIR_BECKMANN);
 
   if (bsdf->cross_section == NODE_MICROFACET_HAIR_CIRCULAR || bsdf->aspect_ratio == 1.0f) {
-    return bsdf_microfacet_hair_sample_circular(
-        kg, sc, sd, randu, randv, eval, O, pdf, sampled_roughness, eta);
+    if (beckmann) {
+      return bsdf_microfacet_hair_sample_circular<MicrofacetType::BECKMANN>(
+          kg, sc, sd, randu, randv, eval, wo, pdf, sampled_roughness, eta);
+    }
+
+    return bsdf_microfacet_hair_sample_circular<MicrofacetType::GGX>(
+        kg, sc, sd, randu, randv, eval, wo, pdf, sampled_roughness, eta);
   }
 
-  return bsdf_microfacet_hair_sample_elliptic(
-      kg, sc, sd, randu, randv, eval, O, pdf, sampled_roughness, eta);
+  if (beckmann) {
+    return bsdf_microfacet_hair_sample_elliptic<MicrofacetType::BECKMANN>(
+        kg, sc, sd, randu, randv, eval, wo, pdf, sampled_roughness, eta);
+  }
+  return bsdf_microfacet_hair_sample_elliptic<MicrofacetType::GGX>(
+      kg, sc, sd, randu, randv, eval, wo, pdf, sampled_roughness, eta);
 }
 
 /* Implements Filter Glossy by capping the effective roughness. */

@@ -116,7 +116,7 @@ static bool ED_uvedit_ensure_uvs(Object *obedit)
   BM_uv_map_ensure_edge_select_attr(em->bm, active_uv_name);
   const BMUVOffsets offsets = BM_uv_map_get_offsets(em->bm);
 
-  /* select new UV's (ignore UV_SYNC_SELECTION in this case) */
+  /* select new UVs (ignore UV_SYNC_SELECTION in this case) */
   BM_ITER_MESH (efa, &iter, em->bm, BM_FACES_OF_MESH) {
     BMIter liter;
     BMLoop *l;
@@ -176,7 +176,7 @@ typedef struct UnwrapOptions {
   /** Only affect selected faces. */
   bool only_selected_faces;
   /**
-   * Only affect selected UV's.
+   * Only affect selected UVs.
    * \note Disable this for operations that don't run in the image-window.
    * Unwrapping from the 3D view for example, where only 'only_selected_faces' should be used.
    */
@@ -279,6 +279,13 @@ void ED_uvedit_get_aspect(Object *ob, float *r_aspx, float *r_aspy)
   }
 
   ED_uvedit_get_aspect_from_material(ob, efa->mat_nr, r_aspx, r_aspy);
+}
+
+float ED_uvedit_get_aspect_y(Object *ob)
+{
+  float aspect[2];
+  ED_uvedit_get_aspect(ob, &aspect[0], &aspect[1]);
+  return aspect[0] / aspect[1];
 }
 
 static bool uvedit_is_face_affected(const Scene *scene,
@@ -588,10 +595,10 @@ static ParamHandle *construct_param_handle_subsurfed(const Scene *scene,
   /* Modifier initialization data, will  control what type of subdivision will happen. */
   SubsurfModifierData smd = {{NULL}};
 
-  /* holds a map to editfaces for every subsurfed MFace.
+  /* Holds a map to edit-faces for every subdivision-surface polygon.
    * These will be used to get hidden/ selected flags etc. */
   BMFace **faceMap;
-  /* similar to the above, we need a way to map edges to their original ones */
+  /* Similar to the above, we need a way to map edges to their original ones. */
   BMEdge **edgeMap;
 
   const BMUVOffsets offsets = BM_uv_map_get_offsets(em->bm);
@@ -1548,9 +1555,7 @@ static void shrink_loop_uv_by_aspect_ratio(BMFace *efa,
 static void correct_uv_aspect(Object *ob, BMEditMesh *em)
 {
   const int cd_loop_uv_offset = CustomData_get_offset(&em->bm->ldata, CD_PROP_FLOAT2);
-  float aspx, aspy;
-  ED_uvedit_get_aspect(ob, &aspx, &aspy);
-  const float aspect_y = aspx / aspy;
+  const float aspect_y = ED_uvedit_get_aspect_y(ob);
   if (aspect_y == 1.0f) {
     /* Scaling by 1.0 has no effect. */
     return;
@@ -1650,7 +1655,7 @@ static void uv_map_clip_correct_properties(wmOperatorType *ot)
 
 /**
  * \param per_face_aspect: Calculate the aspect ratio per-face,
- * otherwise use a single aspect for all UV's based on the material of the active face.
+ * otherwise use a single aspect for all UVs based on the material of the active face.
  * TODO: using per-face aspect may split UV islands so more advanced UV projection methods
  * such as "Unwrap" & "Smart UV Projections" will need to handle aspect correction themselves.
  * For now keep using a single aspect for all faces in this case.
@@ -2073,7 +2078,7 @@ void UV_OT_unwrap(wmOperatorType *ot)
 /** \name Smart UV Project Operator
  * \{ */
 
-/* Ignore all areas below this, as the UV's get zeroed. */
+/* Ignore all areas below this, as the UVs get zeroed. */
 static const float smart_uv_project_area_ignore = 1e-12f;
 
 typedef struct ThickFace {
@@ -2281,7 +2286,7 @@ static int smart_project_exec(bContext *C, wmOperator *op)
     while ((thick_faces_len > 0) &&
            !(thick_faces[thick_faces_len - 1].area > smart_uv_project_area_ignore)) {
 
-      /* Zero UV's so they don't overlap with other faces being unwrapped. */
+      /* Zero UVs so they don't overlap with other faces being unwrapped. */
       BMIter liter;
       BMLoop *l;
       BM_ITER_ELEM (l, &liter, thick_faces[thick_faces_len - 1].efa, BM_LOOPS_OF_FACE) {

@@ -268,22 +268,22 @@ set(SRC
   intern/sound.c
   intern/speaker.c
   intern/studiolight.c
-  intern/subdiv.c
+  intern/subdiv.cc
   intern/subdiv_ccg.cc
-  intern/subdiv_ccg_mask.c
-  intern/subdiv_ccg_material.c
-  intern/subdiv_converter.c
-  intern/subdiv_converter_mesh.c
-  intern/subdiv_deform.c
-  intern/subdiv_displacement.c
-  intern/subdiv_displacement_multires.c
-  intern/subdiv_eval.c
-  intern/subdiv_foreach.c
+  intern/subdiv_ccg_mask.cc
+  intern/subdiv_ccg_material.cc
+  intern/subdiv_converter.cc
+  intern/subdiv_converter_mesh.cc
+  intern/subdiv_deform.cc
+  intern/subdiv_displacement.cc
+  intern/subdiv_displacement_multires.cc
+  intern/subdiv_eval.cc
+  intern/subdiv_foreach.cc
   intern/subdiv_mesh.cc
   intern/subdiv_modifier.cc
-  intern/subdiv_stats.c
-  intern/subdiv_topology.c
-  intern/subsurf_ccg.c
+  intern/subdiv_stats.cc
+  intern/subdiv_topology.cc
+  intern/subsurf_ccg.cc
   intern/text.c
   intern/text_suggestions.c
   intern/texture.cc
@@ -559,15 +559,16 @@ if(WIN32)
 endif()
 
 if(WITH_AUDASPACE)
-  add_definitions(-DWITH_AUDASPACE)
-
   list(APPEND INC_SYS
     ${AUDASPACE_C_INCLUDE_DIRS}
   )
-  list(APPEND LIB
-    ${AUDASPACE_C_LIBRARIES}
-    ${AUDASPACE_PY_LIBRARIES}
-  )
+  if(WITH_SYSTEM_AUDASPACE)
+    list(APPEND LIB
+      ${AUDASPACE_C_LIBRARIES}
+      ${AUDASPACE_PY_LIBRARIES}
+    )
+  endif()
+  add_definitions(-DWITH_AUDASPACE)
 endif()
 
 if(WITH_BULLET)
@@ -577,13 +578,6 @@ if(WITH_BULLET)
   list(APPEND INC
     ../../../intern/rigidbody
   )
-
-  if(NOT WITH_SYSTEM_BULLET)
-    list(APPEND LIB
-      extern_bullet
-    )
-  endif()
-
   list(APPEND LIB
     bf_intern_rigidbody
 
@@ -843,6 +837,7 @@ if(WITH_GTESTS)
     intern/lib_id_remapper_test.cc
     intern/lib_id_test.cc
     intern/lib_remap_test.cc
+    intern/nla_test.cc
     intern/tracking_test.cc
   )
   set(TEST_INC

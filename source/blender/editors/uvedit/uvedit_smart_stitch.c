@@ -130,6 +130,7 @@ typedef struct UvEdge {
 
 /* stitch state object */
 typedef struct StitchState {
+  /** The `aspect[0] / aspect[1]`. */
   float aspect;
   /* object for editmesh */
   Object *obedit;
@@ -948,7 +949,7 @@ static int stitch_process_data(StitchStateContainer *ssc,
   bool is_active_state = (state == ssc->states[ssc->active_object_index]);
 
   char stitch_midpoints = ssc->midpoints;
-  /* used to map uv indices to uvaverage indices for selection */
+  /* Used to map UV indices to UV-average indices for selection. */
   uint *uvfinal_map = NULL;
   /* per face preview position in preview buffer */
   PreviewPosition *preview_position = NULL;
@@ -1827,7 +1828,6 @@ static StitchState *stitch_init(bContext *C,
   StitchState *state;
   Scene *scene = CTX_data_scene(C);
   ToolSettings *ts = scene->toolsettings;
-  float aspx, aspy;
 
   BMEditMesh *em = BKE_editmesh_from_object(obedit);
   const BMUVOffsets offsets = BM_uv_map_get_offsets(em->bm);
@@ -1850,8 +1850,7 @@ static StitchState *stitch_init(bContext *C,
     return NULL;
   }
 
-  ED_uvedit_get_aspect(obedit, &aspx, &aspy);
-  state->aspect = aspx / aspy;
+  state->aspect = ED_uvedit_get_aspect_y(obedit);
 
   int unique_uvs = state->element_map->total_unique_uvs;
   state->total_separate_uvs = unique_uvs;
@@ -1911,8 +1910,8 @@ static StitchState *stitch_init(bContext *C,
       all_edges[counter].first = NULL;
       all_edges[counter].flag = 0;
       all_edges[counter].element = element;
-      /* Using an order policy, sort UV's according to address space.
-       * This avoids having two different UvEdges with the same UV's on different positions. */
+      /* Using an order policy, sort UVs according to address space.
+       * This avoids having two different UvEdges with the same UVs on different positions. */
       if (offset1 < offset2) {
         all_edges[counter].uv1 = offset1;
         all_edges[counter].uv2 = offset2;

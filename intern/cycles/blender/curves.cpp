@@ -890,13 +890,17 @@ static void export_hair_curves(Scene *scene,
   int *curve_shader = hair->get_curve_shader().data();
 
   /* Add requested attributes. */
-  float3 *attr_normal = NULL;
   float *attr_intercept = NULL;
   float *attr_length = NULL;
   float *attr_random = NULL;
 
   if (hair->need_attribute(scene, ATTR_STD_VERTEX_NORMAL)) {
-    attr_normal = hair->attributes.add(ATTR_STD_VERTEX_NORMAL)->data_float3();
+    /* Compute geometry normals. */
+    float3 *attr_normal = hair->attributes.add(ATTR_STD_VERTEX_NORMAL)->data_float3();
+    int i = 0;
+    for (BL::FloatVectorValueReadOnly &normal : b_curves.normals) {
+      attr_normal[i++] = get_float3(normal.vector());
+    }
   }
   if (hair->need_attribute(scene, ATTR_STD_CURVE_INTERCEPT)) {
     attr_intercept = hair->attributes.add(ATTR_STD_CURVE_INTERCEPT)->data_float();
@@ -911,14 +915,6 @@ static void export_hair_curves(Scene *scene,
   BL::FloatVectorAttribute b_attr_position = find_curves_position_attribute(b_curves);
   std::optional<BL::FloatAttribute> b_attr_radius = find_curves_radius_attribute(b_curves);
 
-  /* Evaluate geometry normals. */
-  /* TODO: implement proper RNA curves API. */
-  const Curves *curves = (Curves *)b_curves.ptr.owner_id;
-  const auto curves_geometry = blender::bke::CurvesGeometry::wrap(curves->geometry);
-  const blender::VArray<int> resolutions = curves_geometry.resolution();
-  const auto evaluated_normals = curves_geometry.evaluated_normals();
-  const auto evaluated_offsets = curves_geometry.evaluated_offsets();
-
   /* Export curves and points. */
   for (int i = 0; i < num_curves; i++) {
     const int first_point_index = b_curves.curve_offset_data[i].value();
@@ -927,21 +923,11 @@ static void export_hair_curves(Scene *scene,
     float3 prev_co = zero_float3();
     float length = 0.0f;
 
-    /* TODO: It seems a waste of time to compute the normals of the subdivided curve, but only use
-     * those of the control points. Maybe the API of `evaluated_normals()` should be changed. */
-    const int resolution = resolutions[i];
-    const int evaluated_offset = evaluated_offsets[i];
-
     /* Position and radius. */
     for (int j = 0; j < num_points; j++) {
       const int point_offset = first_point_index + j;
       const float3 co = get_float3(b_attr_position.data[point_offset].vector());
       const float radius = b_attr_radius ? b_attr_radius->data[point_offset].value() : 0.005f;
-
-      if (attr_normal) {
-        const blender::float3 normal = evaluated_normals[evaluated_offset + j * resolution];
-        attr_normal[point_offset] = make_float3(normal.x, normal.y, normal.z);
-      }
 
       curve_keys[point_offset] = co;
       curve_radius[point_offset] = radius;

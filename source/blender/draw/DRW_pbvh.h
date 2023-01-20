@@ -17,17 +17,14 @@
 extern "C" {
 #endif
 
-struct GPUViewport;
 struct PBVHAttrReq;
 struct GPUBatch;
 struct PBVHNode;
 struct GSet;
 struct DMFlagMat;
-struct Object;
 struct Mesh;
 struct MLoopTri;
 struct CustomData;
-struct MEdge;
 struct MLoop;
 struct MPoly;
 struct SubdivCCG;
@@ -64,7 +61,7 @@ typedef struct PBVH_GPU_Args {
   int *prim_indices;
   int totprim;
 
-  bool *hide_poly;
+  const bool *hide_poly;
 
   int node_verts_num;
 

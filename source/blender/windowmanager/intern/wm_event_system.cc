@@ -77,6 +77,7 @@
 #include "wm_event_types.h"
 #include "wm_surface.h"
 #include "wm_window.h"
+#include "wm_window_private.h"
 
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_query.h"
@@ -420,13 +421,14 @@ void wm_event_do_depsgraph(bContext *C, bool is_after_open_file)
   if (wm->is_interface_locked) {
     return;
   }
-  /* Combine data-masks so one window doesn't disable UV's in another T26448. */
+  /* Combine data-masks so one window doesn't disable UVs in another T26448. */
   CustomData_MeshMasks win_combine_v3d_datamask = {0};
   LISTBASE_FOREACH (wmWindow *, win, &wm->windows) {
     const Scene *scene = WM_window_get_active_scene(win);
+    ViewLayer *view_layer = WM_window_get_active_view_layer(win);
     const bScreen *screen = WM_window_get_active_screen(win);
 
-    ED_view3d_screen_datamask(C, scene, screen, &win_combine_v3d_datamask);
+    ED_view3d_screen_datamask(scene, view_layer, screen, &win_combine_v3d_datamask);
   }
   /* Update all the dependency graphs of visible view layers. */
   LISTBASE_FOREACH (wmWindow *, win, &wm->windows) {
@@ -703,6 +705,8 @@ void wm_event_do_notifiers(bContext *C)
 
   /* Auto-run warning. */
   wm_test_autorun_warning(C);
+  /* Deprecation warning. */
+  wm_test_opengl_deprecation_warning(C);
 
   GPU_render_end();
 }
@@ -2665,7 +2669,9 @@ static int wm_handler_fileselect_do(bContext *C,
 
             wm_window_close(C, wm, win);
 
-            CTX_wm_window_set(C, root_win); /* #wm_window_close() nullptrs. */
+            /* #wm_window_close() sets the context's window to null. */
+            CTX_wm_window_set(C, root_win);
+
             /* Some operators expect a drawable context (for #EVT_FILESELECT_EXEC). */
             wm_window_make_drawable(wm, root_win);
             /* Ensure correct cursor position, otherwise, popups may close immediately after
@@ -3573,10 +3579,10 @@ static ARegion *region_event_inside(bContext *C, const int xy[2])
   return nullptr;
 }
 
-static void wm_paintcursor_tag(bContext *C, wmPaintCursor *pc, ARegion *region)
+static void wm_paintcursor_tag(bContext *C, wmWindowManager *wm, ARegion *region)
 {
   if (region) {
-    for (; pc; pc = pc->next) {
+    LISTBASE_FOREACH_MUTABLE (wmPaintCursor *, pc, &wm->paintcursors) {
       if (pc->poll == nullptr || pc->poll(C)) {
         wmWindow *win = CTX_wm_window(C);
         WM_paint_cursor_tag_redraw(win, region);
@@ -3598,7 +3604,7 @@ static void wm_paintcursor_test(bContext *C, const wmEvent *event)
     ARegion *region = CTX_wm_region(C);
 
     if (region) {
-      wm_paintcursor_tag(C, static_cast<wmPaintCursor *>(wm->paintcursors.first), region);
+      wm_paintcursor_tag(C, wm, region);
     }
 
     /* If previous position was not in current region, we have to set a temp new context. */
@@ -3608,8 +3614,7 @@ static void wm_paintcursor_test(bContext *C, const wmEvent *event)
       CTX_wm_area_set(C, area_event_inside(C, event->prev_xy));
       CTX_wm_region_set(C, region_event_inside(C, event->prev_xy));
 
-      wm_paintcursor_tag(
-          C, static_cast<wmPaintCursor *>(wm->paintcursors.first), CTX_wm_region(C));
+      wm_paintcursor_tag(C, wm, CTX_wm_region(C));
 
       CTX_wm_area_set(C, area);
       CTX_wm_region_set(C, region);
@@ -5586,7 +5591,7 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, void 
           }
           else if (event.keymodifier == EVT_UNKNOWNKEY) {
             /* This case happens with an external number-pad, and also when using 'dead keys'
-             * (to compose complex latin characters e.g.), it's not really clear why.
+             * (to compose complex Latin characters e.g.), it's not really clear why.
              * Since it's impossible to map a key modifier to an unknown key,
              * it shouldn't harm to clear it. */
             event_state->keymodifier = event.keymodifier = 0;
