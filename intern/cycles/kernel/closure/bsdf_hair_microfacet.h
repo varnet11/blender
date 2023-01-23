@@ -512,7 +512,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt(KernelGlobals kg,
 
     /* TRT */
     if (bsdf->extra->TRT > 0.0f) {
-      /* sample wh2 */
+      /* Sample wh2. */
       const float2 sample2 = make_float2(lcg_step_float(&rng_quadrature),
                                          lcg_step_float(&rng_quadrature));
       const float3 wh2 = sample_wh<m_type>(kg, roughness, -wt, wmt, sample2);
