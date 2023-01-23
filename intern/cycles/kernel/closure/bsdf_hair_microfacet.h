@@ -1,6 +1,10 @@
 /* SPDX-License-Identifier: Apache-2.0
  * Copyright 2018-2022 Blender Foundation */
 
+/* This code implements the paper [A Microfacet-based Hair Scattering
+ * Model](https://onlinelibrary.wiley.com/doi/full/10.1111/cgf.14588) by Weizhen Huang, Matthias B.
+ * Hullin and Johannes Hanika. */
+
 #pragma once
 
 #ifndef __KERNEL_GPU__
@@ -80,7 +84,6 @@ ccl_device int bsdf_microfacet_hair_setup(ccl_private ShaderData *sd,
           sd->dPdu, make_float3(bsdf->extra->geom.x, bsdf->extra->geom.y, bsdf->extra->geom.z)));
       const float3 major_axis = safe_normalize(cross(minor_axis, sd->dPdu));
 
-      /* Local frame is independent of the ray direction for elliptical hairs. */
       bsdf->extra->geom = make_float4(major_axis.x, major_axis.y, major_axis.z, h);
     }
     else {
@@ -88,6 +91,7 @@ ccl_device int bsdf_microfacet_hair_setup(ccl_private ShaderData *sd,
     }
   }
   else {
+    /* Align local frame with the ray direction so that `phi_i == 0`. */
     bsdf->extra->geom = make_float4(X.x, X.y, X.z, h);
   }
 
@@ -226,9 +230,9 @@ ccl_device_inline float3 sample_wh(
 
   const float3 wi_wm = make_float3(dot(wi, s), dot(wi, t), dot(wi, n));
 
-  float G1i;
+  float discard;
   const float3 wh_wm = microfacet_sample_stretched<m_type>(
-      kg, wi_wm, roughness, roughness, rand.x, rand.y, &G1i);
+      kg, wi_wm, roughness, roughness, rand.x, rand.y, &discard);
 
   const float3 wh = wh_wm.x * s + wh_wm.y * t + wh_wm.z * n;
   return wh;
@@ -365,7 +369,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_r(ccl_private const ShaderClosure *s
   /* Modified resolution based on numbers of intervals. */
   res = (gamma_m_max - gamma_m_min) / float(intervals);
 
-  /* Integrate using Simpson's rule. */
+  /* Integrate using Composite Simpson's 1/3 rule. */
   float integral = 0.0f;
   for (size_t i = 0; i <= intervals; i++) {
 
@@ -445,7 +449,7 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt(KernelGlobals kg,
     const float3 wmi = sphg_dir(tilt, gamma_mi, b);
     const float3 wmi_ = sphg_dir(0.0f, gamma_mi, b);
 
-    /* sample wh1 */
+    /* Sample wh1. */
     const float2 sample1 = make_float2(lcg_step_float(&rng_quadrature),
                                        lcg_step_float(&rng_quadrature));
 
@@ -473,7 +477,6 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt(KernelGlobals kg,
       continue;
     }
 
-    /* Simpson's rule weight */
     const float weight = (i == 0 || i == intervals) ? 0.5f : (i % 2 + 1);
 
     const float3 A_t = exp(mu_a / cos_theta(wt) *
@@ -626,7 +629,7 @@ ccl_device int bsdf_microfacet_hair_sample(const KernelGlobals kg,
   const float roughness = bsdf->roughness;
   const float roughness2 = sqr(roughness);
 
-  /* generate sample */
+  /* Generate samples. */
   float sample_lobe = randu;
   const float sample_h = randv;
   const float2 sample_h1 = make_float2(lcg_step_float(&sd->lcg_state),
@@ -655,7 +658,7 @@ ccl_device int bsdf_microfacet_hair_sample(const KernelGlobals kg,
     return LABEL_NONE;
   }
 
-  /* sample R lobe */
+  /* Sample R lobe. */
   const float3 wh1 = sample_wh<m_type>(kg, roughness, wi, wmi, sample_h1);
   const float3 wr = -reflect(wi, wh1);
 
@@ -669,7 +672,7 @@ ccl_device int bsdf_microfacet_hair_sample(const KernelGlobals kg,
   const float R1 = fresnel(dot(wi, wh1), *eta, &cos_theta_t1);
   const float3 R = make_float3(bsdf->extra->R * R1);
 
-  /* sample TT lobe */
+  /* Sample TT lobe. */
   const float3 wt = -refract_angle(wi, wh1, cos_theta_t1, inv_eta);
   const float phi_t = dir_phi(wt);
 
@@ -820,7 +823,7 @@ ccl_device Spectrum bsdf_microfacet_hair_eval(KernelGlobals kg,
     return zero_spectrum();
   }
 
-  /* evaluate */
+  /* Evaluate. */
   float3 R;
   if (bsdf->distribution_type == NODE_MICROFACET_HAIR_BECKMANN) {
     R = bsdf_microfacet_hair_eval_r<MicrofacetType::BECKMANN>(sc, local_I, local_O) +
@@ -868,8 +871,7 @@ ccl_device void bsdf_microfacet_hair_blur(ccl_private ShaderClosure *sc, float r
   bsdf->roughness = fmaxf(roughness, bsdf->roughness);
 }
 
-/* Hair Albedo */
-
+/* Hair Albedo. */
 ccl_device float3 bsdf_microfacet_hair_albedo(ccl_private const ShaderClosure *sc)
 {
   ccl_private MicrofacetHairBSDF *bsdf = (ccl_private MicrofacetHairBSDF *)sc;
