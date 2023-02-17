@@ -1,12 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0
  * Copyright 2021-2022 Blender Foundation */
 
-#include "blender/display_driver.h"
-
-#include "device/device.h"
-#include "util/log.h"
-#include "util/math.h"
-
 #include "GPU_context.h"
 #include "GPU_immediate.h"
 #include "GPU_shader.h"
@@ -14,6 +8,12 @@
 #include "GPU_texture.h"
 
 #include "RE_engine.h"
+
+#include "blender/display_driver.h"
+
+#include "device/device.h"
+#include "util/log.h"
+#include "util/math.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -105,11 +105,12 @@ GPUShader *BlenderFallbackDisplayShader::bind(int width, int height)
 
   /* Bind shader now to enable uniform assignment. */
   GPU_shader_bind(shader_program_);
-  GPU_shader_uniform_int(shader_program_, image_texture_location_, 0);
+  int slot = 0;
+  GPU_shader_uniform_int_ex(shader_program_, image_texture_location_, 1, 1, &slot);
   float size[2];
   size[0] = width;
   size[1] = height;
-  GPU_shader_uniform_vector(shader_program_, fullscreen_location_, 2, 1, size);
+  GPU_shader_uniform_float_ex(shader_program_, fullscreen_location_, 2, 1, size);
   return shader_program_;
 }
 
@@ -721,8 +722,6 @@ static void draw_tile(const float2 &zoom,
     return;
   }
 
-  GPU_texture_bind(texture.gpu_texture, 0);
-
   /* Trick to keep sharp rendering without jagged edges on all GPUs.
    *
    * The idea here is to enforce driver to use linear interpolation when the image is not zoomed
@@ -735,14 +734,14 @@ static void draw_tile(const float2 &zoom,
   const float zoomed_height = draw_tile.params.size.y * zoom.y;
   if (texture.width != draw_tile.params.size.x || texture.height != draw_tile.params.size.y) {
     /* Resolution divider is different from 1, force nearest interpolation. */
-    GPU_texture_filter_mode(texture.gpu_texture, false);
+    GPU_texture_bind_ex(texture.gpu_texture, GPU_SAMPLER_DEFAULT, 0, false);
   }
   else if (zoomed_width - draw_tile.params.size.x > 0.5f ||
            zoomed_height - draw_tile.params.size.y > 0.5f) {
-    GPU_texture_filter_mode(texture.gpu_texture, false);
+    GPU_texture_bind_ex(texture.gpu_texture, GPU_SAMPLER_DEFAULT, 0, false);
   }
   else {
-    GPU_texture_filter_mode(texture.gpu_texture, true);
+    GPU_texture_bind_ex(texture.gpu_texture, GPU_SAMPLER_FILTER, 0, false);
   }
 
   /* Draw at the parameters for which the texture has been updated for. This allows to always draw

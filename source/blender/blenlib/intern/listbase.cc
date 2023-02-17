@@ -9,8 +9,8 @@
  * For single linked lists see 'BLI_linklist.h'
  */
 
-#include <stdlib.h>
-#include <string.h>
+#include <cstdlib>
+#include <cstring>
 
 #include "MEM_guardedalloc.h"
 
@@ -55,6 +55,35 @@ void BLI_movelisttolist_reverse(ListBase *dst, ListBase *src)
   }
 
   src->first = src->last = nullptr;
+}
+
+void BLI_listbase_split_after(ListBase *original_listbase, ListBase *split_listbase, void *vlink)
+{
+  BLI_assert(BLI_listbase_is_empty(split_listbase));
+  BLI_assert(vlink == nullptr || BLI_findindex(original_listbase, vlink) >= 0);
+
+  if (vlink == original_listbase->last) {
+    /* Nothing to split, and `split_listbase` is assumed already empty (see assert above). */
+    return;
+  }
+
+  if (vlink == nullptr) {
+    /* Move everything into `split_listbase`. */
+    SWAP(ListBase, *original_listbase, *split_listbase);
+    return;
+  }
+
+  Link *link = static_cast<Link *>(vlink);
+  Link *next_link = link->next;
+  BLI_assert(next_link != nullptr);
+  Link *last_link = static_cast<Link *>(original_listbase->last);
+
+  original_listbase->last = link;
+  split_listbase->first = next_link;
+  split_listbase->last = last_link;
+
+  link->next = nullptr;
+  next_link->prev = nullptr;
 }
 
 void BLI_addhead(ListBase *listbase, void *vlink)
@@ -140,7 +169,7 @@ void BLI_listbase_swaplinks(ListBase *listbase, void *vlinka, void *vlinkb)
   }
 
   if (linkb->next == linka) {
-    SWAP(Link *, linka, linkb);
+    std::swap(linka, linkb);
   }
 
   if (linka->next == linkb) {
@@ -150,8 +179,8 @@ void BLI_listbase_swaplinks(ListBase *listbase, void *vlinka, void *vlinkb)
     linkb->next = linka;
   }
   else { /* Non-contiguous items, we can safely swap. */
-    SWAP(Link *, linka->prev, linkb->prev);
-    SWAP(Link *, linka->next, linkb->next);
+    std::swap(linka->prev, linkb->prev);
+    std::swap(linka->next, linkb->next);
   }
 
   /* Update neighbors of linka and linkb. */

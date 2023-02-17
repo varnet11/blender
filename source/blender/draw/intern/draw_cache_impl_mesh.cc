@@ -252,7 +252,7 @@ static void mesh_cd_calc_active_uv_layer(const Object *object,
 {
   const Mesh *me_final = editmesh_final_or_this(object, me);
   const CustomData *cd_ldata = mesh_cd_ldata_get_from_mesh(me_final);
-  int layer = CustomData_get_active_layer(cd_ldata, CD_MLOOPUV);
+  int layer = CustomData_get_active_layer(cd_ldata, CD_PROP_FLOAT2);
   if (layer != -1) {
     cd_used->uv |= (1 << layer);
   }
@@ -264,7 +264,7 @@ static void mesh_cd_calc_active_mask_uv_layer(const Object *object,
 {
   const Mesh *me_final = editmesh_final_or_this(object, me);
   const CustomData *cd_ldata = mesh_cd_ldata_get_from_mesh(me_final);
-  int layer = CustomData_get_stencil_layer(cd_ldata, CD_MLOOPUV);
+  int layer = CustomData_get_stencil_layer(cd_ldata, CD_PROP_FLOAT2);
   if (layer != -1) {
     cd_used->uv |= (1 << layer);
   }
@@ -312,10 +312,10 @@ static DRW_MeshCDMask mesh_cd_calc_used_gpu_layers(const Object *object,
          * We do it based on the specified name.
          */
         if (name[0] != '\0') {
-          layer = CustomData_get_named_layer(cd_ldata, CD_MLOOPUV, name);
+          layer = CustomData_get_named_layer(cd_ldata, CD_PROP_FLOAT2, name);
           type = CD_MTFACE;
 
-#if 0 /* Tangents are always from UV's - this will never happen. */
+#if 0 /* Tangents are always from UVs - this will never happen. */
             if (layer == -1) {
               layer = CustomData_get_named_layer(cd_ldata, CD_TANGENT, name);
               type = CD_TANGENT;
@@ -354,8 +354,9 @@ static DRW_MeshCDMask mesh_cd_calc_used_gpu_layers(const Object *object,
       switch (type) {
         case CD_MTFACE: {
           if (layer == -1) {
-            layer = (name[0] != '\0') ? CustomData_get_named_layer(cd_ldata, CD_MLOOPUV, name) :
-                                        CustomData_get_render_layer(cd_ldata, CD_MLOOPUV);
+            layer = (name[0] != '\0') ?
+                        CustomData_get_named_layer(cd_ldata, CD_PROP_FLOAT2, name) :
+                        CustomData_get_render_layer(cd_ldata, CD_PROP_FLOAT2);
           }
           if (layer != -1) {
             cd_used.uv |= (1 << layer);
@@ -364,12 +365,13 @@ static DRW_MeshCDMask mesh_cd_calc_used_gpu_layers(const Object *object,
         }
         case CD_TANGENT: {
           if (layer == -1) {
-            layer = (name[0] != '\0') ? CustomData_get_named_layer(cd_ldata, CD_MLOOPUV, name) :
-                                        CustomData_get_render_layer(cd_ldata, CD_MLOOPUV);
+            layer = (name[0] != '\0') ?
+                        CustomData_get_named_layer(cd_ldata, CD_PROP_FLOAT2, name) :
+                        CustomData_get_render_layer(cd_ldata, CD_PROP_FLOAT2);
 
-            /* Only fallback to orco (below) when we have no UV layers, see: T56545 */
+            /* Only fallback to orco (below) when we have no UV layers, see: #56545 */
             if (layer == -1 && name[0] != '\0') {
-              layer = CustomData_get_render_layer(cd_ldata, CD_MLOOPUV);
+              layer = CustomData_get_render_layer(cd_ldata, CD_PROP_FLOAT2);
             }
           }
           if (layer != -1) {
@@ -748,7 +750,7 @@ void DRW_mesh_batch_cache_dirty_tag(Mesh *me, eMeshBatchDirtyMode mode)
       break;
     case BKE_MESH_BATCH_DIRTY_SELECT_PAINT:
       /* Paint mode selection flag is packed inside the nor attribute.
-       * Note that it can be slow if auto smooth is enabled. (see T63946) */
+       * Note that it can be slow if auto smooth is enabled. (see #63946) */
       FOREACH_MESH_BUFFER_CACHE (cache, mbc) {
         GPU_INDEXBUF_DISCARD_SAFE(mbc->buff.ibo.lines_paint_mask);
         GPU_VERTBUF_DISCARD_SAFE(mbc->buff.vbo.pos_nor);
@@ -1111,14 +1113,14 @@ GPUBatch *DRW_mesh_batch_cache_get_edit_vertices(Mesh *me)
   return DRW_batch_request(&cache->batch.edit_vertices);
 }
 
-GPUBatch *DRW_mesh_batch_cache_get_edit_vnors(Mesh *me)
+GPUBatch *DRW_mesh_batch_cache_get_edit_vert_normals(Mesh *me)
 {
   MeshBatchCache *cache = mesh_batch_cache_get(me);
   mesh_batch_cache_add_request(cache, MBC_EDIT_VNOR);
   return DRW_batch_request(&cache->batch.edit_vnor);
 }
 
-GPUBatch *DRW_mesh_batch_cache_get_edit_lnors(Mesh *me)
+GPUBatch *DRW_mesh_batch_cache_get_edit_loop_normals(Mesh *me)
 {
   MeshBatchCache *cache = mesh_batch_cache_get(me);
   mesh_batch_cache_add_request(cache, MBC_EDIT_LNOR);
@@ -1313,7 +1315,7 @@ static void drw_mesh_batch_cache_check_available(struct TaskGraph *task_graph, M
   MeshBatchCache *cache = mesh_batch_cache_get(me);
   /* Make sure all requested batches have been setup. */
   /* NOTE: The next line creates a different scheduling than during release builds what can lead to
-   * some issues (See T77867 where we needed to disable this function in order to debug what was
+   * some issues (See #77867 where we needed to disable this function in order to debug what was
    * happening in release builds). */
   BLI_task_graph_work_and_wait(task_graph);
   for (int i = 0; i < MBC_BATCH_LEN; i++) {
@@ -1939,7 +1941,7 @@ void DRW_mesh_batch_cache_create_requested(struct TaskGraph *task_graph,
 
   /* Ensure that all requested batches have finished.
    * Ideally we want to remove this sync, but there are cases where this doesn't work.
-   * See T79038 for example.
+   * See #79038 for example.
    *
    * An idea to improve this is to separate the Object mode from the edit mode draw caches. And
    * based on the mode the correct one will be updated. Other option is to look into using

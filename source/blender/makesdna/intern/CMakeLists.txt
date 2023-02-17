@@ -55,6 +55,7 @@ set(SRC
   ../../../../intern/guardedalloc/intern/mallocn.c
   ../../../../intern/guardedalloc/intern/mallocn_guarded_impl.c
   ../../../../intern/guardedalloc/intern/mallocn_lockfree_impl.c
+  ../../../../intern/guardedalloc/intern/memory_usage.cc
   ${dna_header_include_file}
   ${dna_header_string_file}
 )
@@ -69,7 +70,9 @@ blender_target_include_dirs(makesdna ${INC})
 blender_target_include_dirs_sys(makesdna ${INC_SYS})
 
 if(WIN32 AND NOT UNIX)
-  target_link_libraries(makesdna ${PTHREADS_LIBRARIES})
+  if(DEFINED PTHREADS_LIBRARIES)
+    target_link_libraries(makesdna ${PTHREADS_LIBRARIES})
+  endif()
 endif()
 
 # Output dna.c

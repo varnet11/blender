@@ -1443,6 +1443,8 @@ OSL_NOISE_IMPL(osl_snoise, snoise)
 
 /* Texturing */
 
+#include "kernel/svm/ies.h"
+
 ccl_device_extern ccl_private OSLTextureOptions *osl_get_texture_options(
     ccl_private ShaderGlobals *sg)
 {
@@ -1532,7 +1534,7 @@ ccl_device_extern void osl_texture_set_missingcolor_alpha(ccl_private OSLTexture
 ccl_device_extern bool osl_texture(ccl_private ShaderGlobals *sg,
                                    DeviceString filename,
                                    ccl_private void *texture_handle,
-                                   OSLTextureOptions *opt,
+                                   ccl_private OSLTextureOptions *opt,
                                    float s,
                                    float t,
                                    float dsdx,
@@ -1548,30 +1550,37 @@ ccl_device_extern bool osl_texture(ccl_private ShaderGlobals *sg,
                                    ccl_private float *dalphady,
                                    ccl_private void *errormessage)
 {
-  if (!texture_handle) {
-    return false;
+  const unsigned int type = OSL_TEXTURE_HANDLE_TYPE(texture_handle);
+  const unsigned int slot = OSL_TEXTURE_HANDLE_SLOT(texture_handle);
+
+  switch (type) {
+    case OSL_TEXTURE_HANDLE_TYPE_SVM: {
+      const float4 rgba = kernel_tex_image_interp(nullptr, slot, s, 1.0f - t);
+      if (nchannels > 0)
+        result[0] = rgba.x;
+      if (nchannels > 1)
+        result[1] = rgba.y;
+      if (nchannels > 2)
+        result[2] = rgba.z;
+      if (alpha)
+        *alpha = rgba.w;
+      return true;
+    }
+    case OSL_TEXTURE_HANDLE_TYPE_IES: {
+      if (nchannels > 0)
+        result[0] = kernel_ies_interp(nullptr, slot, s, t);
+      return true;
+    }
+    default: {
+      return false;
+    }
   }
-
-  /* Only SVM textures are supported. */
-  int id = static_cast<int>(reinterpret_cast<size_t>(texture_handle) - 1);
-
-  const float4 rgba = kernel_tex_image_interp(nullptr, id, s, 1.0f - t);
-
-  result[0] = rgba.x;
-  if (nchannels > 1)
-    result[1] = rgba.y;
-  if (nchannels > 2)
-    result[2] = rgba.z;
-  if (nchannels > 3)
-    result[3] = rgba.w;
-
-  return true;
 }
 
 ccl_device_extern bool osl_texture3d(ccl_private ShaderGlobals *sg,
                                      DeviceString filename,
                                      ccl_private void *texture_handle,
-                                     OSLTextureOptions *opt,
+                                     ccl_private OSLTextureOptions *opt,
                                      ccl_private const float3 *P,
                                      ccl_private const float3 *dPdx,
                                      ccl_private const float3 *dPdy,
@@ -1585,30 +1594,32 @@ ccl_device_extern bool osl_texture3d(ccl_private ShaderGlobals *sg,
                                      ccl_private float *dalphady,
                                      ccl_private void *errormessage)
 {
-  if (!texture_handle) {
-    return false;
+  const unsigned int type = OSL_TEXTURE_HANDLE_TYPE(texture_handle);
+  const unsigned int slot = OSL_TEXTURE_HANDLE_SLOT(texture_handle);
+
+  switch (type) {
+    case OSL_TEXTURE_HANDLE_TYPE_SVM: {
+      const float4 rgba = kernel_tex_image_interp_3d(nullptr, slot, *P, INTERPOLATION_NONE);
+      if (nchannels > 0)
+        result[0] = rgba.x;
+      if (nchannels > 1)
+        result[1] = rgba.y;
+      if (nchannels > 2)
+        result[2] = rgba.z;
+      if (alpha)
+        *alpha = rgba.w;
+      return true;
+    }
+    default: {
+      return false;
+    }
   }
-
-  /* Only SVM textures are supported. */
-  int id = static_cast<int>(reinterpret_cast<size_t>(texture_handle) - 1);
-
-  const float4 rgba = kernel_tex_image_interp_3d(nullptr, id, *P, INTERPOLATION_NONE);
-
-  result[0] = rgba.x;
-  if (nchannels > 1)
-    result[1] = rgba.y;
-  if (nchannels > 2)
-    result[2] = rgba.z;
-  if (nchannels > 3)
-    result[3] = rgba.w;
-
-  return true;
 }
 
 ccl_device_extern bool osl_environment(ccl_private ShaderGlobals *sg,
                                        DeviceString filename,
                                        ccl_private void *texture_handle,
-                                       OSLTextureOptions *opt,
+                                       ccl_private OSLTextureOptions *opt,
                                        ccl_private const float3 *R,
                                        ccl_private const float3 *dRdx,
                                        ccl_private const float3 *dRdy,
@@ -1621,13 +1632,14 @@ ccl_device_extern bool osl_environment(ccl_private ShaderGlobals *sg,
                                        ccl_private float *dalphay,
                                        ccl_private void *errormessage)
 {
-  result[0] = 1.0f;
+  if (nchannels > 0)
+    result[0] = 1.0f;
   if (nchannels > 1)
     result[1] = 0.0f;
   if (nchannels > 2)
     result[2] = 1.0f;
-  if (nchannels > 3)
-    result[3] = 1.0f;
+  if (alpha)
+    *alpha = 1.0f;
 
   return false;
 }

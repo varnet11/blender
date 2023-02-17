@@ -326,8 +326,8 @@ function(blender_add_lib__impl
   # NOTE: If separated libraries for debug and release are needed every library is the list are
   # to be prefixed explicitly.
   #
-  #  Use: "optimized libfoo optimized libbar debug libfoo_d debug libbar_d"
-  #  NOT: "optimized libfoo libbar debug libfoo_d libbar_d"
+  # Use: "optimized libfoo optimized libbar debug libfoo_d debug libbar_d"
+  # NOT: "optimized libfoo libbar debug libfoo_d libbar_d"
   if(NOT "${library_deps}" STREQUAL "")
     set(next_library_mode "")
     foreach(library ${library_deps})
@@ -535,7 +535,7 @@ function(setup_platform_linker_flags
   set_property(TARGET ${target} APPEND_STRING PROPERTY LINK_FLAGS_DEBUG " ${PLATFORM_LINKFLAGS_DEBUG}")
 
   get_target_property(target_type ${target} TYPE)
-  if (target_type STREQUAL "EXECUTABLE")
+  if(target_type STREQUAL "EXECUTABLE")
     set_property(TARGET ${target} APPEND_STRING PROPERTY LINK_FLAGS " ${PLATFORM_LINKFLAGS_EXECUTABLE}")
   endif()
 endfunction()
@@ -544,13 +544,15 @@ endfunction()
 function(setup_platform_linker_libs
   target
   )
-  # jemalloc must be early in the list, to be before pthread (see T57998)
+  # jemalloc must be early in the list, to be before pthread (see #57998).
   if(WITH_MEM_JEMALLOC)
     target_link_libraries(${target} ${JEMALLOC_LIBRARIES})
   endif()
 
   if(WIN32 AND NOT UNIX)
-    target_link_libraries(${target} ${PTHREADS_LIBRARIES})
+    if(DEFINED PTHREADS_LIBRARIES)
+      target_link_libraries(${target} ${PTHREADS_LIBRARIES})
+    endif()
   endif()
 
   # target_link_libraries(${target} ${PLATFORM_LINKLIBS} ${CMAKE_DL_LIBS})
@@ -1115,7 +1117,7 @@ function(find_python_package
     # endif()
     # Not set, so initialize.
   else()
-   string(REPLACE "." ";" _PY_VER_SPLIT "${PYTHON_VERSION}")
+    string(REPLACE "." ";" _PY_VER_SPLIT "${PYTHON_VERSION}")
     list(GET _PY_VER_SPLIT 0 _PY_VER_MAJOR)
 
     # re-cache
@@ -1209,43 +1211,6 @@ function(print_all_vars)
   endforeach()
 endfunction()
 
-# Print a list of all cached variables with values containing `contents`.
-function(print_cached_vars_containing_value
-  contents
-  msg_header
-  msg_footer
-  )
-  set(_list_info)
-  set(_found)
-  get_cmake_property(_vars VARIABLES)
-  foreach(_var ${_vars})
-    if (DEFINED CACHE{${_var}})
-      # Skip "_" prefixed variables, these are used for internal book-keeping,
-      # not under user control.
-      string(FIND "${_var}" "_" _found)
-      if(NOT (_found EQUAL 0))
-        string(FIND "${${_var}}" "${contents}" _found)
-        if(NOT (_found EQUAL -1))
-          if(_found)
-            list(APPEND _list_info "${_var}=${${_var}}")
-          endif()
-        endif()
-      endif()
-    endif()
-  endforeach()
-  unset(_var)
-  unset(_vars)
-  unset(_found)
-  if(_list_info)
-    message(${msg_header})
-    foreach(_var ${_list_info})
-      message(" * ${_var}")
-    endforeach()
-    message(${msg_footer})
-  endif()
-  unset(_list_info)
-endfunction()
-
 macro(openmp_delayload
   projectname
   )
@@ -1256,10 +1221,10 @@ macro(openmp_delayload
       else()
         set(OPENMP_DLL_NAME "vcomp140")
       endif()
-      set_property(TARGET ${projectname} APPEND_STRING  PROPERTY LINK_FLAGS_RELEASE " /DELAYLOAD:${OPENMP_DLL_NAME}.dll delayimp.lib")
-      set_property(TARGET ${projectname} APPEND_STRING  PROPERTY LINK_FLAGS_DEBUG " /DELAYLOAD:${OPENMP_DLL_NAME}d.dll delayimp.lib")
-      set_property(TARGET ${projectname} APPEND_STRING  PROPERTY LINK_FLAGS_RELWITHDEBINFO " /DELAYLOAD:${OPENMP_DLL_NAME}.dll delayimp.lib")
-      set_property(TARGET ${projectname} APPEND_STRING  PROPERTY LINK_FLAGS_MINSIZEREL " /DELAYLOAD:${OPENMP_DLL_NAME}.dll delayimp.lib")
+      set_property(TARGET ${projectname} APPEND_STRING PROPERTY LINK_FLAGS_RELEASE " /DELAYLOAD:${OPENMP_DLL_NAME}.dll delayimp.lib")
+      set_property(TARGET ${projectname} APPEND_STRING PROPERTY LINK_FLAGS_DEBUG " /DELAYLOAD:${OPENMP_DLL_NAME}d.dll delayimp.lib")
+      set_property(TARGET ${projectname} APPEND_STRING PROPERTY LINK_FLAGS_RELWITHDEBINFO " /DELAYLOAD:${OPENMP_DLL_NAME}.dll delayimp.lib")
+      set_property(TARGET ${projectname} APPEND_STRING PROPERTY LINK_FLAGS_MINSIZEREL " /DELAYLOAD:${OPENMP_DLL_NAME}.dll delayimp.lib")
     endif()
   endif()
 endmacro()
@@ -1299,7 +1264,7 @@ endmacro()
 
 # Utility to gather and install precompiled shared libraries.
 macro(add_bundled_libraries library_dir)
-  if(EXISTS ${LIBDIR})
+  if(DEFINED LIBDIR)
     set(_library_dir ${LIBDIR}/${library_dir})
     if(WIN32)
       file(GLOB _all_library_versions ${_library_dir}/*\.dll)
@@ -1312,7 +1277,7 @@ macro(add_bundled_libraries library_dir)
     list(APPEND PLATFORM_BUNDLED_LIBRARY_DIRS ${_library_dir})
     unset(_all_library_versions)
     unset(_library_dir)
- endif()
+  endif()
 endmacro()
 
 macro(windows_install_shared_manifest)

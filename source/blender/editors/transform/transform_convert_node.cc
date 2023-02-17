@@ -156,7 +156,8 @@ static void node_snap_grid_apply(TransInfo *t)
 {
   using namespace blender;
 
-  if (!(activeSnap(t) && (t->tsnap.mode & (SCE_SNAP_MODE_INCREMENT | SCE_SNAP_MODE_GRID)))) {
+  if (!(transform_snap_is_active(t) &&
+        (t->tsnap.mode & (SCE_SNAP_MODE_INCREMENT | SCE_SNAP_MODE_GRID)))) {
     return;
   }
 
@@ -302,8 +303,8 @@ static void special_aftertrans_update__node(bContext *C, TransInfo *t)
 /** \} */
 
 TransConvertTypeInfo TransConvertType_Node = {
-    /* flags */ (T_POINTS | T_2D_EDIT),
-    /* createTransData */ createTransNodeData,
-    /* recalcData */ flushTransNodes,
-    /* special_aftertrans_update */ special_aftertrans_update__node,
+    /*flags*/ (T_POINTS | T_2D_EDIT),
+    /*createTransData*/ createTransNodeData,
+    /*recalcData*/ flushTransNodes,
+    /*special_aftertrans_update*/ special_aftertrans_update__node,
 };

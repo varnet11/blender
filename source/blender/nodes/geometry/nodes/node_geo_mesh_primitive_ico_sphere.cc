@@ -25,7 +25,7 @@ static void node_declare(NodeDeclarationBuilder &b)
       .max(7)
       .description(N_("Number of subdivisions on top of the basic icosahedron"));
   b.add_output<decl::Geometry>(N_("Mesh"));
-  b.add_output<decl::Vector>(N_("UV Map")).field_source();
+  b.add_output<decl::Vector>(N_("UV Map")).field_on_all();
 }
 
 static Mesh *create_ico_sphere_mesh(const int subdivisions,
@@ -40,14 +40,18 @@ static Mesh *create_ico_sphere_mesh(const int subdivisions,
   bmesh_create_params.use_toolflags = true;
   const BMAllocTemplate allocsize = {0, 0, 0, 0};
   BMesh *bm = BM_mesh_create(&allocsize, &bmesh_create_params);
-  BM_data_layer_add_named(bm, &bm->ldata, CD_MLOOPUV, nullptr);
+  BM_data_layer_add_named(bm, &bm->ldata, CD_PROP_FLOAT2, "UVMap");
+  /* Make sure the associated boolean layers exists as well. Normally this would be done when
+   * adding a UV layer via python or when copying from Mesh, but when we 'manually' create the UV
+   * layer we need to make sure the boolean layers exist as well. */
+  BM_uv_map_ensure_select_and_pin_attrs(bm);
 
   BMO_op_callf(bm,
                BMO_FLAG_DEFAULTS,
                "create_icosphere subdivisions=%i radius=%f matrix=%m4 calc_uvs=%b",
                subdivisions,
                std::abs(radius),
-               transform.values,
+               transform.ptr(),
                create_uv_map);
 
   BMeshToMeshParams params{};
@@ -77,10 +81,8 @@ static void node_geo_exec(GeoNodeExecParams params)
   const int subdivisions = std::min(params.extract_input<int>("Subdivisions"), 10);
   const float radius = params.extract_input<float>("Radius");
 
-  StrongAnonymousAttributeID uv_map_id;
-  if (params.output_is_required("UV Map")) {
-    uv_map_id = StrongAnonymousAttributeID("uv_map");
-  }
+  AutoAnonymousAttributeID uv_map_id = params.get_output_anonymous_attribute_id_if_needed(
+      "UV Map");
 
   Mesh *mesh = create_ico_sphere_mesh(subdivisions, radius, uv_map_id.get());
   params.set_output("Mesh", GeometrySet::create_with_mesh(mesh));

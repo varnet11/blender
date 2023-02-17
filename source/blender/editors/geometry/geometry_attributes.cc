@@ -248,7 +248,6 @@ static int geometry_color_attribute_add_exec(bContext *C, wmOperator *op)
 
 enum class ConvertAttributeMode {
   Generic,
-  UVMap,
   VertexGroup,
 };
 
@@ -298,23 +297,6 @@ static int geometry_attribute_convert_exec(bContext *C, wmOperator *op)
                                          eAttrDomain(RNA_enum_get(op->ptr, "domain")),
                                          op->reports)) {
         return OPERATOR_CANCELLED;
-      }
-      break;
-    }
-    case ConvertAttributeMode::UVMap: {
-      MLoopUV *dst_uvs = static_cast<MLoopUV *>(
-          MEM_calloc_arrayN(mesh->totloop, sizeof(MLoopUV), __func__));
-      VArray<float2> src_varray = attributes.lookup_or_default<float2>(
-          name, ATTR_DOMAIN_CORNER, {0.0f, 0.0f});
-      for (const int i : IndexRange(mesh->totloop)) {
-        copy_v2_v2(dst_uvs[i].uv, src_varray[i]);
-      }
-      attributes.remove(name);
-      CustomData_add_layer_named(
-          &mesh->ldata, CD_MLOOPUV, CD_ASSIGN, dst_uvs, mesh->totloop, name.c_str());
-      int *active_index = BKE_id_attributes_active_index_p(&mesh->id);
-      if (*active_index > 0) {
-        *active_index -= 1;
       }
       break;
     }
@@ -599,15 +581,22 @@ static bool geometry_color_attribute_convert_poll(bContext *C)
     return false;
   }
 
+  if (CTX_data_edit_object(C) != nullptr) {
+    CTX_wm_operator_poll_msg_set(C, "Operation is not allowed in edit mode");
+    return false;
+  }
+
   Object *ob = ED_object_context(C);
   ID *id = static_cast<ID *>(ob->data);
   if (GS(id->name) != ID_ME) {
     return false;
   }
+
   CustomDataLayer *layer = BKE_id_attributes_active_color_get(id);
   if (layer == nullptr) {
     return false;
   }
+
   return true;
 }
 
@@ -646,7 +635,7 @@ static int geometry_color_attribute_convert_invoke(bContext *C,
   return WM_operator_props_dialog_popup(C, op, 300);
 }
 
-static void geometry_color_attribute_convert_ui(bContext *UNUSED(C), wmOperator *op)
+static void geometry_color_attribute_convert_ui(bContext * /*C*/, wmOperator *op)
 {
   uiLayout *layout = op->layout;
   uiLayoutSetPropSep(layout, true);
@@ -703,7 +692,6 @@ void GEOMETRY_OT_attribute_convert(wmOperatorType *ot)
 
   static EnumPropertyItem mode_items[] = {
       {int(ConvertAttributeMode::Generic), "GENERIC", 0, "Generic", ""},
-      {int(ConvertAttributeMode::UVMap), "UV_MAP", 0, "UV Map", ""},
       {int(ConvertAttributeMode::VertexGroup), "VERTEX_GROUP", 0, "Vertex Group", ""},
       {0, nullptr, 0, nullptr, nullptr},
   };
