@@ -684,7 +684,6 @@ classes = (
     NODE_MT_geometry_node_mesh_topology,
     NODE_MT_category_GEO_POINT,
     NODE_MT_category_simulation,
-    NODE_MT_category_GEO_TEXT,
     NODE_MT_category_GEO_VOLUME,
     NODE_MT_geometry_node_GEO_MATERIAL,
     NODE_MT_category_GEO_TEXTURE,

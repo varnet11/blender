@@ -121,7 +121,7 @@ struct TreeDrawContext {
    */
   bool used_by_realtime_compositor = false;
 
-  Vector<blender::ed::space_node::SubContext> sub_contexts;
+  blender::Vector<blender::ed::space_node::SubContext> sub_contexts;
 };
 
 float ED_node_grid_size()
@@ -3126,13 +3126,12 @@ static void node_draw_sub_context_frames(TreeDrawContext &tree_draw_ctx,
     }
 
     if (snode.runtime->linkdrag) {
-      for (const bNodeLink *link : snode.runtime->linkdrag->links) {
-        if (link->fromnode == nullptr) {
+      for (const bNodeLink &link : snode.runtime->linkdrag->links) {
+        if (link.fromnode == nullptr) {
           continue;
         }
-        if (nodes_in_context.contains(link->fromnode) &&
-            !context_outputs.contains(link->fromnode)) {
-          const float2 pos = node_link_bezier_points_dragged(snode, *link)[3];
+        if (nodes_in_context.contains(link.fromnode) && !context_outputs.contains(link.fromnode)) {
+          const float2 pos = node_link_bezier_points_dragged(snode, link)[3];
           rctf rect;
           BLI_rctf_init_pt_radius(&rect, pos, padding);
           add_rect_corner_positions(possible_boundary_positions, rect);
@@ -3164,7 +3163,8 @@ static void node_draw_sub_context_frames(TreeDrawContext &tree_draw_ctx,
         IndexRange(1),
         VArray<float>::ForSingle(UI_UNIT_X / 2, num_convex_positions),
         VArray<int>::ForSingle(5, num_convex_positions),
-        true);
+        true,
+        {});
     const Span<float3> boundary_positions = fillet_curve.positions();
 
     const uint pos = GPU_vertformat_attr_add(

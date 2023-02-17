@@ -1331,6 +1331,11 @@ struct GeometryNodesLazyFunctionGraphBuilder {
           this->handle_viewer_node(*bnode);
           break;
         }
+        case GEO_NODE_SIMULATION_OUTPUT: {
+          const lf::FunctionNode &lf_node = this->handle_geometry_node(*bnode);
+          mapping_->sim_output_node_map.add_new(bnode, &lf_node);
+          break;
+        }
         default: {
           if (node_type->geometry_node_execute) {
             this->handle_geometry_node(*bnode);
@@ -1479,13 +1484,13 @@ struct GeometryNodesLazyFunctionGraphBuilder {
     lf_graph_info_->functions.append(std::move(lazy_function));
   }
 
-  void handle_geometry_node(const bNode &bnode)
+  lf::FunctionNode &handle_geometry_node(const bNode &bnode)
   {
     Vector<const bNodeSocket *> used_inputs;
     Vector<const bNodeSocket *> used_outputs;
     auto lazy_function = std::make_unique<LazyFunctionForGeometryNode>(
         bnode, used_inputs, used_outputs);
-    lf::Node &lf_node = lf_graph_->add_function(*lazy_function);
+    lf::FunctionNode &lf_node = lf_graph_->add_function(*lazy_function);
 
     for (const int i : used_inputs.index_range()) {
       const bNodeSocket &bsocket = *used_inputs[i];
@@ -1527,6 +1532,8 @@ struct GeometryNodesLazyFunctionGraphBuilder {
     }
 
     lf_graph_info_->functions.append(std::move(lazy_function));
+
+    return lf_node;
   }
 
   void handle_multi_function_node(const bNode &bnode, const NodeMultiFunctions::Item &fn_item)
