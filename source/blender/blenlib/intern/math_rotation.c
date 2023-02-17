@@ -1490,9 +1490,9 @@ void rotate_eul(float beul[3], const char axis, const float angle)
 
 void compatible_eul(float eul[3], const float oldrot[3])
 {
-  /* we could use M_PI as pi_thresh: which is correct but 5.1 gives better results.
-   * Checked with baking actions to fcurves - campbell */
-  const float pi_thresh = (5.1f);
+  /* When the rotation exceeds 180 degrees, it can be wrapped by 360 degrees
+   * to produce a closer match, see !104856. */
+  const float pi_thresh = (float)M_PI;
   const float pi_x2 = (2.0f * (float)M_PI);
 
   float deul[3];
@@ -1511,29 +1511,16 @@ void compatible_eul(float eul[3], const float oldrot[3])
     }
   }
 
-  /* is 1 of the axis rotations larger than 180 degrees and the other small? NO ELSE IF!! */
-  if (fabsf(deul[0]) > 3.2f && fabsf(deul[1]) < 1.6f && fabsf(deul[2]) < 1.6f) {
-    if (deul[0] > 0.0f) {
-      eul[0] -= pi_x2;
-    }
-    else {
-      eul[0] += pi_x2;
-    }
-  }
-  if (fabsf(deul[1]) > 3.2f && fabsf(deul[2]) < 1.6f && fabsf(deul[0]) < 1.6f) {
-    if (deul[1] > 0.0f) {
-      eul[1] -= pi_x2;
-    }
-    else {
-      eul[1] += pi_x2;
-    }
-  }
-  if (fabsf(deul[2]) > 3.2f && fabsf(deul[0]) < 1.6f && fabsf(deul[1]) < 1.6f) {
-    if (deul[2] > 0.0f) {
-      eul[2] -= pi_x2;
-    }
-    else {
-      eul[2] += pi_x2;
+  uint j = 1, k = 2;
+  for (i = 0; i < 3; j = k, k = i++) {
+    /* is 1 of the axis rotations larger than 180 degrees and the other small? */
+    if (fabsf(deul[i]) > 3.2f && fabsf(deul[j]) < 1.6f && fabsf(deul[k]) < 1.6f) {
+      if (deul[i] > 0.0f) {
+        eul[i] -= pi_x2;
+      }
+      else {
+        eul[i] += pi_x2;
+      }
     }
   }
 }
