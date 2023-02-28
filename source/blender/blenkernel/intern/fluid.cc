@@ -939,7 +939,7 @@ struct ObstaclesFromDMData {
 
   const float (*vert_positions)[3];
   const MLoop *mloop;
-  const MLoopTri *mlooptri;
+  blender::Span<MLoopTri> looptris;
 
   BVHTreeFromMesh *tree;
   FluidObjectBB *bb;
@@ -974,7 +974,7 @@ static void obstacles_from_mesh_task_cb(void *__restrict userdata,
       update_velocities(data->fes,
                         data->vert_positions,
                         data->mloop,
-                        data->mlooptri,
+                        data->looptris.data(),
                         bb->velocity,
                         index,
                         data->tree,
@@ -997,7 +997,6 @@ static void obstacles_from_mesh(Object *coll_ob,
                                 float dt)
 {
   if (fes->mesh) {
-    const MLoopTri *looptri;
     BVHTreeFromMesh tree_data = {nullptr};
     int numverts, i;
 
@@ -1010,7 +1009,7 @@ static void obstacles_from_mesh(Object *coll_ob,
     int min[3], max[3], res[3];
 
     const MLoop *mloop = BKE_mesh_loops(me);
-    looptri = BKE_mesh_runtime_looptri_ensure(me);
+    const blender::Span<MLoopTri> looptris = me->looptris();
     numverts = me->totvert;
 
     /* TODO(sebbas): Make initialization of vertex velocities optional? */
@@ -1074,7 +1073,7 @@ static void obstacles_from_mesh(Object *coll_ob,
       data.fes = fes;
       data.vert_positions = positions;
       data.mloop = mloop;
-      data.mlooptri = looptri;
+      data.looptris = looptris;
       data.tree = &tree_data;
       data.bb = bb;
       data.has_velocity = has_velocity;
@@ -1983,7 +1982,7 @@ struct EmitFromDMData {
   const float (*vert_positions)[3];
   const float (*vert_normals)[3];
   const MLoop *mloop;
-  const MLoopTri *mlooptri;
+  blender::Span<MLoopTri> looptris;
   const float (*mloopuv)[2];
   const MDeformVert *dvert;
   int defgrp_index;
@@ -2017,7 +2016,7 @@ static void emit_from_mesh_task_cb(void *__restrict userdata,
                     data->vert_positions,
                     data->vert_normals,
                     data->mloop,
-                    data->mlooptri,
+                    data->looptris.data(),
                     data->mloopuv,
                     bb->influence,
                     bb->velocity,
@@ -2067,7 +2066,7 @@ static void emit_from_mesh(
     float(*positions)[3] = BKE_mesh_vert_positions_for_write(me);
 
     const MLoop *mloop = BKE_mesh_loops(me);
-    const MLoopTri *mlooptri = BKE_mesh_runtime_looptri_ensure(me);
+    const blender::Span<MLoopTri> looptris = me->looptris();
     const int numverts = me->totvert;
     const MDeformVert *dvert = BKE_mesh_deform_verts(me);
     const float(*mloopuv)[2] = static_cast<const float(*)[2]>(
@@ -2092,8 +2091,8 @@ static void emit_from_mesh(
 
     /* Transform mesh vertices to domain grid space for fast lookups.
      * This is valid because the mesh is copied above. */
-    BKE_mesh_vertex_normals_ensure(me);
-    float(*vert_normals)[3] = BKE_mesh_vertex_normals_for_write(me);
+    BKE_mesh_vert_normals_ensure(me);
+    float(*vert_normals)[3] = BKE_mesh_vert_normals_for_write(me);
     for (i = 0; i < numverts; i++) {
       /* Vertex position. */
       mul_m4_v3(flow_ob->object_to_world, positions[i]);
@@ -2144,7 +2143,7 @@ static void emit_from_mesh(
       data.vert_positions = positions;
       data.vert_normals = vert_normals;
       data.mloop = mloop;
-      data.mlooptri = mlooptri;
+      data.looptris = looptris;
       data.mloopuv = mloopuv;
       data.dvert = dvert;
       data.defgrp_index = defgrp_index;
@@ -3248,7 +3247,7 @@ static Mesh *create_liquid_geometry(FluidDomainSettings *fds,
     return nullptr;
   }
 
-  me = BKE_mesh_new_nomain(num_verts, 0, 0, num_faces * 3, num_faces);
+  me = BKE_mesh_new_nomain(num_verts, 0, num_faces * 3, num_faces);
   if (!me) {
     return nullptr;
   }
@@ -3386,7 +3385,7 @@ static Mesh *create_smoke_geometry(FluidDomainSettings *fds, Mesh *orgmesh, Obje
     return BKE_mesh_copy_for_eval(orgmesh, false);
   }
 
-  result = BKE_mesh_new_nomain(num_verts, 0, 0, num_faces * 4, num_faces);
+  result = BKE_mesh_new_nomain(num_verts, 0, num_faces * 4, num_faces);
   float(*positions)[3] = BKE_mesh_vert_positions_for_write(result);
   mpolys = BKE_mesh_polys_for_write(result);
   mloops = BKE_mesh_loops_for_write(result);
