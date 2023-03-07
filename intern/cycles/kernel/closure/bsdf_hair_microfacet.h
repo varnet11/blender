@@ -230,9 +230,10 @@ ccl_device_inline float3 sample_wh(
 
   const float3 wi_wm = make_float3(dot(wi, s), dot(wi, t), dot(wi, n));
 
-  float discard;
-  const float3 wh_wm = microfacet_sample_stretched<m_type>(
-      kg, wi_wm, roughness, roughness, rand.x, rand.y, &discard);
+  const float3 wh_wm =
+      (m_type == MicrofacetType::GGX) ?
+          microfacet_ggx_sample_vndf(wi_wm, roughness, roughness, rand.x, rand.y) :
+          microfacet_beckmann_sample_vndf(wi_wm, roughness, roughness, rand.x, rand.y);
 
   const float3 wh = wh_wm.x * s + wh_wm.y * t + wh_wm.z * n;
   return wh;
@@ -372,14 +373,15 @@ ccl_device float3 bsdf_microfacet_hair_eval_r(ccl_private const ShaderClosure *s
   /* Integrate using Composite Simpson's 1/3 rule. */
   float integral = 0.0f;
   for (size_t i = 0; i <= intervals; i++) {
-
     const float gamma_m = gamma_m_min + i * res;
     const float3 wm = sphg_dir(tilt, gamma_m, b);
 
     if (microfacet_visible(wi, wo, make_float3(wm.x, 0.0f, wm.z), wh)) {
       const float weight = (i == 0 || i == intervals) ? 0.5f : (i % 2 + 1);
-      integral += weight * bsdf_D<m_type>(roughness2, dot(wm, wh)) *
-                  bsdf_G<m_type>(roughness2, dot(wi, wm), dot(wo, wm)) * arc_length(e2, gamma_m);
+      /* NOTE: using separable masking and shadowing as one factor cancels out in `sample()`. */
+      const float G = bsdf_G<m_type>(roughness2, dot(wm, wi)) *
+                      bsdf_G<m_type>(roughness2, dot(wm, wo));
+      integral += weight * bsdf_D<m_type>(roughness2, dot(wm, wh)) * G * arc_length(e2, gamma_m);
     }
   }
 
@@ -472,8 +474,8 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt(KernelGlobals kg,
     const float cos_mi1 = dot(wi, wmi);
     const float cos_mo1 = dot(-wt, wmi);
     const float cos_mi2 = dot(-wt, wmt);
-    const float G1 = bsdf_G<m_type>(roughness2, cos_mi1, cos_mo1);
-    if (G1 == 0.0f || !microfacet_visible(wi, -wt, wmi_, wh1)) {
+    const float G1o = bsdf_G<m_type>(roughness2, cos_mo1);
+    if (!microfacet_visible(wi, -wt, wmi, wh1) || !microfacet_visible(wi, -wt, wmi_, wh1)) {
       continue;
     }
 
@@ -498,10 +500,11 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt(KernelGlobals kg,
 
           const float T2 = 1.0f - fresnel_dielectric_cos(cos_hi2, inv_eta);
           const float D2 = bsdf_D<m_type>(roughness2, cos_mh2);
-          const float G2 = bsdf_G<m_type>(roughness2, cos_mi2, cos_mo2);
+          const float G2 = bsdf_G<m_type>(roughness2, cos_mi2) *
+                           bsdf_G<m_type>(roughness2, cos_mo2);
 
-          const float3 result = weight * T1 * T2 * D2 * G2 * A_t / cos_mo1 * cos_mi1 * cos_hi2 *
-                                cos_ho2 * sqr(rcp_norm_wh2) * bsdf_G1<m_type>(roughness2, cos_mo1);
+          const float3 result = weight * T1 * T2 * D2 * G1o * G2 * A_t / cos_mo1 * cos_mi1 *
+                                cos_hi2 * cos_ho2 * sqr(rcp_norm_wh2);
 
           if (isfinite_safe(result)) {
             S_tt += bsdf->extra->TT * result * arc_length(e2, gamma_mt);
@@ -527,9 +530,8 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt(KernelGlobals kg,
         /* Total internal reflection. */
         continue;
       }
-      const float cos_mo2 = dot(-wtr, wmt);
-      const float G2 = bsdf_G<m_type>(roughness2, cos_mi2, cos_mo2);
-      if (G2 == 0.0f || !microfacet_visible(-wt, -wtr, wmt_, wh2)) {
+
+      if (!microfacet_visible(-wt, -wtr, wmt, wh2) || !microfacet_visible(-wt, -wtr, wmt_, wh2)) {
         continue;
       }
 
@@ -538,12 +540,12 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt(KernelGlobals kg,
       const float3 wmtr = sphg_dir(-tilt, gamma_mtr, b);
       const float3 wmtr_ = sphg_dir(0.0f, gamma_mtr, b);
 
-      const float G3 = bsdf_G<m_type>(roughness2, dot(wtr, wmtr), dot(-wo, wmtr));
       float3 wh3 = wtr + inv_eta * wo;
       const float rcp_norm_wh3 = 1.0f / len(wh3);
       wh3 *= rcp_norm_wh3;
       const float cos_mh3 = dot(wmtr, wh3);
-      if (cos_mh3 < 0.0f || G3 == 0.0f || !microfacet_visible(wtr, -wo, wmtr_, wh3)) {
+      if (cos_mh3 < 0.0f || !microfacet_visible(wtr, -wo, wmtr, wh3) ||
+          !microfacet_visible(wtr, -wo, wmtr_, wh3)) {
         continue;
       }
 
@@ -558,9 +560,14 @@ ccl_device float3 bsdf_microfacet_hair_eval_tt_trt(KernelGlobals kg,
                                    2.0f * cosf(phi_tr - gamma_mt) :
                                    -len(to_point(gamma_mtr, b) - to_point(gamma_mt, b))));
 
-      const float3 result = weight * T1 * R2 * T3 * D3 * G3 * A_t * A_tr / (cos_mo1 * cos_mo2) *
-                            cos_mi1 * cos_mi2 * cos_hi3 * cos_ho3 * sqr(rcp_norm_wh3) *
-                            bsdf_G<m_type>(roughness2, cos_mo1, cos_mo2);
+      const float cos_mo2 = dot(wmt, -wtr);
+      const float G2o = bsdf_G<m_type>(roughness2, cos_mo2);
+      const float G3 = bsdf_G<m_type>(roughness2, dot(wmtr, wtr)) *
+                       bsdf_G<m_type>(roughness2, dot(wmtr, -wo));
+
+      const float3 result = weight * T1 * R2 * T3 * D3 * G1o * G2o * G3 * A_t * A_tr /
+                            (cos_mo1 * cos_mo2) * cos_mi1 * cos_mi2 * cos_hi3 * cos_ho3 *
+                            sqr(rcp_norm_wh3);
 
       if (isfinite_safe(result)) {
         S_trt += bsdf->extra->TRT * result * arc_length(e2, gamma_mtr);
@@ -575,8 +582,7 @@ template<MicrofacetType m_type>
 ccl_device int bsdf_microfacet_hair_sample(const KernelGlobals kg,
                                            ccl_private const ShaderClosure *sc,
                                            ccl_private ShaderData *sd,
-                                           float randu,
-                                           float randv,
+                                           float3 rand,
                                            ccl_private Spectrum *eval,
                                            ccl_private float3 *wo,
                                            ccl_private float *pdf,
@@ -630,10 +636,9 @@ ccl_device int bsdf_microfacet_hair_sample(const KernelGlobals kg,
   const float roughness2 = sqr(roughness);
 
   /* Generate samples. */
-  float sample_lobe = randu;
-  const float sample_h = randv;
-  const float2 sample_h1 = make_float2(lcg_step_float(&sd->lcg_state),
-                                       lcg_step_float(&sd->lcg_state));
+  float sample_lobe = rand.x;
+  const float sample_h = rand.y;
+  const float2 sample_h1 = make_float2(rand.z, lcg_step_float(&sd->lcg_state));
   const float2 sample_h2 = make_float2(lcg_step_float(&sd->lcg_state),
                                        lcg_step_float(&sd->lcg_state));
   const float2 sample_h3 = make_float2(lcg_step_float(&sd->lcg_state),
@@ -690,7 +695,7 @@ ccl_device int bsdf_microfacet_hair_sample(const KernelGlobals kg,
   float3 TT = zero_float3();
   float3 TRT = zero_float3();
 
-  if (dot(wt, wh2) < 0.0f && dot(wmt, wt) < 0.0f && microfacet_visible(-wt, -wtr, wmt_, wh2)) {
+  if (dot(wh2, -wt) > 0.0f && dot(wmt, -wt) > 0.0f && microfacet_visible(-wt, -wtr, wmt_, wh2)) {
     const float3 mu_a = bsdf->sigma;
     const float3 A_t = exp(mu_a / cos_theta(wt) *
                            (is_circular ?
@@ -704,7 +709,7 @@ ccl_device int bsdf_microfacet_hair_sample(const KernelGlobals kg,
 
     wtt = -refract_angle(-wt, wh2, cos_theta_t2, *eta);
 
-    if (dot(wtt, wmt) < 0.0f && cos_theta_t2 != 0.0f) {
+    if (dot(wmt, -wtt) > 0.0f && cos_theta_t2 != 0.0f) {
       TT = bsdf->extra->TT * T1 * A_t * T2;
     }
 
@@ -721,7 +726,7 @@ ccl_device int bsdf_microfacet_hair_sample(const KernelGlobals kg,
     wtrt = -refract_angle(wtr, wh3, cos_theta_t3, *eta);
 
     if (cos_theta_t3 != 0.0f && dot(wtr, wh3) > 0.0f && dot(wmtr, wtr) > 0.0f &&
-        dot(wtrt, wmtr) < 0.0f &&
+        dot(wmtr, -wtrt) > 0.0f &&
         microfacet_visible(wtr, -wtrt, make_float3(wmtr.x, 0.0f, wmtr.z), wh3)) {
       const float3 T3 = make_float3(1.0f - R3);
 
@@ -755,7 +760,7 @@ ccl_device int bsdf_microfacet_hair_sample(const KernelGlobals kg,
     *eval = rgb_to_spectrum(R / r * total_energy);
 
     if (microfacet_visible(wi, wr, wmi_, wh1)) {
-      visibility = bsdf_G1<m_type>(roughness2, dot(wr, wmi));
+      visibility = bsdf_G<m_type>(roughness2, dot(wmi, wr));
     }
 
     label |= LABEL_REFLECT;
@@ -765,7 +770,8 @@ ccl_device int bsdf_microfacet_hair_sample(const KernelGlobals kg,
     *eval = rgb_to_spectrum(TT / tt * total_energy);
 
     if (microfacet_visible(wi, -wt, wmi_, wh1) && microfacet_visible(-wt, -wtt, wmt_, wh2)) {
-      visibility = bsdf_G<m_type>(roughness2, dot(-wt, wmi), dot(-wtt, wmt));
+      visibility = bsdf_G<m_type>(roughness2, dot(wmi, -wt)) *
+                   bsdf_G<m_type>(roughness2, dot(wmt, -wtt));
     }
 
     label |= LABEL_TRANSMIT;
@@ -775,8 +781,9 @@ ccl_device int bsdf_microfacet_hair_sample(const KernelGlobals kg,
     *eval = rgb_to_spectrum(TRT / trt * total_energy);
 
     if (microfacet_visible(wi, -wt, wmi_, wh1)) {
-      visibility = bsdf_G<m_type>(roughness2, dot(-wt, wmi), dot(-wtr, wmt)) *
-                   bsdf_G1<m_type>(roughness2, dot(-wtrt, wmtr));
+      visibility = bsdf_G<m_type>(roughness2, dot(wmi, -wt)) *
+                   bsdf_G<m_type>(roughness2, dot(wmt, -wtr)) *
+                   bsdf_G<m_type>(roughness2, dot(wmtr, -wtrt));
     }
 
     label |= LABEL_TRANSMIT;
@@ -845,8 +852,7 @@ ccl_device Spectrum bsdf_microfacet_hair_eval(KernelGlobals kg,
 ccl_device int bsdf_microfacet_hair_sample(KernelGlobals kg,
                                            ccl_private const ShaderClosure *sc,
                                            ccl_private ShaderData *sd,
-                                           float randu,
-                                           float randv,
+                                           float3 rand,
                                            ccl_private Spectrum *eval,
                                            ccl_private float3 *wo,
                                            ccl_private float *pdf,
@@ -857,10 +863,10 @@ ccl_device int bsdf_microfacet_hair_sample(KernelGlobals kg,
 
   if (bsdf->distribution_type == NODE_MICROFACET_HAIR_BECKMANN) {
     return bsdf_microfacet_hair_sample<MicrofacetType::BECKMANN>(
-        kg, sc, sd, randu, randv, eval, wo, pdf, sampled_roughness, eta);
+        kg, sc, sd, rand, eval, wo, pdf, sampled_roughness, eta);
   }
   return bsdf_microfacet_hair_sample<MicrofacetType::GGX>(
-      kg, sc, sd, randu, randv, eval, wo, pdf, sampled_roughness, eta);
+      kg, sc, sd, rand, eval, wo, pdf, sampled_roughness, eta);
 }
 
 /* Implements Filter Glossy by capping the effective roughness. */
