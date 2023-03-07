@@ -167,14 +167,26 @@ get_blender_version()
 option(WITH_BLENDER "Build blender (disable to build only the blender player)" ON)
 mark_as_advanced(WITH_BLENDER)
 
-if(APPLE)
-  # In future, can be used with `quicklookthumbnailing/qlthumbnailreply` to create file
-  # thumbnails for say Finder. Turn it off for now.
-  option(WITH_BLENDER_THUMBNAILER "Build \"blender-thumbnailer\" thumbnail extraction utility" OFF)
-elseif(WIN32)
-  option(WITH_BLENDER_THUMBNAILER "Build \"BlendThumb.dll\" helper for Windows explorer integration" ON)
+if(WIN32)
+  option(WITH_BLENDER_THUMBNAILER "\
+Build \"BlendThumb.dll\" helper for Windows explorer integration to support extracting \
+thumbnails from `.blend` files."
+    ON
+  )
 else()
-  option(WITH_BLENDER_THUMBNAILER "Build \"blender-thumbnailer\" thumbnail extraction utility" ON)
+  set(_option_default ON)
+  if(APPLE)
+    # In future, can be used with `quicklookthumbnailing/qlthumbnailreply`
+    # to create file thumbnails for say Finder.
+    # Turn it off for now, even though it can build on APPLE, it's not likely to be useful.
+    set(_option_default OFF)
+  endif()
+  option(WITH_BLENDER_THUMBNAILER "\
+Build stand-alone \"blender-thumbnailer\" command-line thumbnail extraction utility, \
+intended for use by file-managers to extract PNG images from `.blend` files."
+    ${_option_default}
+  )
+  unset(_option_default)
 endif()
 
 option(WITH_INTERNATIONAL "Enable I18N (International fonts and text)" ON)
@@ -214,14 +226,19 @@ option(WITH_BULLET        "Enable Bullet (Physics Engine)" ON)
 option(WITH_SYSTEM_BULLET "Use the systems bullet library (currently unsupported due to missing features in upstream!)" )
 mark_as_advanced(WITH_SYSTEM_BULLET)
 option(WITH_OPENCOLORIO   "Enable OpenColorIO color management" ON)
+
+set(_option_default ON)
 if(APPLE)
   # There's no OpenXR runtime in sight for macOS, neither is code well
   # tested there -> disable it by default.
-  option(WITH_XR_OPENXR   "Enable VR features through the OpenXR specification" OFF)
-  mark_as_advanced(WITH_XR_OPENXR)
-else()
-  option(WITH_XR_OPENXR   "Enable VR features through the OpenXR specification" ON)
+  set(_option_default OFF)
 endif()
+option(WITH_XR_OPENXR "Enable VR features through the OpenXR specification" ${_option_default})
+if(APPLE)
+  mark_as_advanced(WITH_XR_OPENXR)
+endif()
+unset(_option_default)
+
 option(WITH_GMP "Enable features depending on GMP (Exact Boolean)" ON)
 
 # Compositor
@@ -314,7 +331,6 @@ option(WITH_MOD_REMESH          "Enable Remesh Modifier" ON)
 option(WITH_MOD_OCEANSIM        "Enable Ocean Modifier" ON)
 
 # Image format support
-option(WITH_OPENIMAGEIO         "Enable OpenImageIO Support (http://www.openimageio.org)" ON)
 option(WITH_IMAGE_OPENEXR       "Enable OpenEXR Support (http://www.openexr.com)" ON)
 option(WITH_IMAGE_OPENJPEG      "Enable OpenJpeg Support (http://www.openjpeg.org)" ON)
 option(WITH_IMAGE_TIFF          "Enable LibTIFF Support" ON)
@@ -341,6 +357,7 @@ option(WITH_MATERIALX           "Enable MaterialX Support" OFF)
 # Disable opencollada when we don't have precompiled libs
 option(WITH_OPENCOLLADA   "Enable OpenCollada Support (http://www.opencollada.org)" ON)
 option(WITH_IO_WAVEFRONT_OBJ  "Enable Wavefront-OBJ 3D file format support (*.obj)" ON)
+option(WITH_IO_PLY            "Enable PLY 3D file format support (*.ply)" ON)
 option(WITH_IO_STL            "Enable STL 3D file format support (*.stl)" ON)
 option(WITH_IO_GPENCIL        "Enable grease-pencil file format IO (*.svg, *.pdf)" ON)
 
@@ -353,12 +370,13 @@ else()
   set(WITH_COREAUDIO OFF)
 endif()
 if(NOT WIN32)
+  set(_option_default ON)
   if(APPLE)
-    option(WITH_JACK          "Enable JACK Support (http://www.jackaudio.org)" OFF)
-  else()
-    option(WITH_JACK          "Enable JACK Support (http://www.jackaudio.org)" ON)
+    set(_option_default OFF)
   endif()
-  option(WITH_JACK_DYNLOAD  "Enable runtime dynamic JACK libraries loading" OFF)
+  option(WITH_JACK "Enable JACK Support (http://www.jackaudio.org)" ${_option_default})
+  unset(_option_default)
+  option(WITH_JACK_DYNLOAD "Enable runtime dynamic JACK libraries loading" OFF)
 else()
   set(WITH_JACK OFF)
 endif()
@@ -607,8 +625,10 @@ mark_as_advanced(
 
 # Vulkan
 option(WITH_VULKAN_BACKEND "Enable Vulkan as graphics backend (only for development)" OFF)
+option(WITH_VULKAN_GUARDEDALLOC "Use guardedalloc for host allocations done inside Vulkan (development option)" OFF)
 mark_as_advanced(
   WITH_VULKAN_BACKEND
+  WITH_VULKAN_GUARDEDALLOC
 )
 
 # Metal
@@ -872,8 +892,6 @@ set_and_warn_dependency(WITH_IMAGE_TIFF WITH_HARU       OFF)
 
 # auto enable openimageio for cycles
 if(WITH_CYCLES)
-  set(WITH_OPENIMAGEIO ON)
-
   # auto enable llvm for cycles_osl
   if(WITH_CYCLES_OSL)
     set(WITH_LLVM ON CACHE BOOL "" FORCE)
@@ -934,21 +952,6 @@ endif()
 # -----------------------------------------------------------------------------
 # Check if Sub-modules are Cloned
 
-if(WITH_INTERNATIONAL)
-  file(GLOB RESULT "${CMAKE_SOURCE_DIR}/release/datafiles/locale")
-  list(LENGTH RESULT DIR_LEN)
-  if(DIR_LEN EQUAL 0)
-    message(
-      WARNING
-      "Translation path '${CMAKE_SOURCE_DIR}/release/datafiles/locale' is missing, "
-      "This is a 'git submodule', which are known not to work with bridges to other version "
-      "control systems."
-    )
-    set(TRANSLATIONS_FOUND OFF)
-    set_and_warn_library_found("Translations" TRANSLATIONS_FOUND WITH_INTERNATIONAL)
-  endif()
-endif()
-
 if(WITH_PYTHON)
   # While we have this as an '#error' in 'bpy_capi_utils.h',
   # upgrading Python tends to cause confusion for users who build.
@@ -964,14 +967,14 @@ if(WITH_PYTHON)
     )
   endif()
 
-  file(GLOB RESULT "${CMAKE_SOURCE_DIR}/release/scripts/addons")
+  file(GLOB RESULT "${CMAKE_SOURCE_DIR}/scripts/addons")
   list(LENGTH RESULT DIR_LEN)
   if(DIR_LEN EQUAL 0)
     message(
       WARNING
-      "Addons path '${CMAKE_SOURCE_DIR}/release/scripts/addons' is missing, "
-      "This is a 'git submodule', which are known not to work with bridges to other version "
-      "control systems: * CONTINUING WITHOUT ADDONS *"
+      "Addons path '${CMAKE_SOURCE_DIR}/scripts/addons' is missing. "
+      "This is an external repository which needs to be checked out. Use `make update` to do so. "
+      "* CONTINUING WITHOUT ADDONS *"
     )
   endif()
 endif()
@@ -1080,13 +1083,6 @@ if(NOT WITH_FFTW3 AND WITH_MOD_OCEANSIM)
 endif()
 
 if(WITH_CYCLES)
-  if(NOT WITH_OPENIMAGEIO)
-    message(
-      FATAL_ERROR
-      "Cycles requires WITH_OPENIMAGEIO, the library may not have been found. "
-      "Configure OIIO or disable WITH_CYCLES"
-    )
-  endif()
   if(WITH_CYCLES_OSL)
     if(NOT WITH_LLVM)
       message(
@@ -1221,13 +1217,6 @@ endif()
 
 if(WITH_OPENGL)
   add_definitions(-DWITH_OPENGL)
-endif()
-
-#-----------------------------------------------------------------------------
-# Configure Vulkan.
-
-if(WITH_VULKAN_BACKEND)
-  list(APPEND BLENDER_GL_LIBRARIES ${VULKAN_LIBRARIES})
 endif()
 
 # -----------------------------------------------------------------------------
@@ -1944,8 +1933,7 @@ if(FIRST_RUN)
   info_cfg_option(WITH_IMAGE_OPENEXR)
   info_cfg_option(WITH_IMAGE_OPENJPEG)
   info_cfg_option(WITH_IMAGE_TIFF)
-  info_cfg_option(WITH_OPENIMAGEIO)
-
+  
   info_cfg_text("Audio:")
   info_cfg_option(WITH_CODEC_AVI)
   info_cfg_option(WITH_CODEC_FFMPEG)

@@ -44,7 +44,7 @@
 #include "GPU_batch.h"
 
 #include "DRW_engine.h"
-#include "DRW_pbvh.h"
+#include "DRW_pbvh.hh"
 
 #include "bmesh.h"
 #include "draw_pbvh.h"
@@ -339,14 +339,14 @@ struct PBVHBatches {
     bool smooth = false;
 
     foreach_faces([&](int /*buffer_i*/, int /*tri_i*/, int vertex_i, const MLoopTri *tri) {
-      const MPoly *mp = args->mpoly + tri->poly;
-
       if (tri->poly != last_poly) {
         last_poly = tri->poly;
 
-        if (!(mp->flag & ME_SMOOTH)) {
+        const MPoly &poly = args->polys[tri->poly];
+        if (!(poly.flag & ME_SMOOTH)) {
           smooth = true;
-          BKE_mesh_calc_poly_normal(mp, args->mloop + mp->loopstart, args->vert_positions, fno);
+          BKE_mesh_calc_poly_normal(
+              &poly, args->mloop + poly.loopstart, args->vert_positions, fno);
           normal_float_to_short_v3(no, fno);
         }
         else {
@@ -1303,10 +1303,10 @@ struct PBVHBatches {
       int vbo_i = get_vbo_index(vbo);
 
       batch.vbos.append(vbo_i);
-      GPU_batch_vertbuf_add_ex(batch.tris, vbo->vert_buf, false);
+      GPU_batch_vertbuf_add(batch.tris, vbo->vert_buf, false);
 
       if (batch.lines) {
-        GPU_batch_vertbuf_add_ex(batch.lines, vbo->vert_buf, false);
+        GPU_batch_vertbuf_add(batch.lines, vbo->vert_buf, false);
       }
     }
 

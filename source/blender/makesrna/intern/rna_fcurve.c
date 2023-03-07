@@ -161,6 +161,20 @@ const EnumPropertyItem rna_enum_driver_target_rotation_mode_items[] = {
     {0, NULL, 0, NULL, NULL},
 };
 
+const EnumPropertyItem rna_enum_driver_target_context_property_items[] = {
+    {DTAR_CONTEXT_PROPERTY_ACTIVE_SCENE,
+     "ACTIVE_SCENE",
+     ICON_NONE,
+     "Active Scene",
+     "Currently evaluating scene"},
+    {DTAR_CONTEXT_PROPERTY_ACTIVE_VIEW_LAYER,
+     "ACTIVE_VIEW_LAYER",
+     ICON_NONE,
+     "Active View Layer",
+     "Currently evaluating view layer"},
+    {0, NULL, 0, NULL, NULL},
+};
+
 #ifdef RNA_RUNTIME
 
 #  include "WM_api.h"
@@ -714,7 +728,7 @@ static void rna_FModifier_start_frame_range(PointerRNA *UNUSED(ptr),
   // FModifier *fcm = (FModifier *)ptr->data;
 
   /* Technically, "sfra <= efra" must hold; however, we can't strictly enforce that,
-   * or else it becomes tricky to adjust the range, see: T36844.
+   * or else it becomes tricky to adjust the range, see: #36844.
    *
    * NOTE: we do not set soft-limits on lower bounds, as it's too confusing when you
    *       can't easily use the slider to set things here
@@ -729,7 +743,7 @@ static void rna_FModifier_end_frame_range(
   FModifier *fcm = (FModifier *)ptr->data;
 
   /* Technically, "sfra <= efra" must hold; however, we can't strictly enforce that,
-   * or else it becomes tricky to adjust the range, see: T36844. */
+   * or else it becomes tricky to adjust the range, see: #36844. */
   *min = MINAFRAMEF;
   *softmin = (fcm->flag & FMODIFIER_FLAG_RANGERESTRICT) ? fcm->sfra : MINAFRAMEF;
 
@@ -951,7 +965,7 @@ static void rna_FModifierStepped_frame_start_set(PointerRNA *ptr, float value)
   value = CLAMPIS(value, prop_clamp_min, prop_clamp_max);
 
   /* Need to set both step-data's start/end and the start/end on the base-data,
-   * or else Restrict-Range doesn't work due to RNA-property shadowing (T52009)
+   * or else Restrict-Range doesn't work due to RNA-property shadowing (#52009)
    */
   data->start_frame = value;
   fcm->sfra = value;
@@ -968,7 +982,7 @@ static void rna_FModifierStepped_frame_end_set(PointerRNA *ptr, float value)
   value = CLAMPIS(value, prop_clamp_min, prop_clamp_max);
 
   /* Need to set both step-data's start/end and the start/end on the base-data,
-   * or else Restrict-Range doesn't work due to RNA-property shadowing (T52009)
+   * or else Restrict-Range doesn't work due to RNA-property shadowing (#52009)
    */
   data->end_frame = value;
   fcm->efra = value;
@@ -1879,6 +1893,14 @@ static void rna_def_drivertarget(BlenderRNA *brna)
   RNA_def_property_enum_items(prop, prop_local_space_items);
   RNA_def_property_ui_text(prop, "Transform Space", "Space in which transforms are used");
   RNA_def_property_update(prop, 0, "rna_DriverTarget_update_data");
+
+  prop = RNA_def_property(srna, "context_property", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "context_property");
+  RNA_def_property_enum_items(prop, rna_enum_driver_target_context_property_items);
+  RNA_def_property_enum_default(prop, DTAR_CONTEXT_PROPERTY_ACTIVE_SCENE);
+  RNA_def_property_ui_text(
+      prop, "Context Property", "Type of a context-dependent data-block to access property from");
+  RNA_def_property_update(prop, 0, "rna_DriverTarget_update_data");
 }
 
 static void rna_def_drivervar(BlenderRNA *brna)
@@ -1907,6 +1929,11 @@ static void rna_def_drivervar(BlenderRNA *brna)
        ICON_DRIVER_DISTANCE,
        "Distance",
        "Distance between two bones or objects"},
+      {DVAR_TYPE_CONTEXT_PROP,
+       "CONTEXT_PROP",
+       ICON_RNA,
+       "Context Property",
+       "Use the value from some RNA property within the current evaluation context"},
       {0, NULL, 0, NULL, NULL},
   };
 

@@ -46,7 +46,7 @@
 
 #include "ED_sculpt.h"
 
-#include "sculpt_intern.h"
+#include "sculpt_intern.hh"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -132,10 +132,10 @@ static void do_draw_face_sets_brush_task_cb_ex(void *__restrict userdata,
     if (BKE_pbvh_type(ss->pbvh) == PBVH_FACES) {
       MeshElemMap *vert_map = &ss->pmap[vd.index];
       for (int j = 0; j < ss->pmap[vd.index].count; j++) {
-        const MPoly *p = &ss->mpoly[vert_map->indices[j]];
+        const MPoly &poly = ss->polys[vert_map->indices[j]];
 
         float poly_center[3];
-        BKE_mesh_calc_poly_center(p, &ss->mloop[p->loopstart], positions, poly_center);
+        BKE_mesh_calc_poly_center(&poly, &ss->mloop[poly.loopstart], positions, poly_center);
 
         if (!sculpt_brush_test_sq_fn(&test, poly_center)) {
           continue;
@@ -410,7 +410,7 @@ static int sculpt_face_set_create_exec(bContext *C, wmOperator *op)
     const bke::AttributeAccessor attributes = mesh->attributes();
     const VArraySpan<bool> select_poly = attributes.lookup_or_default<bool>(
         ".select_poly", ATTR_DOMAIN_FACE, false);
-    threading::parallel_for(IndexRange(mesh->totvert), 4096, [&](const IndexRange range) {
+    threading::parallel_for(select_poly.index_range(), 4096, [&](const IndexRange range) {
       for (const int i : range) {
         if (select_poly[i]) {
           ss->face_sets[i] = next_face_set;
@@ -548,7 +548,6 @@ static void sculpt_face_sets_init_flood_fill(Object *ob, const FaceSetsFloodFill
   if (!ss->epmap) {
     BKE_mesh_edge_poly_map_create(&ss->epmap,
                                   &ss->epmap_mem,
-                                  edges.data(),
                                   edges.size(),
                                   polys.data(),
                                   polys.size(),
@@ -681,10 +680,11 @@ static int sculpt_face_set_init_exec(bContext *C, wmOperator *op)
       break;
     }
     case SCULPT_FACE_SETS_FROM_UV_SEAMS: {
-      const Span<MEdge> edges = mesh->edges();
+      const VArraySpan<bool> uv_seams = mesh->attributes().lookup_or_default<bool>(
+          ".uv_seam", ATTR_DOMAIN_EDGE, false);
       sculpt_face_sets_init_flood_fill(
           ob, [&](const int /*from_face*/, const int edge, const int /*to_face*/) -> bool {
-            return (edges[edge].flag & ME_SEAM) == 0;
+            return !uv_seams[edge];
           });
       break;
     }
@@ -1103,16 +1103,16 @@ static void sculpt_face_set_grow(Object *ob,
                                  const bool modify_hidden)
 {
   Mesh *mesh = BKE_mesh_from_object(ob);
-  const MPoly *polys = BKE_mesh_polys(mesh);
-  const MLoop *loops = BKE_mesh_loops(mesh);
+  const blender::Span<MPoly> polys = mesh->polys();
+  const blender::Span<MLoop> loops = mesh->loops();
 
-  for (int p = 0; p < mesh->totpoly; p++) {
+  for (const int p : polys.index_range()) {
     if (!modify_hidden && prev_face_sets[p] <= 0) {
       continue;
     }
-    const MPoly *c_poly = &polys[p];
-    for (int l = 0; l < c_poly->totloop; l++) {
-      const MLoop *c_loop = &loops[c_poly->loopstart + l];
+    const MPoly &c_poly = polys[p];
+    for (int l = 0; l < c_poly.totloop; l++) {
+      const MLoop *c_loop = &loops[c_poly.loopstart + l];
       const MeshElemMap *vert_map = &ss->pmap[c_loop->v];
       for (int i = 0; i < vert_map->count; i++) {
         const int neighbor_face_index = vert_map->indices[i];
@@ -1134,16 +1134,16 @@ static void sculpt_face_set_shrink(Object *ob,
                                    const bool modify_hidden)
 {
   Mesh *mesh = BKE_mesh_from_object(ob);
-  const MPoly *polys = BKE_mesh_polys(mesh);
-  const MLoop *loops = BKE_mesh_loops(mesh);
-  for (int p = 0; p < mesh->totpoly; p++) {
+  const blender::Span<MPoly> polys = mesh->polys();
+  const blender::Span<MLoop> loops = mesh->loops();
+  for (const int p : polys.index_range()) {
     if (!modify_hidden && prev_face_sets[p] <= 0) {
       continue;
     }
     if (abs(prev_face_sets[p]) == active_face_set_id) {
-      const MPoly *c_poly = &polys[p];
-      for (int l = 0; l < c_poly->totloop; l++) {
-        const MLoop *c_loop = &loops[c_poly->loopstart + l];
+      const MPoly &c_poly = polys[p];
+      for (int l = 0; l < c_poly.totloop; l++) {
+        const MLoop *c_loop = &loops[c_poly.loopstart + l];
         const MeshElemMap *vert_map = &ss->pmap[c_loop->v];
         for (int i = 0; i < vert_map->count; i++) {
           const int neighbor_face_index = vert_map->indices[i];
@@ -1303,8 +1303,8 @@ static bool sculpt_face_set_edit_is_operation_valid(SculptSession *ss,
 
   if (mode == SCULPT_FACE_SET_EDIT_DELETE_GEOMETRY) {
     if (BKE_pbvh_type(ss->pbvh) == PBVH_GRIDS) {
-      /* Modification of base mesh geometry requires special remapping of multires displacement,
-       * which does not happen here.
+      /* Modification of base mesh geometry requires special remapping of multi-resolution
+       * displacement, which does not happen here.
        * Disable delete operation. It can be supported in the future by doing similar displacement
        * data remapping as what happens in the mesh edit mode. */
       return false;
@@ -1318,9 +1318,9 @@ static bool sculpt_face_set_edit_is_operation_valid(SculptSession *ss,
 
   if (ELEM(mode, SCULPT_FACE_SET_EDIT_FAIR_POSITIONS, SCULPT_FACE_SET_EDIT_FAIR_TANGENCY)) {
     if (BKE_pbvh_type(ss->pbvh) == PBVH_GRIDS) {
-      /* TODO: Multires topology representation using grids and duplicates can't be used directly
-       * by the fair algorithm. Multires topology needs to be exposed in a different way or
-       * converted to a mesh for this operation. */
+      /* TODO: Multi-resolution topology representation using grids and duplicates can't be used
+       * directly by the fair algorithm. Multi-resolution topology needs to be exposed in a
+       * different way or converted to a mesh for this operation. */
       return false;
     }
   }

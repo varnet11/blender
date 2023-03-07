@@ -21,6 +21,21 @@ typedef enum eUSDMtlNameCollisionMode {
   USD_MTL_NAME_COLLISION_REFERENCE_EXISTING = 1,
 } eUSDMtlNameCollisionMode;
 
+/* Behavior when importing textures from a package
+ * (e.g., USDZ archive) or from a URI path. */
+typedef enum eUSDTexImportMode {
+  USD_TEX_IMPORT_NONE = 0,
+  USD_TEX_IMPORT_PACK,
+  USD_TEX_IMPORT_COPY,
+} eUSDTexImportMode;
+
+/* Behavior when the name of an imported texture
+ * file conflicts with an existing file. */
+typedef enum eUSDTexNameCollisionMode {
+  USD_TEX_NAME_COLLISION_USE_EXISTING = 0,
+  USD_TEX_NAME_COLLISION_OVERWRITE = 1,
+} eUSDTexNameCollisionMode;
+
 struct USDExportParams {
   bool export_animation;
   bool export_hair;
@@ -51,6 +66,7 @@ struct USDImportParams {
   bool import_materials;
   bool import_meshes;
   bool import_volumes;
+  bool import_shapes;
   char prim_path_mask[1024];
   bool import_subdiv;
   bool import_instance_proxies;
@@ -64,7 +80,21 @@ struct USDImportParams {
   bool set_material_blend;
   float light_intensity_scale;
   eUSDMtlNameCollisionMode mtl_name_collision_mode;
+  eUSDTexImportMode import_textures_mode;
+  char import_textures_dir[768]; /* FILE_MAXDIR */
+  eUSDTexNameCollisionMode tex_name_collision_mode;
+  bool import_all_materials;
 };
+
+/* This struct is in place to store the mesh sequence parameters needed when reading a data from a
+ * usd file for the mesh sequence cache.
+ */
+typedef struct USDMeshReadParams {
+  double motion_sample_time; /* USD TimeCode in frames. */
+  int read_flags; /* MOD_MESHSEQ_xxx value that is set from MeshSeqCacheModifierData.read_flag. */
+} USDMeshReadParams;
+
+USDMeshReadParams create_mesh_read_params(double motion_sample_time, int read_flags);
 
 /* The USD_export takes a as_background_job parameter, and returns a boolean.
  *
@@ -101,9 +131,8 @@ void USD_get_transform(struct CacheReader *reader, float r_mat[4][4], float time
 struct Mesh *USD_read_mesh(struct CacheReader *reader,
                            struct Object *ob,
                            struct Mesh *existing_mesh,
-                           double time,
-                           const char **err_str,
-                           int read_flag);
+                           USDMeshReadParams params,
+                           const char **err_str);
 
 bool USD_mesh_topology_changed(struct CacheReader *reader,
                                const struct Object *ob,

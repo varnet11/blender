@@ -142,14 +142,15 @@ static void graph_init(struct wmWindowManager *wm, ScrArea *area)
 
   /* init dopesheet data if non-existent (i.e. for old files) */
   if (sipo->ads == NULL) {
+    wmWindow *win = WM_window_find_by_area(wm, area);
     sipo->ads = MEM_callocN(sizeof(bDopeSheet), "GraphEdit DopeSheet");
-    sipo->ads->source = (ID *)WM_window_get_active_scene(wm->winactive);
+    sipo->ads->source = win ? (ID *)WM_window_get_active_scene(win) : NULL;
   }
 
   /* force immediate init of any invalid F-Curve colors */
   /* XXX: but, don't do SIPO_TEMP_NEEDCHANSYNC (i.e. channel select state sync)
    * as this is run on each region resize; setting this here will cause selection
-   * state to be lost on area/region resizing. T35744.
+   * state to be lost on area/region resizing. #35744.
    */
   ED_area_tag_refresh(area);
 }

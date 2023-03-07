@@ -111,6 +111,7 @@ find_package_wrapper(Epoxy REQUIRED)
 
 if(WITH_VULKAN_BACKEND)
   find_package_wrapper(Vulkan REQUIRED)
+  find_package_wrapper(ShaderC REQUIRED)
 endif()
 
 function(check_freetype_for_brotli)
@@ -437,32 +438,7 @@ if(WITH_IMAGE_WEBP)
   set_and_warn_library_found("WebP" WEBP_FOUND WITH_IMAGE_WEBP)
 endif()
 
-if(WITH_OPENIMAGEIO)
-  find_package_wrapper(OpenImageIO)
-  set(OPENIMAGEIO_LIBRARIES
-    ${OPENIMAGEIO_LIBRARIES}
-    ${PNG_LIBRARIES}
-    ${JPEG_LIBRARIES}
-    ${ZLIB_LIBRARIES}
-  )
-
-  set(OPENIMAGEIO_DEFINITIONS "")
-
-  if(WITH_BOOST)
-    list(APPEND OPENIMAGEIO_LIBRARIES "${BOOST_LIBRARIES}")
-  endif()
-  if(WITH_IMAGE_TIFF)
-    list(APPEND OPENIMAGEIO_LIBRARIES "${TIFF_LIBRARY}")
-  endif()
-  if(WITH_IMAGE_OPENEXR)
-    list(APPEND OPENIMAGEIO_LIBRARIES "${OPENEXR_LIBRARIES}")
-  endif()
-  if(WITH_IMAGE_WEBP)
-    list(APPEND OPENIMAGEIO_LIBRARIES "${WEBP_LIBRARIES}")
-  endif()
-
-  set_and_warn_library_found("OPENIMAGEIO" OPENIMAGEIO_FOUND WITH_OPENIMAGEIO)
-endif()
+find_package_wrapper(OpenImageIO REQUIRED)
 add_bundled_libraries(openimageio/lib)
 
 if(WITH_OPENCOLORIO)

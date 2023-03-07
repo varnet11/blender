@@ -60,28 +60,7 @@ ccl_device_forceinline void film_write_denoising_features_surface(KernelGlobals 
     }
     sum_weight += sc->sample_weight;
 
-    Spectrum closure_albedo = sc->weight;
-    /* Closures that include a Fresnel term typically have weights close to 1 even though their
-     * actual contribution is significantly lower.
-     * To account for this, we scale their weight by the average fresnel factor (the same is also
-     * done for the sample weight in the BSDF setup, so we don't need to scale that here). */
-    if (CLOSURE_IS_BSDF_MICROFACET_FRESNEL(sc->type)) {
-      ccl_private MicrofacetBsdf *bsdf = (ccl_private MicrofacetBsdf *)sc;
-      closure_albedo *= bsdf->extra->fresnel_color;
-    }
-    else if (sc->type == CLOSURE_BSDF_PRINCIPLED_SHEEN_ID) {
-      ccl_private PrincipledSheenBsdf *bsdf = (ccl_private PrincipledSheenBsdf *)sc;
-      closure_albedo *= bsdf->avg_value;
-    }
-    else if (sc->type == CLOSURE_BSDF_HAIR_PRINCIPLED_ID) {
-      closure_albedo *= bsdf_principled_hair_albedo(sc);
-    }
-    else if (sc->type == CLOSURE_BSDF_HAIR_MICROFACET_ID) {
-      closure_albedo *= bsdf_microfacet_hair_albedo(sc);
-      // if hair, use fiber tangent as feature instead of normal
-      normal += safe_normalize(sd->dPdu);
-    }
-    else if (sc->type == CLOSURE_BSDF_PRINCIPLED_DIFFUSE_ID) {
+    if (sc->type == CLOSURE_BSDF_PRINCIPLED_DIFFUSE_ID) {
       /* BSSRDF already accounts for weight, retro-reflection would double up. */
       ccl_private const PrincipledDiffuseBsdf *bsdf = (ccl_private const PrincipledDiffuseBsdf *)
           sc;
@@ -89,9 +68,14 @@ ccl_device_forceinline void film_write_denoising_features_surface(KernelGlobals 
         continue;
       }
     }
+    else if (sc->type == CLOSURE_BSDF_HAIR_MICROFACET_ID) {
+      /* If hair, use fiber tangent as feature instead of normal. */
+      normal += safe_normalize(sd->dPdu);
+    }
 
+    Spectrum closure_albedo = bsdf_albedo(sd, sc);
     if (sc->type == CLOSURE_BSDF_HAIR_MICROFACET_ID) {
-      /* hair far field models "count" as diffuse */
+      /* Hair far field models "count" as diffuse. */
       diffuse_albedo += closure_albedo;
       sum_nonspecular_weight += sc->sample_weight;
     }

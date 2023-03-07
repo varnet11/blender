@@ -92,7 +92,7 @@ set(SRC
   intern/cdderivedmesh.cc
   intern/cloth.cc
   intern/collection.c
-  intern/collision.c
+  intern/collision.cc
   intern/colorband.c
   intern/colortools.c
   intern/compute_contexts.cc
@@ -201,7 +201,6 @@ set(SRC
   intern/mesh_iterators.cc
   intern/mesh_legacy_convert.cc
   intern/mesh_mapping.cc
-  intern/mesh_merge.c
   intern/mesh_merge_customdata.cc
   intern/mesh_mirror.cc
   intern/mesh_normals.cc
@@ -248,9 +247,9 @@ set(SRC
   intern/particle_child.c
   intern/particle_distribute.c
   intern/particle_system.c
-  intern/pbvh.c
   intern/pbvh.cc
-  intern/pbvh_bmesh.c
+  intern/pbvh_bmesh.cc
+  intern/pbvh_colors.cc
   intern/pbvh_pixels.cc
   intern/pbvh_uv_islands.cc
   intern/pointcache.c
@@ -287,14 +286,14 @@ set(SRC
   intern/text.c
   intern/text_suggestions.c
   intern/texture.cc
-  intern/tracking.c
-  intern/tracking_auto.c
-  intern/tracking_detect.c
-  intern/tracking_plane_tracker.c
-  intern/tracking_region_tracker.c
-  intern/tracking_solver.c
-  intern/tracking_stabilize.c
-  intern/tracking_util.c
+  intern/tracking.cc
+  intern/tracking_auto.cc
+  intern/tracking_detect.cc
+  intern/tracking_plane_tracker.cc
+  intern/tracking_region_tracker.cc
+  intern/tracking_solver.cc
+  intern/tracking_stabilize.cc
+  intern/tracking_util.cc
   intern/type_conversions.cc
   intern/undo_system.cc
   intern/unit.c
@@ -470,8 +469,8 @@ set(SRC
   BKE_subdiv_ccg.h
   BKE_subdiv_deform.h
   BKE_subdiv_eval.h
-  BKE_subdiv_foreach.h
-  BKE_subdiv_mesh.h
+  BKE_subdiv_foreach.hh
+  BKE_subdiv_mesh.hh
   BKE_subdiv_modifier.h
   BKE_subdiv_topology.h
   BKE_subsurf.h
@@ -502,10 +501,10 @@ set(SRC
   intern/data_transfer_intern.h
   intern/lib_intern.h
   intern/multires_inline.h
-  intern/multires_reshape.h
+  intern/multires_reshape.hh
   intern/multires_unsubdivide.h
   intern/ocean_intern.h
-  intern/pbvh_intern.h
+  intern/pbvh_intern.hh
   intern/pbvh_uv_islands.hh
   intern/subdiv_converter.h
   intern/subdiv_inline.h
@@ -592,10 +591,6 @@ endif()
 
 if(WITH_IMAGE_TIFF)
   add_definitions(-DWITH_TIFF)
-endif()
-
-if(WITH_OPENIMAGEIO)
-  add_definitions(-DWITH_OPENIMAGEIO)
 endif()
 
 if(WITH_IMAGE_OPENJPEG)

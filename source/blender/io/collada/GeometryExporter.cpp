@@ -101,7 +101,7 @@ void GeometryExporter::operator()(Object *ob)
 
   createLooseEdgeList(ob, me, geom_id);
 
-  /* Only create Polylists if number of faces > 0 */
+  /* Only create poly-lists if number of faces > 0. */
   if (me->totface > 0) {
     /* XXX slow */
     if (ob->totcol) {
@@ -312,7 +312,7 @@ static bool collect_vertex_counts_per_poly(Mesh *me,
   return is_triangulated;
 }
 
-std::string GeometryExporter::makeVertexColorSourceId(std::string &geom_id, char *layer_name)
+std::string GeometryExporter::makeVertexColorSourceId(std::string &geom_id, const char *layer_name)
 {
   std::string result = getIdBySemantics(geom_id, COLLADASW::InputSemantic::COLOR) + "-" +
                        layer_name;
@@ -390,7 +390,7 @@ void GeometryExporter::create_mesh_primitive_list(short material_index,
     int map_index = 0;
 
     for (int a = 0; a < totlayer_mcol; a++) {
-      char *layer_name = bc_CustomData_get_layer_name(&me->ldata, CD_PROP_BYTE_COLOR, a);
+      const char *layer_name = bc_CustomData_get_layer_name(&me->ldata, CD_PROP_BYTE_COLOR, a);
       COLLADASW::Input input4(COLLADASW::InputSemantic::COLOR,
                               makeUrl(makeVertexColorSourceId(geom_id, layer_name)),
                               (has_uvs) ? 3 : 2, /* all color layers have same index order */
@@ -411,11 +411,11 @@ void GeometryExporter::create_mesh_primitive_list(short material_index,
   /* <p> */
   int texindex = 0;
   for (const int i : polys.index_range()) {
-    const MPoly *p = &polys[i];
-    int loop_count = p->totloop;
+    const MPoly *poly = &polys[i];
+    int loop_count = poly->totloop;
 
     if (material_indices[i] == material_index) {
-      const MLoop *l = &loops[p->loopstart];
+      const MLoop *l = &loops[poly->loopstart];
       BCPolygonNormalsIndices normal_indices = norind[i];
 
       for (int j = 0; j < loop_count; j++) {
@@ -489,7 +489,7 @@ void GeometryExporter::createVertexColorSource(std::string geom_id, Mesh *me)
 
     COLLADASW::FloatSourceF source(mSW);
 
-    char *layer_name = bc_CustomData_get_layer_name(&me->ldata, CD_PROP_BYTE_COLOR, a);
+    const char *layer_name = bc_CustomData_get_layer_name(&me->ldata, CD_PROP_BYTE_COLOR, a);
     std::string layer_id = makeVertexColorSourceId(geom_id, layer_name);
     source.setId(layer_id);
 
@@ -565,9 +565,9 @@ void GeometryExporter::createTexcoordsSource(std::string geom_id, Mesh *me)
       source.prepareToAppendValues();
 
       for (const int i : polys.index_range()) {
-        const MPoly *mpoly = &polys[i];
-        const blender::float2 *mloop = uv_map + mpoly->loopstart;
-        for (int j = 0; j < mpoly->totloop; j++) {
+        const MPoly *poly = &polys[i];
+        const blender::float2 *mloop = uv_map + poly->loopstart;
+        for (int j = 0; j < poly->totloop; j++) {
           source.appendValues(mloop[j][0], mloop[j][1]);
         }
       }
@@ -619,7 +619,7 @@ void GeometryExporter::create_normals(std::vector<Normal> &normals,
   int last_normal_index = -1;
 
   const Span<float3> positions = me->vert_positions();
-  const float(*vert_normals)[3] = BKE_mesh_vertex_normals_ensure(me);
+  const float(*vert_normals)[3] = BKE_mesh_vert_normals_ensure(me);
   const Span<MPoly> polys = me->polys();
   const Span<MLoop> loops = me->loops();
   const float(*lnors)[3] = nullptr;
@@ -632,15 +632,15 @@ void GeometryExporter::create_normals(std::vector<Normal> &normals,
   }
 
   for (const int poly_index : polys.index_range()) {
-    const MPoly *mpoly = &polys[poly_index];
-    bool use_vertex_normals = use_custom_normals || mpoly->flag & ME_SMOOTH;
+    const MPoly *poly = &polys[poly_index];
+    bool use_vert_normals = use_custom_normals || poly->flag & ME_SMOOTH;
 
-    if (!use_vertex_normals) {
+    if (!use_vert_normals) {
       /* For flat faces use face normal as vertex normal: */
 
       float vector[3];
-      BKE_mesh_calc_poly_normal(mpoly,
-                                &loops[mpoly->loopstart],
+      BKE_mesh_calc_poly_normal(poly,
+                                &loops[poly->loopstart],
                                 reinterpret_cast<const float(*)[3]>(positions.data()),
                                 vector);
 
@@ -650,9 +650,9 @@ void GeometryExporter::create_normals(std::vector<Normal> &normals,
     }
 
     BCPolygonNormalsIndices poly_indices;
-    for (int loop_index = 0; loop_index < mpoly->totloop; loop_index++) {
-      uint loop_idx = mpoly->loopstart + loop_index;
-      if (use_vertex_normals) {
+    for (int loop_index = 0; loop_index < poly->totloop; loop_index++) {
+      uint loop_idx = poly->loopstart + loop_index;
+      if (use_vert_normals) {
         float normalized[3];
 
         if (use_custom_normals) {

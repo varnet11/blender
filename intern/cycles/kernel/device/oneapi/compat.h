@@ -150,18 +150,18 @@ void oneapi_kernel_##name(KernelGlobalsGPU *ccl_restrict kg, \
 
 /* Debug defines */
 #if defined(__SYCL_DEVICE_ONLY__)
-#  define CONSTANT __attribute__((opencl_constant))
+#  define CCL_ONEAPI_CONSTANT __attribute__((opencl_constant))
 #else
-#  define CONSTANT
+#  define CCL_ONEAPI_CONSTANT
 #endif
 
 #define sycl_printf(format, ...) {               \
-    static const CONSTANT char fmt[] = format;               \
+    static const CCL_ONEAPI_CONSTANT char fmt[] = format;          \
     sycl::ext::oneapi::experimental::printf(fmt, __VA_ARGS__ );    \
   }
 
 #define sycl_printf_(format) {               \
-    static const CONSTANT char fmt[] = format;               \
+    static const CCL_ONEAPI_CONSTANT char fmt[] = format;          \
     sycl::ext::oneapi::experimental::printf(fmt);                  \
   }
 
@@ -195,7 +195,15 @@ using sycl::half;
 #define fmodf(x, y) sycl::fmod((x), (y))
 #define lgammaf(x) sycl::lgamma((x))
 
-#define cosf(x) sycl::native::cos(((float)(x)))
+/* `sycl::native::cos` precision is not sufficient and `-ffast-math` lets
+ * the current DPC++ compiler overload `sycl::cos` with it.
+ * We work around this issue by directly calling the SPIRV implementation which
+ * provides greater precision. */
+#if defined(__SYCL_DEVICE_ONLY__) && defined(__SPIR__)
+#  define cosf(x) __spirv_ocl_cos(((float)(x)))
+#else
+#  define cosf(x) sycl::cos(((float)(x)))
+#endif
 #define sinf(x) sycl::native::sin(((float)(x)))
 #define powf(x, y) sycl::native::powr(((float)(x)), ((float)(y)))
 #define tanf(x) sycl::native::tan(((float)(x)))

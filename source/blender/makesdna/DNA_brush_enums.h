@@ -412,6 +412,7 @@ typedef enum eBrushFlags2 {
   BRUSH_CLOTH_USE_COLLISION = (1 << 6),
   BRUSH_AREA_RADIUS_PRESSURE = (1 << 7),
   BRUSH_GRAB_SILHOUETTE = (1 << 8),
+  BRUSH_USE_COLOR_AS_DISPLACEMENT = (1 << 9),
 } eBrushFlags2;
 
 typedef enum {
@@ -649,7 +650,6 @@ typedef enum eBrushCurvesSculptDensityMode {
 } eBrushCurvesSculptDensityMode;
 
 #define MAX_BRUSH_PIXEL_RADIUS 500
-#define GP_MAX_BRUSH_PIXEL_RADIUS 1000
 
 #ifdef __cplusplus
 }

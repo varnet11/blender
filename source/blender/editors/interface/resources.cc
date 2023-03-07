@@ -366,6 +366,9 @@ const uchar *UI_ThemeGetColorPtr(bTheme *btheme, int spacetype, int colorid)
         case TH_EDGE:
           cp = ts->edge;
           break;
+        case TH_EDGE_WIDTH:
+          cp = &ts->edge_width;
+          break;
         case TH_EDGE_SELECT:
           cp = ts->edge_select;
           break;
@@ -392,6 +395,9 @@ const uchar *UI_ThemeGetColorPtr(bTheme *btheme, int spacetype, int colorid)
           break;
         case TH_FACE_SELECT:
           cp = ts->face_select;
+          break;
+        case TH_FACE_RETOPOLOGY:
+          cp = ts->face_retopology;
           break;
         case TH_FACE_BACK:
           cp = ts->face_back;
@@ -802,6 +808,9 @@ const uchar *UI_ThemeGetColorPtr(bTheme *btheme, int spacetype, int colorid)
           break;
         case TH_CAMERA_PATH:
           cp = ts->camera_path;
+          break;
+        case TH_CAMERA_PASSEPARTOUT:
+          cp = ts->camera_passepartout;
           break;
         case TH_LOCK_MARKER:
           cp = ts->lock_marker;

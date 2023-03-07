@@ -26,7 +26,7 @@
 #include "DRW_render.h"
 
 #include "draw_cache_impl.h"
-#include "draw_curves_private.h"
+#include "draw_curves_private.hh"
 #include "draw_hair_private.h"
 #include "draw_manager.h"
 #include "draw_shader.h"
@@ -327,8 +327,7 @@ DRWShadingGroup *DRW_shgroup_curves_create_sub(Object *object,
 
   /* Use the radius of the root and tip of the first curve for now. This is a workaround that we
    * use for now because we can't use a per-point radius yet. */
-  const blender::bke::CurvesGeometry &curves = blender::bke::CurvesGeometry::wrap(
-      curves_id.geometry);
+  const blender::bke::CurvesGeometry &curves = curves_id.geometry.wrap();
   if (curves.curves_num() >= 1) {
     blender::VArray<float> radii = curves.attributes().lookup_or_default(
         "radius", ATTR_DOMAIN_POINT, 0.005f);
@@ -394,7 +393,7 @@ DRWShadingGroup *DRW_shgroup_curves_create_sub(Object *object,
   DRW_shgroup_uniform_bool_copy(shgrp, "hairCloseTip", hair_close_tip);
   if (gpu_material) {
     /* NOTE: This needs to happen before the drawcall to allow correct attribute extraction.
-     * (see T101896) */
+     * (see #101896) */
     DRW_shgroup_add_material_resources(shgrp, gpu_material);
   }
   /* TODO(fclem): Until we have a better way to cull the curves and render with orco, bypass
@@ -413,7 +412,7 @@ void DRW_curves_update()
   if (!GPU_transform_feedback_support()) {
     /**
      * Workaround to transform feedback not working on mac.
-     * On some system it crashes (see T58489) and on some other it renders garbage (see T60171).
+     * On some system it crashes (see #58489) and on some other it renders garbage (see #60171).
      *
      * So instead of using transform feedback we render to a texture,
      * read back the result to system memory and re-upload as VBO data.
@@ -490,7 +489,7 @@ void DRW_curves_update()
     GPUFrameBuffer *temp_fb = nullptr;
     GPUFrameBuffer *prev_fb = nullptr;
     if (GPU_type_matches_ex(GPU_DEVICE_ANY, GPU_OS_MAC, GPU_DRIVER_ANY, GPU_BACKEND_METAL)) {
-      if (!GPU_compute_shader_support()) {
+      if (!(GPU_compute_shader_support() && GPU_shader_storage_buffer_objects_support())) {
         prev_fb = GPU_framebuffer_active_get();
         char errorOut[256];
         /* if the frame-buffer is invalid we need a dummy frame-buffer to be bound. */

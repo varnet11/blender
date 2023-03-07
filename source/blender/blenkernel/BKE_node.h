@@ -98,6 +98,7 @@ class NodeMultiFunctionBuilder;
 class GeoNodeExecParams;
 class NodeDeclaration;
 class NodeDeclarationBuilder;
+class GatherAddNodeSearchParams;
 class GatherLinkSearchOpParams;
 }  // namespace nodes
 namespace realtime_compositor {
@@ -122,6 +123,10 @@ using SocketGetGeometryNodesCPPValueFunction = void (*)(const struct bNodeSocket
 using NodeGatherSocketLinkOperationsFunction =
     void (*)(blender::nodes::GatherLinkSearchOpParams &params);
 
+/* Adds node add menu operations that are specific to this node type. */
+using NodeGatherAddOperationsFunction =
+    void (*)(blender::nodes::GatherAddNodeSearchParams &params);
+
 using NodeGetCompositorOperationFunction = blender::realtime_compositor::NodeOperation
     *(*)(blender::realtime_compositor::Context &context, blender::nodes::DNode node);
 using NodeGetCompositorShaderNodeFunction =
@@ -135,6 +140,7 @@ typedef void *NodeGeometryExecFunction;
 typedef void *NodeDeclareFunction;
 typedef void *NodeDeclareDynamicFunction;
 typedef void *NodeGatherSocketLinkOperationsFunction;
+typedef void *NodeGatherAddOperationsFunction;
 typedef void *SocketGetCPPTypeFunction;
 typedef void *SocketGetGeometryNodesCPPTypeFunction;
 typedef void *SocketGetGeometryNodesCPPValueFunction;
@@ -298,7 +304,7 @@ typedef struct bNodeType {
                         const struct bNodeTree *nodetree,
                         const char **r_disabled_hint);
 
-  /* optional handling of link insertion. Returns false if the link shouldn't be created. */
+  /* Optional handling of link insertion. Returns false if the link shouldn't be created. */
   bool (*insert_link)(struct bNodeTree *ntree, struct bNode *node, struct bNodeLink *link);
 
   void (*free_self)(struct bNodeType *ntype);
@@ -352,6 +358,13 @@ typedef struct bNodeType {
    * custom behavior here like adding custom search items.
    */
   NodeGatherSocketLinkOperationsFunction gather_link_search_ops;
+
+  /**
+   * Add to the list of search items gathered by the add-node search. The default behavior of
+   * adding a single item with the node name is usually enough, but node types can have any number
+   * of custom search items.
+   */
+  NodeGatherAddOperationsFunction gather_add_node_search_ops;
 
   /** True when the node cannot be muted. */
   bool no_muting;
@@ -439,7 +452,7 @@ typedef struct bNodeTreeType {
 struct bNodeTreeType *ntreeTypeFind(const char *idname);
 void ntreeTypeAdd(struct bNodeTreeType *nt);
 void ntreeTypeFreeLink(const struct bNodeTreeType *nt);
-bool ntreeIsRegistered(struct bNodeTree *ntree);
+bool ntreeIsRegistered(const struct bNodeTree *ntree);
 struct GHashIterator *ntreeTypeGetIterator(void);
 
 /* Helper macros for iterating over tree types. */
@@ -504,7 +517,13 @@ struct bNodeTree *ntreeFromID(struct ID *id);
 void ntreeFreeLocalNode(struct bNodeTree *ntree, struct bNode *node);
 void ntreeFreeLocalTree(struct bNodeTree *ntree);
 struct bNode *ntreeFindType(struct bNodeTree *ntree, int type);
-bool ntreeHasTree(const struct bNodeTree *ntree, const struct bNodeTree *lookup);
+
+/**
+ * Check recursively if a node tree contains another.
+ */
+bool ntreeContainsTree(const struct bNodeTree *tree_to_search_in,
+                       const struct bNodeTree *tree_to_search_for);
+
 void ntreeUpdateAllNew(struct Main *main);
 void ntreeUpdateAllUsers(struct Main *main, struct ID *id);
 
@@ -601,7 +620,7 @@ struct GHashIterator *nodeTypeGetIterator(void);
 struct bNodeSocketType *nodeSocketTypeFind(const char *idname);
 void nodeRegisterSocketType(struct bNodeSocketType *stype);
 void nodeUnregisterSocketType(struct bNodeSocketType *stype);
-bool nodeSocketIsRegistered(struct bNodeSocket *sock);
+bool nodeSocketIsRegistered(const struct bNodeSocket *sock);
 struct GHashIterator *nodeSocketTypeGetIterator(void);
 const char *nodeSocketTypeLabel(const bNodeSocketType *stype);
 
@@ -625,7 +644,7 @@ const char *nodeStaticSocketLabel(int type, int subtype);
   } \
   ((void)0)
 
-struct bNodeSocket *nodeFindSocket(struct bNode *node,
+struct bNodeSocket *nodeFindSocket(const struct bNode *node,
                                    eNodeSocketInOut in_out,
                                    const char *identifier);
 struct bNodeSocket *nodeAddSocket(struct bNodeTree *ntree,
@@ -738,14 +757,13 @@ void nodeInternalRelink(struct bNodeTree *ntree, struct bNode *node);
 
 void nodeToView(const struct bNode *node, float x, float y, float *rx, float *ry);
 void nodeFromView(const struct bNode *node, float x, float y, float *rx, float *ry);
-bool nodeAttachNodeCheck(const struct bNode *node, const struct bNode *parent);
 void nodeAttachNode(struct bNodeTree *ntree, struct bNode *node, struct bNode *parent);
 void nodeDetachNode(struct bNodeTree *ntree, struct bNode *node);
 
 void nodePositionRelative(struct bNode *from_node,
-                          struct bNode *to_node,
-                          struct bNodeSocket *from_sock,
-                          struct bNodeSocket *to_sock);
+                          const struct bNode *to_node,
+                          const struct bNodeSocket *from_sock,
+                          const struct bNodeSocket *to_sock);
 void nodePositionPropagate(struct bNode *node);
 
 /**
@@ -771,11 +789,7 @@ void nodeFindNode(struct bNodeTree *ntree,
  */
 struct bNode *nodeFindRootParent(bNode *node);
 
-/**
- * \returns true if \a child has \a parent as a parent/grandparent/... etc.
- * \note Recursive
- */
-bool nodeIsChildOf(const bNode *parent, const bNode *child);
+bool nodeIsParentAndChild(const bNode *parent, const bNode *child);
 
 /**
  * Iterate over a chain of nodes, starting with \a node_start, executing
@@ -989,7 +1003,7 @@ void node_type_size(struct bNodeType *ntype, int width, int minwidth, int maxwid
 void node_type_size_preset(struct bNodeType *ntype, eNodeSizePreset size);
 /**
  * \warning Nodes defining a storage type _must_ allocate this for new nodes.
- * Otherwise nodes will reload as undefined (T46619).
+ * Otherwise nodes will reload as undefined (#46619).
  */
 void node_type_storage(struct bNodeType *ntype,
                        const char *storagename,
@@ -1536,6 +1550,7 @@ void BKE_nodetree_remove_layer_n(struct bNodeTree *ntree, struct Scene *scene, i
 #define GEO_NODE_BLUR_ATTRIBUTE 1190
 #define GEO_NODE_IMAGE 1191
 #define GEO_NODE_INTERPOLATE_CURVES 1192
+#define GEO_NODE_EDGES_TO_FACE_GROUPS 1193
 
 /** \} */
 

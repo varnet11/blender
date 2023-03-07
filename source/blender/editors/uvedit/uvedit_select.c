@@ -87,9 +87,11 @@ typedef enum {
   UV_SSIM_FACE,
   UV_SSIM_LENGTH_UV,
   UV_SSIM_LENGTH_3D,
-  UV_SSIM_SIDES,
-  UV_SSIM_PIN,
   UV_SSIM_MATERIAL,
+  UV_SSIM_OBJECT,
+  UV_SSIM_PIN,
+  UV_SSIM_SIDES,
+  UV_SSIM_WINDING,
 } eUVSelectSimilar;
 
 /* -------------------------------------------------------------------- */
@@ -1341,8 +1343,8 @@ void uvedit_deselect_flush(const Scene *scene, BMEditMesh *em)
       continue;
     }
     BM_ITER_ELEM (l, &liter, efa, BM_LOOPS_OF_FACE) {
-      if ((!BM_ELEM_CD_GET_BOOL(l, offsets.select_vert)) ||
-          (!BM_ELEM_CD_GET_BOOL(l->next, offsets.select_vert))) {
+      if (!BM_ELEM_CD_GET_BOOL(l, offsets.select_vert) ||
+          !BM_ELEM_CD_GET_BOOL(l->next, offsets.select_vert)) {
         BM_ELEM_CD_SET_BOOL(l, offsets.select_edge, false);
       }
     }
@@ -1390,7 +1392,7 @@ static BMLoop *bm_select_edgeloop_single_side_next(const Scene *scene,
       scene, l_step, v_from_next, offsets);
 }
 
-/* TODO(@campbellbarton): support this in the BMesh API, as we have for clearing other types. */
+/* TODO(@ideasman42): support this in the BMesh API, as we have for clearing other types. */
 static void bm_loop_tags_clear(BMesh *bm)
 {
   BMIter iter;
@@ -1784,7 +1786,6 @@ static void uv_select_linked_multi(Scene *scene,
     BMFace *efa;
     BMLoop *l;
     BMIter iter, liter;
-    UvVertMap *vmap;
     UvMapVert *vlist, *iterv, *startv;
     int i, stacksize = 0, *stack;
     uint a;
@@ -1799,14 +1800,13 @@ static void uv_select_linked_multi(Scene *scene,
 
     BM_mesh_elem_table_ensure(em->bm, BM_FACE); /* we can use this too */
 
-    /* NOTE: we had 'use winding' so we don't consider overlapping islands as connected, see T44320
+    /* NOTE: we had 'use winding' so we don't consider overlapping islands as connected, see #44320
      * this made *every* projection split the island into front/back islands.
-     * Keep 'use_winding' to false, see: T50970.
+     * Keep 'use_winding' to false, see: #50970.
      *
      * Better solve this by having a delimit option for select-linked operator,
      * keeping island-select working as is. */
-    vmap = BM_uv_vert_map_create(em->bm, !uv_sync_select, false);
-
+    UvVertMap *vmap = BM_uv_vert_map_create(em->bm, !uv_sync_select);
     if (vmap == NULL) {
       continue;
     }
@@ -2283,14 +2283,14 @@ static void uv_select_invert(const Scene *scene, BMEditMesh *em)
       continue;
     }
     BM_ITER_ELEM (l, &liter, efa, BM_LOOPS_OF_FACE) {
-      if ((uv_selectmode == UV_SELECT_EDGE) || (uv_selectmode == UV_SELECT_FACE)) {
+      if (ELEM(uv_selectmode, UV_SELECT_EDGE, UV_SELECT_FACE)) {
         /* Use UV edge selection to find vertices and edges that must be selected. */
         bool es = BM_ELEM_CD_GET_BOOL(l, offsets.select_edge);
         BM_ELEM_CD_SET_BOOL(l, offsets.select_edge, !es);
         BM_ELEM_CD_SET_BOOL(l, offsets.select_vert, false);
       }
       /* Use UV vertex selection to find vertices and edges that must be selected. */
-      else if ((uv_selectmode == UV_SELECT_VERTEX) || (uv_selectmode == UV_SELECT_ISLAND)) {
+      else if (ELEM(uv_selectmode, UV_SELECT_VERTEX, UV_SELECT_ISLAND)) {
         bool vs = BM_ELEM_CD_GET_BOOL(l, offsets.select_vert);
         BM_ELEM_CD_SET_BOOL(l, offsets.select_vert, !vs);
         BM_ELEM_CD_SET_BOOL(l, offsets.select_edge, false);
@@ -3302,11 +3302,10 @@ static void uv_select_flush_from_tag_face(const Scene *scene, Object *obedit, co
   if ((ts->uv_flag & UV_SYNC_SELECTION) == 0 &&
       ELEM(ts->uv_sticky, SI_STICKY_VERTEX, SI_STICKY_LOC)) {
 
-    struct UvVertMap *vmap;
     uint efa_index;
 
     BM_mesh_elem_table_ensure(em->bm, BM_FACE);
-    vmap = BM_uv_vert_map_create(em->bm, false, false);
+    struct UvVertMap *vmap = BM_uv_vert_map_create(em->bm, false);
     if (vmap == NULL) {
       return;
     }
@@ -3315,12 +3314,12 @@ static void uv_select_flush_from_tag_face(const Scene *scene, Object *obedit, co
       if (BM_elem_flag_test(efa, BM_ELEM_TAG)) {
         BM_ITER_ELEM (l, &liter, efa, BM_LOOPS_OF_FACE) {
           if (select) {
-            BM_ELEM_CD_SET_BOOL(l, offsets.select_vert, true);
+            BM_ELEM_CD_SET_BOOL(l, offsets.select_edge, true);
             uv_select_flush_from_tag_sticky_loc_internal(
                 scene, em, vmap, efa_index, l, select, offsets);
           }
           else {
-            BM_ELEM_CD_SET_BOOL(l, offsets.select_vert, false);
+            BM_ELEM_CD_SET_BOOL(l, offsets.select_edge, false);
             if (!uvedit_vert_is_face_select_any_other(scene, l, offsets)) {
               uv_select_flush_from_tag_sticky_loc_internal(
                   scene, em, vmap, efa_index, l, select, offsets);
@@ -3392,11 +3391,10 @@ static void uv_select_flush_from_tag_loop(const Scene *scene, Object *obedit, co
     }
   }
   else if ((ts->uv_flag & UV_SYNC_SELECTION) == 0 && ts->uv_sticky == SI_STICKY_LOC) {
-    struct UvVertMap *vmap;
     uint efa_index;
 
     BM_mesh_elem_table_ensure(em->bm, BM_FACE);
-    vmap = BM_uv_vert_map_create(em->bm, false, false);
+    struct UvVertMap *vmap = BM_uv_vert_map_create(em->bm, false);
     if (vmap == NULL) {
       return;
     }
@@ -3447,13 +3445,12 @@ static void uv_select_flush_from_loop_edge_flag(const Scene *scene, BMEditMesh *
   if ((ts->uv_flag & UV_SYNC_SELECTION) == 0 &&
       ELEM(ts->uv_sticky, SI_STICKY_LOC, SI_STICKY_VERTEX)) {
     /* Use UV edge selection to identify which verts must to be selected */
-    struct UvVertMap *vmap;
     uint efa_index;
     /* Clear UV vert flags */
     bm_clear_uv_vert_selection(scene, em->bm, offsets);
 
     BM_mesh_elem_table_ensure(em->bm, BM_FACE);
-    vmap = BM_uv_vert_map_create(em->bm, false, false);
+    struct UvVertMap *vmap = BM_uv_vert_map_create(em->bm, false);
     if (vmap == NULL) {
       return;
     }
@@ -4305,7 +4302,7 @@ static bool overlap_tri_tri_uv_test(const float t1[3][2],
    * However, the `endpoint_bias` on segment intersections causes _exact_ overlapping
    * triangles not to be detected.
    *
-   * Resolve this problem at the small cost of calculating the triangle center, see T85508. */
+   * Resolve this problem at the small cost of calculating the triangle center, see #85508. */
   mid_v2_v2v2v2(vi, UNPACK3(t1));
   if (isect_point_tri_v2(vi, UNPACK3(t2)) != 0) {
     return true;
@@ -4405,7 +4402,7 @@ static int uv_select_overlap(bContext *C, const bool extend)
       BLI_polyfill_calc_arena(uv_verts, face_len, coords_sign, indices, arena);
 
       /* A beauty fill is necessary to remove degenerate triangles that may be produced from the
-       * above poly-fill (see T103913), otherwise the overlap tests can fail. */
+       * above poly-fill (see #103913), otherwise the overlap tests can fail. */
       BLI_polyfill_beautify(uv_verts, face_len, indices, arena, heap);
 
       for (int t = 0; t < tri_len; t++) {
@@ -4567,7 +4564,7 @@ static float get_uv_vert_needle(const eUVSelectSimilar type,
       }
     } break;
     case UV_SSIM_PIN:
-      return (BM_ELEM_CD_GET_BOOL(loop, offsets.pin)) ? 1.0f : 0.0f;
+      return BM_ELEM_CD_GET_BOOL(loop, offsets.pin) ? 1.0f : 0.0f;
     default:
       BLI_assert_unreachable();
       return false;
@@ -4633,6 +4630,7 @@ static float get_uv_edge_needle(const eUVSelectSimilar type,
 
 static float get_uv_face_needle(const eUVSelectSimilar type,
                                 BMFace *face,
+                                int ob_index,
                                 const float ob_m3[3][3],
                                 const BMUVOffsets offsets)
 {
@@ -4646,6 +4644,8 @@ static float get_uv_face_needle(const eUVSelectSimilar type,
       return BM_face_calc_area_with_mat3(face, ob_m3);
     case UV_SSIM_SIDES:
       return face->len;
+    case UV_SSIM_OBJECT:
+      return ob_index;
     case UV_SSIM_PIN: {
       BMLoop *l;
       BMIter liter;
@@ -4657,6 +4657,8 @@ static float get_uv_face_needle(const eUVSelectSimilar type,
     } break;
     case UV_SSIM_MATERIAL:
       return face->mat_nr;
+    case UV_SSIM_WINDING:
+      return signum_i(BM_face_calc_area_uv_signed(face, offsets.uv));
     default:
       BLI_assert_unreachable();
       return false;
@@ -4966,7 +4968,7 @@ static int uv_select_similar_face_exec(bContext *C, wmOperator *op)
         continue;
       }
 
-      float needle = get_uv_face_needle(type, face, ob_m3, offsets);
+      float needle = get_uv_face_needle(type, face, ob_index, ob_m3, offsets);
       if (tree_1d) {
         BLI_kdtree_1d_insert(tree_1d, tree_index++, &needle);
       }
@@ -5000,7 +5002,7 @@ static int uv_select_similar_face_exec(bContext *C, wmOperator *op)
         continue;
       }
 
-      float needle = get_uv_face_needle(type, face, ob_m3, offsets);
+      float needle = get_uv_face_needle(type, face, ob_index, ob_m3, offsets);
 
       bool select = ED_select_similar_compare_float_tree(tree_1d, needle, threshold, compare);
       if (select) {
@@ -5180,8 +5182,10 @@ static EnumPropertyItem prop_edge_similar_types[] = {
 static EnumPropertyItem prop_face_similar_types[] = {
     {UV_SSIM_AREA_UV, "AREA", 0, "Area", ""},
     {UV_SSIM_AREA_3D, "AREA_3D", 0, "Area 3D", ""},
-    {UV_SSIM_SIDES, "SIDES", 0, "Polygon Sides", ""},
     {UV_SSIM_MATERIAL, "MATERIAL", 0, "Material", ""},
+    {UV_SSIM_OBJECT, "OBJECT", 0, "Object", ""},
+    {UV_SSIM_SIDES, "SIDES", 0, "Polygon Sides", ""},
+    {UV_SSIM_WINDING, "WINDING", 0, "Winding", ""},
     {0}};
 
 static EnumPropertyItem prop_island_similar_types[] = {

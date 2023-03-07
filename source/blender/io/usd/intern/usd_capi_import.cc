@@ -207,10 +207,12 @@ static void import_startjob(void *customdata, bool *stop, bool *do_update, float
   if (!stage) {
     WM_reportf(RPT_ERROR, "USD Import: unable to open stage to read %s", data->filepath);
     data->import_ok = false;
+    data->error_code = USD_ARCHIVE_FAIL;
     return;
   }
 
   convert_to_z_up(stage, &data->settings);
+  data->settings.stage_meters_per_unit = UsdGeomGetStageMetersPerUnit(stage);
 
   /* Set up the stage for animated data. */
   if (data->params.set_frame_range) {
@@ -226,6 +228,10 @@ static void import_startjob(void *customdata, bool *stop, bool *do_update, float
   data->archive = archive;
 
   archive->collect_readers(data->bmain);
+
+  if (data->params.import_materials && data->params.import_all_materials) {
+    archive->import_all_materials(data->bmain);
+  }
 
   *data->do_update = true;
   *data->progress = 0.2f;
@@ -352,6 +358,10 @@ static void import_endjob(void *customdata)
 
     DEG_id_tag_update(&data->scene->id, ID_RECALC_BASE_FLAGS);
     DEG_relations_tag_update(data->bmain);
+
+    if (data->params.import_materials && data->params.import_all_materials) {
+      data->archive->fake_users_for_unused_materials();
+    }
   }
 
   WM_set_locked_interface(data->wm, false);
@@ -465,12 +475,19 @@ static USDPrimReader *get_usd_reader(CacheReader *reader,
   return usd_reader;
 }
 
+USDMeshReadParams create_mesh_read_params(const double motion_sample_time, const int read_flags)
+{
+  USDMeshReadParams params = {};
+  params.motion_sample_time = motion_sample_time;
+  params.read_flags = read_flags;
+  return params;
+}
+
 struct Mesh *USD_read_mesh(struct CacheReader *reader,
                            struct Object *ob,
                            struct Mesh *existing_mesh,
-                           const double time,
-                           const char **err_str,
-                           const int read_flag)
+                           const USDMeshReadParams params,
+                           const char **err_str)
 {
   USDGeomReader *usd_reader = dynamic_cast<USDGeomReader *>(get_usd_reader(reader, ob, err_str));
 
@@ -478,7 +495,7 @@ struct Mesh *USD_read_mesh(struct CacheReader *reader,
     return nullptr;
   }
 
-  return usd_reader->read_mesh(existing_mesh, time, read_flag, err_str);
+  return usd_reader->read_mesh(existing_mesh, params, err_str);
 }
 
 bool USD_mesh_topology_changed(CacheReader *reader,

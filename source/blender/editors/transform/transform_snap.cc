@@ -147,6 +147,10 @@ bool transformModeUseSnap(const TransInfo *t)
 
 static bool doForceIncrementSnap(const TransInfo *t)
 {
+  if (t->modifiers & MOD_SNAP_FORCED) {
+    return false;
+  }
+
   return !transformModeUseSnap(t);
 }
 
@@ -525,13 +529,7 @@ void transform_snap_mixed_apply(TransInfo *t, float *vec)
     return;
   }
 
-  if (t->tsnap.status & SNAP_FORCED) {
-    t->tsnap.snap_source_fn(t);
-
-    t->tsnap.snap_mode_apply_fn(t, vec);
-  }
-  else if (((t->tsnap.mode & ~(SCE_SNAP_MODE_INCREMENT | SCE_SNAP_MODE_GRID)) != 0) &&
-           transform_snap_is_active(t)) {
+  if (t->tsnap.mode & ~(SCE_SNAP_MODE_INCREMENT | SCE_SNAP_MODE_GRID)) {
     double current = PIL_check_seconds_timer();
 
     /* Time base quirky code to go around find-nearest slowness. */
@@ -701,10 +699,10 @@ static eSnapTargetOP snap_target_select_from_spacetype(TransInfo *t)
 
     if (t->options & (CTX_GPENCIL_STROKES | CTX_CURSOR | CTX_OBMODE_XFORM_OBDATA)) {
       /* In "Edit Strokes" mode,
-       * snap tool can perform snap to selected or active objects (see T49632)
+       * snap tool can perform snap to selected or active objects (see #49632)
        * TODO: perform self snap in gpencil_strokes.
        *
-       * When we're moving the origins, allow snapping onto our own geometry (see T69132). */
+       * When we're moving the origins, allow snapping onto our own geometry (see #69132). */
       return ret;
     }
 
@@ -810,7 +808,8 @@ void initSnapping(TransInfo *t, wmOperator *op)
       if ((prop = RNA_struct_find_property(op->ptr, "snap_point")) &&
           RNA_property_is_set(op->ptr, prop)) {
         RNA_property_float_get_array(op->ptr, prop, t->tsnap.snap_target);
-        t->tsnap.status |= SNAP_FORCED | SNAP_TARGET_FOUND;
+        t->modifiers |= MOD_SNAP_FORCED;
+        t->tsnap.status |= SNAP_TARGET_FOUND;
       }
 
       /* snap align only defined in specific cases */

@@ -93,8 +93,7 @@ static void rna_Mesh_calc_smooth_groups(
   *r_poly_group_len = mesh->totpoly;
   const bool *sharp_edges = (const bool *)CustomData_get_layer_named(
       &mesh->edata, CD_PROP_BOOL, "sharp_edge");
-  *r_poly_group = BKE_mesh_calc_smoothgroups(BKE_mesh_edges(mesh),
-                                             mesh->totedge,
+  *r_poly_group = BKE_mesh_calc_smoothgroups(mesh->totedge,
                                              BKE_mesh_polys(mesh),
                                              mesh->totpoly,
                                              BKE_mesh_loops(mesh),
@@ -177,6 +176,10 @@ static void rna_Mesh_flip_normals(Mesh *mesh)
   DEG_id_tag_update(&mesh->id, 0);
 }
 
+static void rna_Mesh_calc_normals(Mesh *UNUSED(mesh))
+{
+}
+
 static void rna_Mesh_split_faces(Mesh *mesh, bool UNUSED(free_loop_normals))
 {
   ED_mesh_split_faces(mesh);
@@ -222,8 +225,9 @@ void RNA_api_mesh(StructRNA *srna)
                                   "Invert winding of all polygons "
                                   "(clears tessellation, does not handle custom normals)");
 
-  func = RNA_def_function(srna, "calc_normals", "BKE_mesh_calc_normals");
-  RNA_def_function_ui_description(func, "Calculate vertex normals");
+  func = RNA_def_function(srna, "calc_normals", "rna_Mesh_calc_normals");
+  RNA_def_function_ui_description(
+      func, "Deprecated. Has no effect. Normals are calculated upon retrieval");
 
   func = RNA_def_function(srna, "create_normals_split", "rna_Mesh_create_normals_split");
   RNA_def_function_ui_description(func, "Empty split vertex normals");

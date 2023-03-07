@@ -10,9 +10,11 @@
 
 #include "DRW_render.h"
 
+#include "BKE_global.h"
 #include "BKE_object.h"
 #include "BKE_paint.h"
 #include "BKE_particle.h"
+#include "BKE_pbvh.h"
 
 #include "BLI_alloca.h"
 
@@ -178,7 +180,7 @@ static void basic_cache_populate(void *vedata, Object *ob)
                                             DRW_object_axis_orthogonal_to_view(ob, flat_axis));
 
     if (is_flat_object_viewed_from_side) {
-      /* Avoid losing flat objects when in ortho views (see T56549) */
+      /* Avoid losing flat objects when in ortho views (see #56549) */
       struct GPUBatch *geom = DRW_cache_object_all_edges_get(ob);
       if (geom) {
         DRW_shgroup_call(stl->g_data->depth_shgrp[do_in_front], geom, ob);
@@ -218,6 +220,12 @@ static void basic_cache_populate(void *vedata, Object *ob)
       if (geom) {
         DRW_shgroup_call(shgrp, geom, ob);
       }
+    }
+
+    if (G.debug_value == 889 && ob->sculpt && ob->sculpt->pbvh) {
+      int debug_node_nr = 0;
+      DRW_debug_modelmat(ob->object_to_world);
+      BKE_pbvh_draw_debug_cb(ob->sculpt->pbvh, DRW_sculpt_debug_cb, &debug_node_nr);
     }
   }
 }

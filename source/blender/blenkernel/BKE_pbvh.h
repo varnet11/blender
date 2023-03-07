@@ -163,9 +163,11 @@ typedef enum {
   PBVH_UpdateTopology = 1 << 13,
   PBVH_UpdateColor = 1 << 14,
   PBVH_RebuildPixels = 1 << 15,
-  PBVH_TopologyUpdated = 1 << 16, /* Used internally by pbvh_bmesh.c */
+  PBVH_TexLeaf = 1 << 16,
+  PBVH_TopologyUpdated = 1 << 17, /* Used internally by pbvh_bmesh.c */
 
 } PBVHNodeFlags;
+ENUM_OPERATORS(PBVHNodeFlags, PBVH_TopologyUpdated);
 
 typedef struct PBVHFrustumPlanes {
   float (*planes)[4];
@@ -286,7 +288,7 @@ PBVH *BKE_pbvh_new(PBVHType type);
  */
 void BKE_pbvh_build_mesh(PBVH *pbvh,
                          struct Mesh *mesh,
-                         const struct MPoly *mpoly,
+                         const struct MPoly *polys,
                          const struct MLoop *mloop,
                          float (*vert_positions)[3],
                          int totvert,
@@ -337,7 +339,12 @@ void BKE_pbvh_search_callback(PBVH *pbvh,
 
 void BKE_pbvh_search_gather(
     PBVH *pbvh, BKE_pbvh_SearchCallback scb, void *search_data, PBVHNode ***array, int *tot);
-
+void BKE_pbvh_search_gather_ex(PBVH *pbvh,
+                               BKE_pbvh_SearchCallback scb,
+                               void *search_data,
+                               PBVHNode ***r_array,
+                               int *r_tot,
+                               PBVHNodeFlags leaf_flag);
 /* Ray-cast
  * the hit callback is called for all leaf nodes intersecting the ray;
  * it's up to the callback to find the primitive within the leaves that is
@@ -728,7 +735,7 @@ typedef struct PBVHFaceIter {
   int cd_hide_poly_, cd_face_set_;
   bool *hide_poly_;
   int *face_sets_;
-  const struct MPoly *mpoly_;
+  const struct MPoly *polys_;
   const struct MLoopTri *looptri_;
   const struct MLoop *mloop_;
   int prim_index_;
@@ -768,7 +775,7 @@ void BKE_pbvh_node_get_bm_orco_data(PBVHNode *node,
 /**
  * \note doing a full search on all vertices here seems expensive,
  * however this is important to avoid having to recalculate bound-box & sync the buffers to the
- * GPU (which is far more expensive!) See: T47232.
+ * GPU (which is far more expensive!) See: #47232.
  */
 bool BKE_pbvh_node_has_vert_with_normal_update_tag(PBVH *pbvh, PBVHNode *node);
 

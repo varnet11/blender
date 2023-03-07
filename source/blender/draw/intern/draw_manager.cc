@@ -43,9 +43,15 @@ void Manager::begin_sync()
 
 #ifdef DEBUG
   /* Detect uninitialized data. */
-  memset(matrix_buf.current().data(), 0xF0, resource_len_ * sizeof(*matrix_buf.current().data()));
-  memset(bounds_buf.current().data(), 0xF0, resource_len_ * sizeof(*bounds_buf.current().data()));
-  memset(infos_buf.current().data(), 0xF0, resource_len_ * sizeof(*infos_buf.current().data()));
+  memset(matrix_buf.current().data(),
+         0xF0,
+         matrix_buf.current().size() * sizeof(*matrix_buf.current().data()));
+  memset(bounds_buf.current().data(),
+         0xF0,
+         matrix_buf.current().size() * sizeof(*bounds_buf.current().data()));
+  memset(infos_buf.current().data(),
+         0xF0,
+         matrix_buf.current().size() * sizeof(*infos_buf.current().data()));
 #endif
   resource_len_ = 0;
   attribute_len_ = 0;
@@ -108,9 +114,9 @@ void Manager::end_sync()
   GPUShader *shader = DRW_shader_draw_resource_finalize_get();
   GPU_shader_bind(shader);
   GPU_shader_uniform_1i(shader, "resource_len", resource_len_);
-  GPU_storagebuf_bind(matrix_buf.current(), GPU_shader_get_ssbo(shader, "matrix_buf"));
-  GPU_storagebuf_bind(bounds_buf.current(), GPU_shader_get_ssbo(shader, "bounds_buf"));
-  GPU_storagebuf_bind(infos_buf.current(), GPU_shader_get_ssbo(shader, "infos_buf"));
+  GPU_storagebuf_bind(matrix_buf.current(), GPU_shader_get_ssbo_binding(shader, "matrix_buf"));
+  GPU_storagebuf_bind(bounds_buf.current(), GPU_shader_get_ssbo_binding(shader, "bounds_buf"));
+  GPU_storagebuf_bind(infos_buf.current(), GPU_shader_get_ssbo_binding(shader, "infos_buf"));
   GPU_compute_dispatch(shader, thread_groups, 1, 1);
   GPU_memory_barrier(GPU_BARRIER_SHADER_STORAGE);
 
@@ -178,9 +184,10 @@ void Manager::submit(PassMain &pass, View &view)
   pass.draw_commands_buf_.bind(state,
                                pass.headers_,
                                pass.commands_,
-                               view.visibility_buf_,
+                               view.get_visibility_buffer(),
                                view.visibility_word_per_draw(),
-                               view.view_len_);
+                               view.view_len_,
+                               pass.use_custom_ids);
 
   resource_bind();
 
@@ -221,7 +228,7 @@ Manager::SubmitDebugOutput Manager::submit_debug(PassSimple &pass, View &view)
   output.resource_id = {pass.draw_commands_buf_.resource_id_buf_.data(),
                         pass.draw_commands_buf_.resource_id_count_};
   /* There is no visibility data for PassSimple. */
-  output.visibility = {(uint *)view.visibility_buf_.data(), 0};
+  output.visibility = {(uint *)view.get_visibility_buffer().data(), 0};
   return output;
 }
 
@@ -229,15 +236,16 @@ Manager::SubmitDebugOutput Manager::submit_debug(PassMain &pass, View &view)
 {
   submit(pass, view);
 
-  GPU_finish();
+  GPU_memory_barrier(GPU_BARRIER_BUFFER_UPDATE);
 
   pass.draw_commands_buf_.resource_id_buf_.read();
-  view.visibility_buf_.read();
+  view.get_visibility_buffer().read();
 
   Manager::SubmitDebugOutput output;
   output.resource_id = {pass.draw_commands_buf_.resource_id_buf_.data(),
                         pass.draw_commands_buf_.resource_id_count_};
-  output.visibility = {(uint *)view.visibility_buf_.data(), divide_ceil_u(resource_len_, 32)};
+  output.visibility = {(uint *)view.get_visibility_buffer().data(),
+                       divide_ceil_u(resource_len_, 32)};
   return output;
 }
 

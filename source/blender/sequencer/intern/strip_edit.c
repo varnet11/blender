@@ -275,9 +275,7 @@ static void seq_split_set_right_hold_offset(Main *bmain,
   /* Adjust within range of strip contents. */
   else if ((timeline_frame >= content_start) && (timeline_frame <= content_end)) {
     seq->endofs = 0;
-    float speed_factor = (seq->type == SEQ_TYPE_SOUND_RAM) ?
-                             seq_time_media_playback_rate_factor_get(scene, seq) :
-                             seq_time_playback_rate_factor_get(scene, seq);
+    float speed_factor = seq_time_media_playback_rate_factor_get(scene, seq);
     seq->anim_endofs += round_fl_to_int((content_end - timeline_frame) * speed_factor);
   }
 
@@ -296,9 +294,7 @@ static void seq_split_set_left_hold_offset(Main *bmain,
 
   /* Adjust within range of strip contents. */
   if ((timeline_frame >= content_start) && (timeline_frame <= content_end)) {
-    float speed_factor = (seq->type == SEQ_TYPE_SOUND_RAM) ?
-                             seq_time_media_playback_rate_factor_get(scene, seq) :
-                             seq_time_playback_rate_factor_get(scene, seq);
+    float speed_factor = seq_time_media_playback_rate_factor_get(scene, seq);
     seq->anim_startofs += round_fl_to_int((timeline_frame - content_start) * speed_factor);
     seq->start = timeline_frame;
     seq->startofs = 0;
@@ -436,8 +432,8 @@ Sequence *SEQ_edit_strip_split(Main *bmain,
   }
 
   /* Store `F-Curves`, so original ones aren't renamed. */
-  ListBase fcurves_original_backup = {NULL, NULL};
-  SEQ_animation_backup_original(scene, &fcurves_original_backup);
+  SeqAnimationBackup animation_backup = {0};
+  SEQ_animation_backup_original(scene, &animation_backup);
 
   ListBase left_strips = {NULL, NULL};
   SEQ_ITERATOR_FOREACH (seq, collection) {
@@ -446,7 +442,7 @@ Sequence *SEQ_edit_strip_split(Main *bmain,
     BLI_addtail(&left_strips, seq);
 
     /* Duplicate curves from backup, so they can be renamed along with split strips. */
-    SEQ_animation_duplicate(scene, seq, &fcurves_original_backup);
+    SEQ_animation_duplicate_backup_to_scene(scene, seq, &animation_backup);
   }
 
   SEQ_collection_free(collection);
@@ -489,7 +485,7 @@ Sequence *SEQ_edit_strip_split(Main *bmain,
   }
 
   SEQ_edit_remove_flagged_sequences(scene, seqbase);
-  SEQ_animation_restore_original(scene, &fcurves_original_backup);
+  SEQ_animation_restore_original(scene, &animation_backup);
 
   return return_seq;
 }

@@ -1317,8 +1317,8 @@ static int stitch_process_data(StitchStateContainer *ssc,
     }
   }
 
-  /* take mean position here.
-   * For edge case, this can't be done inside the loop for shared uvverts */
+  /* Take mean position here.
+   * For edge case, this can't be done inside the loop for shared UV-verts. */
   if (ssc->mode == STITCH_EDGE && stitch_midpoints) {
     for (i = 0; i < state->total_separate_uvs; i++) {
       final_position[i].uv[0] /= final_position[i].count;
@@ -1839,7 +1839,7 @@ static StitchState *stitch_init(bContext *C,
   state->em = em;
 
   /* Workaround for sync-select & face-select mode which implies all selected faces are detached,
-   * for stitch this isn't useful behavior, see T86924. */
+   * for stitch this isn't useful behavior, see #86924. */
   const int selectmode_orig = scene->toolsettings->selectmode;
   scene->toolsettings->selectmode = SCE_SELECT_VERTEX;
   state->element_map = BM_uv_element_map_create(state->em->bm, scene, false, true, true, true);

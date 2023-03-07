@@ -1261,7 +1261,9 @@ bGPDframe *BKE_gpencil_layer_frame_get(bGPDlayer *gpl, int cframe, eGP_GetFrame_
           found = true;
           break;
         }
-        if ((gpf->next) && (gpf->next->framenum > cframe)) {
+        /* If this is the last frame or the next frame is at a later time, we found the right
+         * frame. */
+        if (!(gpf->next) || (gpf->next->framenum > cframe)) {
           found = true;
           break;
         }
@@ -1273,6 +1275,10 @@ bGPDframe *BKE_gpencil_layer_frame_get(bGPDlayer *gpl, int cframe, eGP_GetFrame_
           gpl->actframe = gpf;
         }
         else if (addnew == GP_GETFRAME_ADD_COPY) {
+          /* The frame_addcopy function copies the active frame of gpl,
+             so we need to set the active frame before copying.
+          */
+          gpl->actframe = gpf;
           gpl->actframe = BKE_gpencil_frame_addcopy(gpl, cframe);
         }
         else {
@@ -1300,6 +1306,10 @@ bGPDframe *BKE_gpencil_layer_frame_get(bGPDlayer *gpl, int cframe, eGP_GetFrame_
           gpl->actframe = gpf;
         }
         else if (addnew == GP_GETFRAME_ADD_COPY) {
+          /* The frame_addcopy function copies the active frame of gpl;
+             so we need to set the active frame before copying.
+          */
+          gpl->actframe = gpf;
           gpl->actframe = BKE_gpencil_frame_addcopy(gpl, cframe);
         }
         else {
@@ -1861,6 +1871,18 @@ void BKE_gpencil_vgroup_remove(Object *ob, bDeformGroup *defgroup)
 
   /* Remove the group */
   BLI_freelinkN(&gpd->vertex_group_names, defgroup);
+
+  /* Update the active deform index if necessary. */
+  const int active_index = BKE_object_defgroup_active_index_get(ob);
+  if (active_index > def_nr) {
+    BKE_object_defgroup_active_index_set(ob, active_index - 1);
+  }
+  /* Keep a valid active index if we still have some vertex groups. */
+  if (!BLI_listbase_is_empty(&gpd->vertex_group_names) &&
+      BKE_object_defgroup_active_index_get(ob) < 1) {
+    BKE_object_defgroup_active_index_set(ob, 1);
+  }
+
   DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
 }
 

@@ -272,7 +272,7 @@ typedef struct ThemeSpace {
   unsigned char edge[4], edge_select[4];
   unsigned char edge_seam[4], edge_sharp[4], edge_facesel[4], edge_crease[4], edge_bevel[4];
   /** Solid faces. */
-  unsigned char face[4], face_select[4], face_back[4], face_front[4];
+  unsigned char face[4], face_select[4], face_retopology[4], face_back[4], face_front[4];
   /** Selected color. */
   unsigned char face_dot[4];
   unsigned char extra_edge_len[4], extra_edge_angle[4], extra_face_angle[4], extra_face_area[4];
@@ -309,10 +309,10 @@ typedef struct ThemeSpace {
   unsigned char console_output[4], console_input[4], console_info[4], console_error[4];
   unsigned char console_cursor[4], console_select[4];
 
-  unsigned char vertex_size, outline_width, obcenter_dia, facedot_size;
+  unsigned char vertex_size, edge_width, outline_width, obcenter_dia, facedot_size;
   unsigned char noodle_curving;
   unsigned char grid_levels;
-  char _pad5[3];
+  char _pad5[2];
   float dash_alpha;
 
   /* Syntax for text-window and nodes. */
@@ -354,6 +354,7 @@ typedef struct ThemeSpace {
   unsigned char path_before[4], path_after[4];
   unsigned char path_keyframe_before[4], path_keyframe_after[4];
   unsigned char camera_path[4];
+  unsigned char camera_passepartout[4];
   unsigned char _pad1[6];
 
   unsigned char gp_vertex_size;
@@ -576,6 +577,9 @@ typedef struct bUserAssetLibrary {
 
   char name[64];   /* MAX_NAME */
   char path[1024]; /* FILE_MAX */
+
+  short import_method; /* eAssetImportMethod */
+  char _pad0[6];
 } bUserAssetLibrary;
 
 typedef struct SolidLight {
@@ -652,6 +656,9 @@ typedef struct UserDef_Experimental {
   char use_override_templates;
   char enable_eevee_next;
   char use_sculpt_texture_paint;
+  char enable_workbench_next;
+  char use_new_volume_nodes;
+  char _pad[6];
   /** `makesdna` does not allow empty structs. */
 } UserDef_Experimental;
 
@@ -685,7 +692,7 @@ typedef struct UserDef {
   /**
    * Optional user location for scripts.
    *
-   * This supports the same layout as Blender's scripts directory `release/scripts`.
+   * This supports the same layout as Blender's scripts directory `scripts`.
    *
    * \note Unlike most paths, changing this is not fully supported at run-time,
    * requiring a restart to properly take effect. Supporting this would cause complications as
@@ -776,8 +783,10 @@ typedef struct UserDef {
 
   char keyconfigstr[64];
 
+  /** Index of the asset library being edited in the Preferences UI. */
+  short active_asset_library;
+
   short undosteps;
-  char _pad1[2];
   int undomemory;
   float gpu_viewport_quality DNA_DEPRECATED;
   short gp_manhattandist, gp_euclideandist, gp_eraser;
@@ -957,7 +966,7 @@ extern UserDef U;
 /* ***************** USERDEF ****************** */
 
 /* Toggles for unfinished 2.8 UserPref design. */
-//#define WITH_USERDEF_WORKSPACES
+// #define WITH_USERDEF_WORKSPACES
 
 /** #UserDef_SpaceData.section_active (UI active_section) */
 typedef enum eUserPref_Section {

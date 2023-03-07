@@ -146,7 +146,7 @@ static void read_mverts(CDStreamConfig &config, const AbcMeshData &mesh_data)
       mesh_data.ceil_positions != nullptr &&
       mesh_data.ceil_positions->size() == positions->size()) {
     read_mverts_interp(vert_positions, positions, mesh_data.ceil_positions, config.weight);
-    BKE_mesh_tag_coords_changed(config.mesh);
+    BKE_mesh_tag_positions_changed(config.mesh);
     return;
   }
 
@@ -161,21 +161,21 @@ void read_mverts(Mesh &mesh, const P3fArraySamplePtr positions, const N3fArraySa
 
     copy_zup_from_yup(vert_positions[i], pos_in.getValue());
   }
-  BKE_mesh_tag_coords_changed(&mesh);
+  BKE_mesh_tag_positions_changed(&mesh);
 
   if (normals) {
-    float(*vert_normals)[3] = BKE_mesh_vertex_normals_for_write(&mesh);
+    float(*vert_normals)[3] = BKE_mesh_vert_normals_for_write(&mesh);
     for (const int64_t i : IndexRange(normals->size())) {
       Imath::V3f nor_in = (*normals)[i];
       copy_zup_from_yup(vert_normals[i], nor_in.getValue());
     }
-    BKE_mesh_vertex_normals_clear_dirty(&mesh);
+    BKE_mesh_vert_normals_clear_dirty(&mesh);
   }
 }
 
 static void read_mpolys(CDStreamConfig &config, const AbcMeshData &mesh_data)
 {
-  MPoly *mpolys = config.mpoly;
+  MPoly *polys = config.polys;
   MLoop *mloops = config.mloop;
   float2 *mloopuvs = config.mloopuv;
 
@@ -197,12 +197,12 @@ static void read_mpolys(CDStreamConfig &config, const AbcMeshData &mesh_data)
   for (int i = 0; i < face_counts->size(); i++) {
     const int face_size = (*face_counts)[i];
 
-    MPoly &poly = mpolys[i];
+    MPoly &poly = polys[i];
     poly.loopstart = loop_index;
     poly.totloop = face_size;
 
     /* Polygons are always assumed to be smooth-shaded. If the Alembic mesh should be flat-shaded,
-     * this is encoded in custom loop normals. See T71246. */
+     * this is encoded in custom loop normals. See #71246. */
     poly.flag |= ME_SMOOTH;
 
     /* NOTE: Alembic data is stored in the reverse order. */
@@ -215,7 +215,7 @@ static void read_mpolys(CDStreamConfig &config, const AbcMeshData &mesh_data)
 
       if (f > 0 && loop.v == last_vertex_index) {
         /* This face is invalid, as it has consecutive loops from the same vertex. This is caused
-         * by invalid geometry in the Alembic file, such as in T76514. */
+         * by invalid geometry in the Alembic file, such as in #76514. */
         seen_invalid_geometry = true;
       }
       last_vertex_index = loop.v;
@@ -270,13 +270,14 @@ static void process_loop_normals(CDStreamConfig &config, const N3fArraySamplePtr
   float(*lnors)[3] = static_cast<float(*)[3]>(
       MEM_malloc_arrayN(loop_count, sizeof(float[3]), "ABC::FaceNormals"));
 
-  MPoly *mpoly = mesh->polys_for_write().data();
+  const Span<MPoly> polys = mesh->polys();
   const N3fArraySample &loop_normals = *loop_normals_ptr;
   int abc_index = 0;
-  for (int i = 0, e = mesh->totpoly; i < e; i++, mpoly++) {
+  for (const int i : polys.index_range()) {
+    const MPoly &poly = polys[i];
     /* As usual, ABC orders the loops in reverse. */
-    for (int j = mpoly->totloop - 1; j >= 0; j--, abc_index++) {
-      int blender_index = mpoly->loopstart + j;
+    for (int j = poly.totloop - 1; j >= 0; j--, abc_index++) {
+      int blender_index = poly.loopstart + j;
       copy_zup_from_yup(lnors[blender_index], loop_normals[abc_index].getValue());
     }
   }
@@ -519,7 +520,7 @@ CDStreamConfig get_config(Mesh *mesh, const bool use_vertex_interpolation)
   config.mesh = mesh;
   config.positions = mesh->vert_positions_for_write().data();
   config.mloop = mesh->loops_for_write().data();
-  config.mpoly = mesh->polys_for_write().data();
+  config.polys = mesh->polys_for_write().data();
   config.totvert = mesh->totvert;
   config.totloop = mesh->totloop;
   config.totpoly = mesh->totpoly;
@@ -726,13 +727,13 @@ Mesh *AbcMeshReader::read_mesh(Mesh *existing_mesh,
 
   if (topology_changed(existing_mesh, sample_sel)) {
     new_mesh = BKE_mesh_new_nomain_from_template(
-        existing_mesh, positions->size(), 0, 0, face_indices->size(), face_counts->size());
+        existing_mesh, positions->size(), 0, face_indices->size(), face_counts->size());
 
     settings.read_flag |= MOD_MESHSEQ_READ_ALL;
   }
   else {
     /* If the face count changed (e.g. by triangulation), only read points.
-     * This prevents crash from T49813.
+     * This prevents crash from #49813.
      * TODO(kevin): perhaps find a better way to do this? */
     if (face_counts->size() != existing_mesh->totpoly ||
         face_indices->size() != existing_mesh->totloop) {
@@ -1059,13 +1060,13 @@ Mesh *AbcSubDReader::read_mesh(Mesh *existing_mesh,
 
   if (existing_mesh->totvert != positions->size()) {
     new_mesh = BKE_mesh_new_nomain_from_template(
-        existing_mesh, positions->size(), 0, 0, face_indices->size(), face_counts->size());
+        existing_mesh, positions->size(), 0, face_indices->size(), face_counts->size());
 
     settings.read_flag |= MOD_MESHSEQ_READ_ALL;
   }
   else {
     /* If the face count changed (e.g. by triangulation), only read points.
-     * This prevents crash from T49813.
+     * This prevents crash from #49813.
      * TODO(kevin): perhaps find a better way to do this? */
     if (face_counts->size() != existing_mesh->totpoly ||
         face_indices->size() != existing_mesh->totloop) {

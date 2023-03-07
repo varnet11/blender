@@ -242,6 +242,8 @@ typedef struct EEVEE_PassList {
   struct DRWPass *volumetric_accum_ps;
   struct DRWPass *ssr_raytrace;
   struct DRWPass *ssr_resolve;
+  struct DRWPass *ssr_resolve_probe;
+  struct DRWPass *ssr_resolve_refl;
   struct DRWPass *sss_blur_ps;
   struct DRWPass *sss_resolve_ps;
   struct DRWPass *sss_translucency_ps;
@@ -607,7 +609,7 @@ typedef struct EEVEE_MotionBlurData {
 typedef struct EEVEE_ObjectKey {
   /** Object or source object for duplis. */
   /** WORKAROUND: The pointer is different for particle systems and do not point to the real
-   * object. (See T97380) */
+   * object. (See #97380) */
   void *ob;
   /** Parent object for duplis */
   struct Object *parent;
@@ -700,6 +702,9 @@ typedef struct EEVEE_EffectsInfo {
   struct GPUTexture *ssr_specrough_input;
   struct GPUTexture *ssr_hit_output;
   struct GPUTexture *ssr_hit_depth;
+  /* Intel devices require a split execution due to shader issue */
+  bool use_split_ssr_pass;
+
   /* Temporal Anti Aliasing */
   int taa_reproject_sample;
   int taa_current_sample;
@@ -988,7 +993,7 @@ typedef struct EEVEE_PrivateData {
   float camtexcofac[4];
   float size_orig[2];
 
-  /* Cached original camera when rendering for motion blur (see T79637). */
+  /* Cached original camera when rendering for motion blur (see #79637). */
   struct Object *cam_original_ob;
 
   /* Mist Settings */
@@ -1000,6 +1005,8 @@ typedef struct EEVEE_PrivateData {
   /* Compiling shaders count. This is to track if a shader has finished compiling. */
   int queued_shaders_count;
   int queued_shaders_count_prev;
+  /* Optimizing shaders count. */
+  int queued_optimise_shaders_count;
 
   /* LookDev Settings */
   int studiolight_index;
@@ -1208,6 +1215,8 @@ struct GPUShader *EEVEE_shaders_effect_ambient_occlusion_sh_get(void);
 struct GPUShader *EEVEE_shaders_effect_ambient_occlusion_debug_sh_get(void);
 struct GPUShader *EEVEE_shaders_effect_reflection_trace_sh_get(void);
 struct GPUShader *EEVEE_shaders_effect_reflection_resolve_sh_get(void);
+struct GPUShader *EEVEE_shaders_effect_reflection_resolve_probe_sh_get(void);
+struct GPUShader *EEVEE_shaders_effect_reflection_resolve_refl_sh_get(void);
 struct GPUShader *EEVEE_shaders_renderpasses_post_process_sh_get(void);
 struct GPUShader *EEVEE_shaders_cryptomatte_sh_get(bool is_hair);
 struct GPUShader *EEVEE_shaders_shadow_sh_get(void);

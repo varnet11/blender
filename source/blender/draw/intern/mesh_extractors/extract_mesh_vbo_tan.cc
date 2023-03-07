@@ -46,7 +46,7 @@ static void extract_tan_init_common(const MeshRenderData *mr,
 
   int tan_len = 0;
 
-  /* FIXME(T91838): This is to avoid a crash when orco tangent was requested but there are valid
+  /* FIXME(#91838): This is to avoid a crash when orco tangent was requested but there are valid
    * uv layers. It would be better to fix the root cause. */
   if (tan_layers == 0 && use_orco_tan &&
       CustomData_get_layer_index(cd_ldata, CD_PROP_FLOAT2) != -1) {
@@ -106,7 +106,7 @@ static void extract_tan_init_common(const MeshRenderData *mr,
                                      calc_active_tangent,
                                      r_tangent_names,
                                      tan_len,
-                                     mr->poly_normals,
+                                     reinterpret_cast<const float(*)[3]>(mr->poly_normals.data()),
                                      mr->loop_normals,
                                      orco,
                                      r_loop_data,
@@ -114,22 +114,22 @@ static void extract_tan_init_common(const MeshRenderData *mr,
                                      &tangent_mask);
     }
     else {
-      BKE_mesh_calc_loop_tangent_ex(reinterpret_cast<const float(*)[3]>(mr->vert_positions),
-                                    mr->mpoly,
-                                    mr->poly_len,
-                                    mr->mloop,
-                                    mr->mlooptri,
+      BKE_mesh_calc_loop_tangent_ex(reinterpret_cast<const float(*)[3]>(mr->vert_positions.data()),
+                                    mr->polys.data(),
+                                    mr->polys.size(),
+                                    mr->loops.data(),
+                                    mr->looptris.data(),
                                     mr->tri_len,
                                     cd_ldata,
                                     calc_active_tangent,
                                     r_tangent_names,
                                     tan_len,
-                                    mr->vert_normals,
-                                    mr->poly_normals,
+                                    reinterpret_cast<const float(*)[3]>(mr->vert_normals.data()),
+                                    reinterpret_cast<const float(*)[3]>(mr->poly_normals.data()),
                                     mr->loop_normals,
                                     orco,
                                     r_loop_data,
-                                    mr->loop_len,
+                                    mr->loops.size(),
                                     &tangent_mask);
     }
   }

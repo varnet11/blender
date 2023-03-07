@@ -176,7 +176,7 @@ void ABCGenericMeshWriter::do_write(HierarchyContext &context)
 
   m_custom_data_config.pack_uvs = args_.export_params->packuv;
   m_custom_data_config.mesh = mesh;
-  m_custom_data_config.mpoly = mesh->polys_for_write().data();
+  m_custom_data_config.polys = mesh->polys_for_write().data();
   m_custom_data_config.mloop = mesh->loops_for_write().data();
   m_custom_data_config.totpoly = mesh->totpoly;
   m_custom_data_config.totloop = mesh->totloop;
@@ -530,7 +530,7 @@ static void get_loop_normals(struct Mesh *mesh,
   normals.clear();
 
   /* If all polygons are smooth shaded, and there are no custom normals, we don't need to export
-   * normals at all. This is also done by other software, see T71246. */
+   * normals at all. This is also done by other software, see #71246. */
   if (!has_flat_shaded_poly && !CustomData_has_layer(&mesh->ldata, CD_CUSTOMLOOPNORMAL) &&
       (mesh->flag & ME_AUTOSMOOTH) == 0) {
     return;
@@ -548,9 +548,9 @@ static void get_loop_normals(struct Mesh *mesh,
   const Span<MPoly> polys = mesh->polys();
 
   for (const int i : polys.index_range()) {
-    const MPoly *mp = &polys[i];
-    for (int j = mp->totloop - 1; j >= 0; j--, abc_index++) {
-      int blender_index = mp->loopstart + j;
+    const MPoly &poly = polys[i];
+    for (int j = poly.totloop - 1; j >= 0; j--, abc_index++) {
+      int blender_index = poly.loopstart + j;
       copy_yup_from_zup(normals[abc_index].getValue(), lnors[blender_index]);
     }
   }

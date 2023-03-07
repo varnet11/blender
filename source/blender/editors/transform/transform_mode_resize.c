@@ -70,7 +70,7 @@ static float ResizeBetween(TransInfo *t, const float p1[3], const float p2[3])
 
   /* Use 'invalid' dist when `center == p1` (after projecting),
    * in this case scale will _never_ move the point in relation to the center,
-   * so it makes no sense to take it into account when scaling. see: T46503 */
+   * so it makes no sense to take it into account when scaling. see: #46503 */
   return len_d1 != 0.0f ? len_v3(d2) / len_d1 : TRANSFORM_DIST_INVALID;
 }
 
@@ -96,7 +96,7 @@ static void constrain_scale_to_boundary(const float numerator,
                                         float *scale)
 {
   /* It's possible the numerator or denominator can be very close to zero due to so-called
-   * "catastrophic cancellation". See T102923 for an example. We use epsilon tests here to
+   * "catastrophic cancellation". See #102923 for an example. We use epsilon tests here to
    * distinguish between genuine negative coordinates versus coordinates that should be rounded off
    * to zero. */
   const float epsilon = 0.25f / 65536.0f; /* i.e. Quarter of a texel on a 65536 x 65536 texture. */
@@ -285,6 +285,7 @@ void initResize(TransInfo *t, float mouse_dir_constraint[3])
 {
   t->mode = TFM_RESIZE;
   t->transform = applyResize;
+  t->transform_matrix = NULL;
   t->tsnap.snap_mode_apply_fn = ApplySnapResize;
   t->tsnap.snap_mode_distance_fn = ResizeBetween;
 

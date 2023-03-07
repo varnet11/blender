@@ -513,7 +513,10 @@ id_property_create_from_socket(const bNodeSocket &socket)
     case SOCK_OBJECT: {
       const bNodeSocketValueObject *value = static_cast<const bNodeSocketValueObject *>(
           socket.default_value);
-      return bke::idprop::create(socket.identifier, reinterpret_cast<ID *>(value->value));
+      auto property = bke::idprop::create(socket.identifier, reinterpret_cast<ID *>(value->value));
+      IDPropertyUIDataID *ui_data = (IDPropertyUIDataID *)IDP_ui_data_ensure(property.get());
+      ui_data->id_type = ID_OB;
+      return property;
     }
     case SOCK_COLLECTION: {
       const bNodeSocketValueCollection *value = static_cast<const bNodeSocketValueCollection *>(
@@ -831,15 +834,21 @@ static void initialize_group_input(NodesModifierData &nmd,
   }
 }
 
-static const lf::FunctionNode &find_viewer_lf_node(const bNode &viewer_bnode)
+static const lf::FunctionNode *find_viewer_lf_node(const bNode &viewer_bnode)
 {
-  return *blender::nodes::ensure_geometry_nodes_lazy_function_graph(viewer_bnode.owner_tree())
-              ->mapping.viewer_node_map.lookup(&viewer_bnode);
+  if (const blender::nodes::GeometryNodesLazyFunctionGraphInfo *lf_graph_info =
+          blender::nodes::ensure_geometry_nodes_lazy_function_graph(viewer_bnode.owner_tree())) {
+    return lf_graph_info->mapping.viewer_node_map.lookup_default(&viewer_bnode, nullptr);
+  }
+  return nullptr;
 }
-static const lf::FunctionNode &find_group_lf_node(const bNode &group_bnode)
+static const lf::FunctionNode *find_group_lf_node(const bNode &group_bnode)
 {
-  return *blender::nodes::ensure_geometry_nodes_lazy_function_graph(group_bnode.owner_tree())
-              ->mapping.group_node_map.lookup(&group_bnode);
+  if (const blender::nodes::GeometryNodesLazyFunctionGraphInfo *lf_graph_info =
+          blender::nodes::ensure_geometry_nodes_lazy_function_graph(group_bnode.owner_tree())) {
+    return lf_graph_info->mapping.group_node_map.lookup_default(&group_bnode, nullptr);
+  }
+  return nullptr;
 }
 
 static void find_side_effect_nodes_for_viewer_path(
@@ -885,15 +894,22 @@ static void find_side_effect_nodes_for_viewer_path(
   if (found_viewer_node == nullptr) {
     return;
   }
+  const lf::FunctionNode *lf_viewer_node = find_viewer_lf_node(*found_viewer_node);
+  if (lf_viewer_node == nullptr) {
+    return;
+  }
 
   /* Not only mark the viewer node as having side effects, but also all group nodes it is contained
    * in. */
-  r_side_effect_nodes.add_non_duplicates(compute_context_builder.hash(),
-                                         &find_viewer_lf_node(*found_viewer_node));
+  r_side_effect_nodes.add_non_duplicates(compute_context_builder.hash(), lf_viewer_node);
   compute_context_builder.pop();
   while (!compute_context_builder.is_empty()) {
-    r_side_effect_nodes.add_non_duplicates(compute_context_builder.hash(),
-                                           &find_group_lf_node(*group_node_stack.pop()));
+    const lf::FunctionNode *lf_group_node = find_group_lf_node(*group_node_stack.pop());
+    if (lf_group_node == nullptr) {
+      return;
+    }
+
+    r_side_effect_nodes.add_non_duplicates(compute_context_builder.hash(), lf_group_node);
     compute_context_builder.pop();
   }
 }
@@ -1280,9 +1296,6 @@ static void check_property_socket_sync(const Object *ob, ModifierData *md)
       BKE_modifier_set_error(ob, md, "Node group's geometry input must be the first");
     }
   }
-  else if (geometry_socket_count > 1) {
-    BKE_modifier_set_error(ob, md, "Node group can only have one geometry input");
-  }
 }
 
 static void modifyGeometry(ModifierData *md,
@@ -1365,7 +1378,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
 
   Mesh *new_mesh = geometry_set.get_component_for_write<MeshComponent>().release();
   if (new_mesh == nullptr) {
-    return BKE_mesh_new_nomain(0, 0, 0, 0, 0);
+    return BKE_mesh_new_nomain(0, 0, 0, 0);
   }
   return new_mesh;
 }
@@ -1736,7 +1749,9 @@ static void panel_draw(const bContext *C, Panel *panel)
 
     int socket_index;
     LISTBASE_FOREACH_INDEX (bNodeSocket *, socket, &nmd->node_group->inputs, socket_index) {
-      draw_property_for_socket(*C, layout, nmd, &bmain_ptr, ptr, *socket, socket_index);
+      if (!(socket->flag & SOCK_HIDE_IN_MODIFIER)) {
+        draw_property_for_socket(*C, layout, nmd, &bmain_ptr, ptr, *socket, socket_index);
+      }
     }
   }
 
@@ -1873,16 +1888,18 @@ static void blendWrite(BlendWriter *writer, const ID * /*id_owner*/, const Modif
   BLO_write_struct(writer, NodesModifierData, nmd);
 
   if (nmd->settings.properties != nullptr) {
-    /* Boolean properties are added automatically for boolean node group inputs. Integer properties
-     * are automatically converted to boolean sockets where applicable as well. However, boolean
-     * properties will crash old versions of Blender, so convert them to integer properties for
-     * writing. The actual value is stored in the same variable for both types */
     Map<IDProperty *, IDPropertyUIDataBool *> boolean_props;
-    LISTBASE_FOREACH (IDProperty *, prop, &nmd->settings.properties->data.group) {
-      if (prop->type == IDP_BOOLEAN) {
-        boolean_props.add_new(prop, reinterpret_cast<IDPropertyUIDataBool *>(prop->ui_data));
-        prop->type = IDP_INT;
-        prop->ui_data = nullptr;
+    if (!BLO_write_is_undo(writer)) {
+      /* Boolean properties are added automatically for boolean node group inputs. Integer
+       * properties are automatically converted to boolean sockets where applicable as well.
+       * However, boolean properties will crash old versions of Blender, so convert them to integer
+       * properties for writing. The actual value is stored in the same variable for both types */
+      LISTBASE_FOREACH (IDProperty *, prop, &nmd->settings.properties->data.group) {
+        if (prop->type == IDP_BOOLEAN) {
+          boolean_props.add_new(prop, reinterpret_cast<IDPropertyUIDataBool *>(prop->ui_data));
+          prop->type = IDP_INT;
+          prop->ui_data = nullptr;
+        }
       }
     }
 
@@ -1890,12 +1907,14 @@ static void blendWrite(BlendWriter *writer, const ID * /*id_owner*/, const Modif
      * and don't necessarily need to be written, but we can't just free them. */
     IDP_BlendWrite(writer, nmd->settings.properties);
 
-    LISTBASE_FOREACH (IDProperty *, prop, &nmd->settings.properties->data.group) {
-      if (prop->type == IDP_INT) {
-        if (IDPropertyUIDataBool **ui_data = boolean_props.lookup_ptr(prop)) {
-          prop->type = IDP_BOOLEAN;
-          if (ui_data) {
-            prop->ui_data = reinterpret_cast<IDPropertyUIData *>(*ui_data);
+    if (!BLO_write_is_undo(writer)) {
+      LISTBASE_FOREACH (IDProperty *, prop, &nmd->settings.properties->data.group) {
+        if (prop->type == IDP_INT) {
+          if (IDPropertyUIDataBool **ui_data = boolean_props.lookup_ptr(prop)) {
+            prop->type = IDP_BOOLEAN;
+            if (ui_data) {
+              prop->ui_data = reinterpret_cast<IDPropertyUIData *>(*ui_data);
+            }
           }
         }
       }

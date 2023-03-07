@@ -11,9 +11,7 @@
 
 #include "../generic/py_capi_utils.h"
 
-#ifdef WITH_OPENIMAGEIO
-#  include "openimageio_api.h"
-#endif
+#include "openimageio_api.h"
 
 static PyTypeObject BlenderAppOIIOType;
 
@@ -36,32 +34,20 @@ static PyObject *make_oiio_info(void)
   PyObject *oiio_info;
   int pos = 0;
 
-#ifdef WITH_OPENIMAGEIO
   int curversion;
-#endif
 
   oiio_info = PyStructSequence_New(&BlenderAppOIIOType);
   if (oiio_info == NULL) {
     return NULL;
   }
 
-#ifndef WITH_OPENIMAGEIO
-#  define SetStrItem(str) PyStructSequence_SET_ITEM(oiio_info, pos++, PyUnicode_FromString(str))
-#endif
-
 #define SetObjItem(obj) PyStructSequence_SET_ITEM(oiio_info, pos++, obj)
 
-#ifdef WITH_OPENIMAGEIO
   curversion = OIIO_getVersionHex();
   SetObjItem(PyBool_FromLong(1));
   SetObjItem(PyC_Tuple_Pack_I32(curversion / 10000, (curversion / 100) % 100, curversion % 100));
   SetObjItem(PyUnicode_FromFormat(
       "%2d, %2d, %2d", curversion / 10000, (curversion / 100) % 100, curversion % 100));
-#else
-  SetObjItem(PyBool_FromLong(0));
-  SetObjItem(PyC_Tuple_Pack_I32(0, 0, 0));
-  SetStrItem("Unknown");
-#endif
 
   if (UNLIKELY(PyErr_Occurred())) {
     Py_DECREF(oiio_info);
@@ -86,7 +72,7 @@ PyObject *BPY_app_oiio_struct(void)
   BlenderAppOIIOType.tp_init = NULL;
   BlenderAppOIIOType.tp_new = NULL;
   BlenderAppOIIOType.tp_hash = (hashfunc)
-      _Py_HashPointer; /* without this we can't do set(sys.modules) T29635. */
+      _Py_HashPointer; /* without this we can't do set(sys.modules) #29635. */
 
   return ret;
 }

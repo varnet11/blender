@@ -149,13 +149,13 @@ static bGPDpalettecolor *BKE_gpencil_palettecolor_addnew(bGPDpalette *palette, c
  */
 static void migrate_single_rot_stabilization_track_settings(MovieTrackingStabilization *stab)
 {
-  if (stab->rot_track) {
-    if (!(stab->rot_track->flag & TRACK_USE_2D_STAB_ROT)) {
+  if (stab->rot_track_legacy) {
+    if (!(stab->rot_track_legacy->flag & TRACK_USE_2D_STAB_ROT)) {
       stab->tot_rot_track++;
-      stab->rot_track->flag |= TRACK_USE_2D_STAB_ROT;
+      stab->rot_track_legacy->flag |= TRACK_USE_2D_STAB_ROT;
     }
   }
-  stab->rot_track = NULL; /* this field is now ignored */
+  stab->rot_track_legacy = NULL; /* this field is now ignored */
 }
 
 static void do_version_constraints_radians_degrees_270_1(ListBase *lb)
@@ -409,7 +409,7 @@ static void do_version_bbone_easing_fcurve_fix(ID *UNUSED(id),
         FMod_Stepped *data = fcm->data;
 
         /* Modifier doesn't work if the modifier's copy of start/end frame are both 0
-         * as those were only getting written to the fcm->data copy (T52009)
+         * as those were only getting written to the fcm->data copy (#52009)
          */
         if ((fcm->sfra == fcm->efra) && (fcm->sfra == 0)) {
           fcm->sfra = data->start_frame;
@@ -557,7 +557,7 @@ void blo_do_versions_270(FileData *fd, Library *UNUSED(lib), Main *bmain)
 
   if (!MAIN_VERSION_ATLEAST(bmain, 270, 4)) {
     /* ui_previews were not handled correctly when copying areas,
-     * leading to corrupted files (see T39847).
+     * leading to corrupted files (see #39847).
      * This will always reset situation to a valid state.
      */
     bScreen *screen;
@@ -1406,7 +1406,7 @@ void blo_do_versions_270(FileData *fd, Library *UNUSED(lib), Main *bmain)
             fd->filesdna, "MovieTrackingStabilization", "int", "tot_rot_track")) {
       MovieClip *clip;
       for (clip = bmain->movieclips.first; clip != NULL; clip = clip->id.next) {
-        if (clip->tracking.stabilization.rot_track) {
+        if (clip->tracking.stabilization.rot_track_legacy) {
           migrate_single_rot_stabilization_track_settings(&clip->tracking.stabilization);
         }
         if (clip->tracking.stabilization.scale == 0.0f) {
@@ -1420,8 +1420,6 @@ void blo_do_versions_270(FileData *fd, Library *UNUSED(lib), Main *bmain)
         clip->tracking.stabilization.anchor_frame = 1;
         /* by default show the track lists expanded, to improve "discoverability" */
         clip->tracking.stabilization.flag |= TRACKING_SHOW_STAB_TRACKS;
-        /* deprecated, not used anymore */
-        clip->tracking.stabilization.ok = false;
       }
     }
   }
@@ -1551,7 +1549,7 @@ void blo_do_versions_270(FileData *fd, Library *UNUSED(lib), Main *bmain)
       }
     }
 
-    /* Fix for T50736, Glare comp node using same var for two different things. */
+    /* Fix for #50736, Glare comp node using same var for two different things. */
     if (!DNA_struct_elem_find(fd->filesdna, "NodeGlare", "char", "star_45")) {
       FOREACH_NODETREE_BEGIN (bmain, ntree, id) {
         if (ntree->type == NTREE_COMPOSIT) {
@@ -1602,7 +1600,7 @@ void blo_do_versions_270(FileData *fd, Library *UNUSED(lib), Main *bmain)
       }
     }
 
-    /* Fix related to VGroup modifiers creating named defgroup CD layers! See T51520. */
+    /* Fix related to VGroup modifiers creating named defgroup CD layers! See #51520. */
     for (Mesh *me = bmain->meshes.first; me; me = me->id.next) {
       CustomData_set_layer_name(&me->vdata, CD_MDEFORMVERT, 0, "");
     }

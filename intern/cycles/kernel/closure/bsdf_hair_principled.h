@@ -41,11 +41,6 @@ static_assert(sizeof(ShaderClosure) >= sizeof(PrincipledHairBSDF),
 static_assert(sizeof(ShaderClosure) >= sizeof(PrincipledHairExtra),
               "PrincipledHairExtra is too large!");
 
-ccl_device_inline float cos_from_sin(const float s)
-{
-  return safe_sqrtf(1.0f - s * s);
-}
-
 /* Gives the change in direction in the normal plane for the given angles and p-th-order
  * scattering. */
 ccl_device_inline float delta_phi(int p, float gamma_o, float gamma_t)
@@ -343,6 +338,7 @@ ccl_device int bsdf_principled_hair_sample(KernelGlobals kg,
                                            ccl_private ShaderData *sd,
                                            float randu,
                                            float randv,
+                                           float randw,
                                            ccl_private Spectrum *eval,
                                            ccl_private float3 *wo,
                                            ccl_private float *pdf,
@@ -361,11 +357,6 @@ ccl_device int bsdf_principled_hair_sample(KernelGlobals kg,
   const float3 Z = safe_normalize(cross(X, Y));
 
   const float3 local_O = make_float3(dot(sd->wi, X), dot(sd->wi, Y), dot(sd->wi, Z));
-
-  float2 u[2];
-  u[0] = make_float2(randu, randv);
-  u[1].x = lcg_step_float(&sd->lcg_state);
-  u[1].y = lcg_step_float(&sd->lcg_state);
 
   const float sin_theta_o = local_O.x;
   const float cos_theta_o = cos_from_sin(sin_theta_o);
@@ -390,11 +381,12 @@ ccl_device int bsdf_principled_hair_sample(KernelGlobals kg,
 
   int p = 0;
   for (; p < 3; p++) {
-    if (u[0].x < Ap_energy[p]) {
+    if (randw < Ap_energy[p]) {
       break;
     }
-    u[0].x -= Ap_energy[p];
+    randw -= Ap_energy[p];
   }
+  randw /= Ap_energy[p];
 
   float v = bsdf->v;
   if (p == 1) {
@@ -404,10 +396,9 @@ ccl_device int bsdf_principled_hair_sample(KernelGlobals kg,
     v *= 4.0f;
   }
 
-  u[1].x = max(u[1].x, 1e-5f);
-  const float fac = 1.0f + v * logf(u[1].x + (1.0f - u[1].x) * expf(-2.0f / v));
-  float sin_theta_i = -fac * sin_theta_o +
-                      cos_from_sin(fac) * cosf(M_2PI_F * u[1].y) * cos_theta_o;
+  randw = max(randw, 1e-5f);
+  const float fac = 1.0f + v * logf(randw + (1.0f - randw) * expf(-2.0f / v));
+  float sin_theta_i = -fac * sin_theta_o + cos_from_sin(fac) * cosf(M_2PI_F * randv) * cos_theta_o;
   float cos_theta_i = cos_from_sin(sin_theta_i);
 
   float angles[6];
@@ -419,10 +410,10 @@ ccl_device int bsdf_principled_hair_sample(KernelGlobals kg,
 
   float phi;
   if (p < 3) {
-    phi = delta_phi(p, gamma_o, gamma_t) + sample_trimmed_logistic(u[0].y, bsdf->s);
+    phi = delta_phi(p, gamma_o, gamma_t) + sample_trimmed_logistic(randu, bsdf->s);
   }
   else {
-    phi = M_2PI_F * u[0].y;
+    phi = M_2PI_F * randu;
   }
   const float phi_i = phi_o + phi;
 
@@ -475,17 +466,24 @@ ccl_device void bsdf_principled_hair_blur(ccl_private ShaderClosure *sc, float r
 }
 
 /* Hair Albedo. Also used by `bsdf_hair_microfacet.h` */
-
 ccl_device_inline float bsdf_hair_albedo_roughness_scale(const float azimuthal_roughness)
 {
   const float x = azimuthal_roughness;
   return (((((0.245f * x) + 5.574f) * x - 10.73f) * x + 2.532f) * x - 0.215f) * x + 5.969f;
 }
 
-ccl_device Spectrum bsdf_principled_hair_albedo(ccl_private const ShaderClosure *sc)
+ccl_device Spectrum bsdf_hair_albedo(ccl_private const ShaderData *sd,
+                                     ccl_private const ShaderClosure *sc)
 {
   ccl_private PrincipledHairBSDF *bsdf = (ccl_private PrincipledHairBSDF *)sc;
-  return exp(-sqrt(bsdf->sigma) * bsdf_hair_albedo_roughness_scale(bsdf->v));
+
+  const float cos_theta_o = cos_from_sin(dot(sd->wi, safe_normalize(sd->dPdu)));
+  const float cos_gamma_o = cos_from_sin(bsdf->extra->geom.w);
+  const float f = fresnel_dielectric_cos(cos_theta_o * cos_gamma_o, bsdf->eta);
+
+  const float roughness_scale = bsdf_hair_albedo_roughness_scale(bsdf->v);
+  /* TODO(lukas): Adding the Fresnel term here as a workaround until the proper refactor. */
+  return exp(-sqrt(bsdf->sigma) * roughness_scale) + make_spectrum(f);
 }
 
 ccl_device_inline Spectrum bsdf_hair_sigma_from_reflectance(const Spectrum color,
