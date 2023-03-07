@@ -68,6 +68,7 @@ void DRW_globals_update(void)
   UI_GetThemeColor4fv(TH_EDGE_FACESEL, gb->color_edge_face_select);
   UI_GetThemeColor4fv(TH_FACE, gb->color_face);
   UI_GetThemeColor4fv(TH_FACE_SELECT, gb->color_face_select);
+  UI_GetThemeColor4fv(TH_FACE_RETOPOLOGY, gb->color_face_retopology);
   UI_GetThemeColor4fv(TH_FACE_BACK, gb->color_face_back);
   UI_GetThemeColor4fv(TH_FACE_FRONT, gb->color_face_front);
   UI_GetThemeColor4fv(TH_NORMAL, gb->color_normal);
@@ -175,8 +176,8 @@ void DRW_globals_update(void)
                     max_ff(1.0f, UI_GetThemeValuef(TH_VERTEX_SIZE) * (float)M_SQRT2 / 2.0f);
   gb->size_vertex_gpencil = U.pixelsize * UI_GetThemeValuef(TH_GP_VERTEX_SIZE);
   gb->size_face_dot = U.pixelsize * UI_GetThemeValuef(TH_FACEDOT_SIZE);
-  gb->size_edge = U.pixelsize * (1.0f / 2.0f); /* TODO: Theme. */
-  gb->size_edge_fix = U.pixelsize * (0.5f + 2.0f * (2.0f * (gb->size_edge * (float)M_SQRT1_2)));
+  gb->size_edge = U.pixelsize * max_ff(1.0f, UI_GetThemeValuef(TH_EDGE_WIDTH)) / 2.0f;
+  gb->size_edge_fix = U.pixelsize * (0.5f + 2.0f * (1.0f * (gb->size_edge * (float)M_SQRT1_2)));
 
   gb->pixel_fac = *DRW_viewport_pixelsize_get();
 

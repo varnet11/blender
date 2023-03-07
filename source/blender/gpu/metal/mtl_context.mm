@@ -1076,13 +1076,13 @@ bool MTLContext::ensure_uniform_buffer_bindings(
       int ubo_size = 0;
 
       bool bind_dummy_buffer = false;
-      if (this->pipeline_state.ubo_bindings[ubo_index].bound) {
+      if (this->pipeline_state.ubo_bindings[ubo.buffer_index].bound) {
 
         /* Fetch UBO global-binding properties from slot. */
         ubo_offset = 0;
-        ubo_buffer = this->pipeline_state.ubo_bindings[ubo_index].ubo->get_metal_buffer(
+        ubo_buffer = this->pipeline_state.ubo_bindings[ubo.buffer_index].ubo->get_metal_buffer(
             &ubo_offset);
-        ubo_size = this->pipeline_state.ubo_bindings[ubo_index].ubo->get_size();
+        ubo_size = this->pipeline_state.ubo_bindings[ubo.buffer_index].ubo->get_size();
 
         /* Use dummy zero buffer if no buffer assigned -- this is an optimization to avoid
          * allocating zero buffers. */
@@ -1233,13 +1233,13 @@ bool MTLContext::ensure_uniform_buffer_bindings(
       int ubo_size = 0;
 
       bool bind_dummy_buffer = false;
-      if (this->pipeline_state.ubo_bindings[ubo_index].bound) {
+      if (this->pipeline_state.ubo_bindings[ubo.buffer_index].bound) {
 
         /* Fetch UBO global-binding properties from slot. */
         ubo_offset = 0;
-        ubo_buffer = this->pipeline_state.ubo_bindings[ubo_index].ubo->get_metal_buffer(
+        ubo_buffer = this->pipeline_state.ubo_bindings[ubo.buffer_index].ubo->get_metal_buffer(
             &ubo_offset);
-        ubo_size = this->pipeline_state.ubo_bindings[ubo_index].ubo->get_size();
+        ubo_size = this->pipeline_state.ubo_bindings[ubo.buffer_index].ubo->get_size();
         UNUSED_VARS_NDEBUG(ubo_size);
 
         /* Use dummy zero buffer if no buffer assigned -- this is an optimization to avoid
@@ -1527,7 +1527,7 @@ void MTLContext::ensure_texture_bindings(
     int compute_arg_buffer_bind_index = -1;
 
     /* Argument buffers are used for samplers, when the limit of 16 is exceeded.
-     * NOTE: Compute uses vertex argument for arg buffer bind index.*/
+     * NOTE: Compute uses vertex argument for arg buffer bind index. */
     bool use_argument_buffer_for_samplers = shader_interface->uses_argument_buffer_for_samplers();
     compute_arg_buffer_bind_index = shader_interface->get_argument_buffer_bind_index(
         ShaderStage::COMPUTE);
