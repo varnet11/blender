@@ -388,9 +388,9 @@ static bool testEdgeMark(Mesh *me, const FreestyleEdge *fed, const MLoopTri *lt,
 
   const MLoop *mloop = &loops[lt->tri[i]];
   const MLoop *mloop_next = &loops[lt->tri[(i + 1) % 3]];
-  const MEdge *medge = &edges[mloop->e];
+  const MEdge *edge = &edges[mloop->e];
 
-  if (!ELEM(mloop_next->v, medge->v1, medge->v2)) {
+  if (!ELEM(mloop_next->v, edge->v1, edge->v2)) {
     /* Not an edge in the original mesh before triangulation. */
     return false;
   }
@@ -400,6 +400,7 @@ static bool testEdgeMark(Mesh *me, const FreestyleEdge *fed, const MLoopTri *lt,
 
 void BlenderFileLoader::insertShapeNode(Object *ob, Mesh *me, int id)
 {
+  using namespace blender;
   char *name = ob->id.name + 2;
 
   const Span<float3> vert_positions = me->vert_positions();
@@ -514,14 +515,16 @@ void BlenderFileLoader::insertShapeNode(Object *ob, Mesh *me, int id)
 
   FrsMaterial tmpMat;
 
-  const blender::VArray<int> material_indices = me->attributes().lookup_or_default<int>(
+  const bke::AttributeAccessor attributes = me->attributes();
+  const VArray<int> material_indices = attributes.lookup_or_default<int>(
       "material_index", ATTR_DOMAIN_FACE, 0);
+  const VArray<bool> sharp_faces = attributes.lookup_or_default<bool>(
+      "sharp_face", ATTR_DOMAIN_FACE, false);
 
   // We parse the vlak nodes again and import meshes while applying the clipping
   // by the near and far view planes.
   for (int a = 0; a < tottri; a++) {
     const MLoopTri *lt = &mlooptri[a];
-    const MPoly *mp = &mesh_polys[lt->poly];
     Material *mat = BKE_object_material_get(ob, material_indices[lt->poly] + 1);
 
     copy_v3_v3(v1, vert_positions[mesh_loops[lt->tri[0]].v]);
@@ -536,7 +539,7 @@ void BlenderFileLoader::insertShapeNode(Object *ob, Mesh *me, int id)
     v2[2] += _z_offset;
     v3[2] += _z_offset;
 
-    if (_smooth && (mp->flag & ME_SMOOTH) && lnors) {
+    if (_smooth && (!sharp_faces[lt->poly]) && lnors) {
       copy_v3_v3(n1, lnors[lt->tri[0]]);
       copy_v3_v3(n2, lnors[lt->tri[1]]);
       copy_v3_v3(n3, lnors[lt->tri[2]]);

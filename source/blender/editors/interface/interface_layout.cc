@@ -5809,7 +5809,6 @@ void uiLayoutSetTooltipFunc(uiLayout *layout,
     if (copy_arg != nullptr && arg_used) {
       arg = copy_arg(arg);
     }
-    arg_used = true;
 
     if (item->type == ITEM_BUTTON) {
       uiButtonItem *bitem = (uiButtonItem *)item;
@@ -5817,9 +5816,11 @@ void uiLayoutSetTooltipFunc(uiLayout *layout,
         continue;
       }
       UI_but_func_tooltip_set(bitem->but, func, arg, free_arg);
+      arg_used = true;
     }
     else {
       uiLayoutSetTooltipFunc((uiLayout *)item, func, arg, copy_arg, free_arg);
+      arg_used = true;
     }
   }
 
@@ -5912,7 +5913,8 @@ static bool ui_layout_has_panel_label(const uiLayout *layout, const PanelType *p
   LISTBASE_FOREACH (uiItem *, subitem, &layout->items) {
     if (subitem->type == ITEM_BUTTON) {
       uiButtonItem *bitem = (uiButtonItem *)subitem;
-      if (!(bitem->but->flag & UI_HIDDEN) && STREQ(bitem->but->str, pt->label)) {
+      if (!(bitem->but->flag & UI_HIDDEN) &&
+          STREQ(bitem->but->str, CTX_IFACE_(pt->translation_context, pt->label))) {
         return true;
       }
     }

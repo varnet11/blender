@@ -7082,7 +7082,7 @@ static void pyrna_subtype_set_rna(PyObject *newclass, StructRNA *srna)
   PyObject_SetAttr(newclass, bpy_intern_str_bl_rna, item);
   Py_DECREF(item);
 
-  /* Add staticmethods and classmethods. */
+  /* Add `staticmethod` and `classmethod` functions. */
   {
     const PointerRNA func_ptr = {NULL, srna, NULL};
     const ListBase *lb;
@@ -7092,7 +7092,7 @@ static void pyrna_subtype_set_rna(PyObject *newclass, StructRNA *srna)
     for (link = lb->first; link; link = link->next) {
       FunctionRNA *func = (FunctionRNA *)link;
       const int flag = RNA_function_flag(func);
-      if ((flag & FUNC_NO_SELF) &&         /* Is staticmethod or classmethod. */
+      if ((flag & FUNC_NO_SELF) &&         /* Is `staticmethod` or `classmethod`. */
           (flag & FUNC_REGISTER) == false) /* Is not for registration. */
       {
         /* We may want to set the type of this later. */
@@ -7405,6 +7405,27 @@ PyObject *pyrna_struct_CreatePyObject(PointerRNA *ptr)
   }
 #endif
   return (PyObject *)pyrna;
+}
+
+PyObject *pyrna_struct_CreatePyObject_with_primitive_support(PointerRNA *ptr)
+{
+  if (ptr->type == &RNA_PrimitiveString) {
+    const PrimitiveStringRNA *data = ptr->data;
+    return PyC_UnicodeFromBytes(data->value);
+  }
+  if (ptr->type == &RNA_PrimitiveInt) {
+    const PrimitiveIntRNA *data = ptr->data;
+    return PyLong_FromLong(data->value);
+  }
+  if (ptr->type == &RNA_PrimitiveFloat) {
+    const PrimitiveFloatRNA *data = ptr->data;
+    return PyFloat_FromDouble(data->value);
+  }
+  if (ptr->type == &RNA_PrimitiveBoolean) {
+    const PrimitiveBooleanRNA *data = ptr->data;
+    return PyBool_FromLong(data->value);
+  }
+  return pyrna_struct_CreatePyObject(ptr);
 }
 
 PyObject *pyrna_prop_CreatePyObject(PointerRNA *ptr, PropertyRNA *prop)

@@ -44,6 +44,8 @@ OBJMesh::OBJMesh(Depsgraph *depsgraph, const OBJExportParams &export_params, Obj
     mesh_edges_ = export_mesh_->edges();
     mesh_polys_ = export_mesh_->polys();
     mesh_loops_ = export_mesh_->loops();
+    sharp_faces_ = export_mesh_->attributes().lookup_or_default<bool>(
+        "sharp_face", ATTR_DOMAIN_FACE, false);
   }
   else {
     /* Curves and NURBS surfaces need a new mesh when they're
@@ -76,6 +78,8 @@ void OBJMesh::set_mesh(Mesh *mesh)
   mesh_edges_ = mesh->edges();
   mesh_polys_ = mesh->polys();
   mesh_loops_ = mesh->loops();
+  sharp_faces_ = export_mesh_->attributes().lookup_or_default<bool>(
+      "sharp_face", ATTR_DOMAIN_FACE, false);
 }
 
 void OBJMesh::clear()
@@ -194,12 +198,15 @@ void OBJMesh::calc_smooth_groups(const bool use_bitflags)
 {
   const bool *sharp_edges = static_cast<const bool *>(
       CustomData_get_layer_named(&export_mesh_->edata, CD_PROP_BOOL, "sharp_edge"));
+  const bool *sharp_faces = static_cast<const bool *>(
+      CustomData_get_layer_named(&export_mesh_->pdata, CD_PROP_BOOL, "sharp_face"));
   poly_smooth_groups_ = BKE_mesh_calc_smoothgroups(mesh_edges_.size(),
                                                    mesh_polys_.data(),
                                                    mesh_polys_.size(),
                                                    mesh_loops_.data(),
                                                    mesh_loops_.size(),
                                                    sharp_edges,
+                                                   sharp_faces,
                                                    &tot_smooth_groups_,
                                                    use_bitflags);
 }
@@ -245,7 +252,7 @@ const Material *OBJMesh::get_object_material(const int16_t mat_nr) const
 
 bool OBJMesh::is_ith_poly_smooth(const int poly_index) const
 {
-  return mesh_polys_[poly_index].flag & ME_SMOOTH;
+  return !sharp_faces_[poly_index];
 }
 
 const char *OBJMesh::get_object_name() const
@@ -277,9 +284,9 @@ float3 OBJMesh::calc_vertex_coords(const int vert_index, const float global_scal
 
 Vector<int> OBJMesh::calc_poly_vertex_indices(const int poly_index) const
 {
-  const MPoly &mpoly = mesh_polys_[poly_index];
-  const MLoop *mloop = &mesh_loops_[mpoly.loopstart];
-  const int totloop = mpoly.totloop;
+  const MPoly &poly = mesh_polys_[poly_index];
+  const MLoop *mloop = &mesh_loops_[poly.loopstart];
+  const int totloop = poly.totloop;
   Vector<int> r_poly_vertex_indices(totloop);
   for (int loop_index = 0; loop_index < totloop; loop_index++) {
     r_poly_vertex_indices[loop_index] = mloop[loop_index].v;
@@ -398,12 +405,12 @@ void OBJMesh::store_normal_coords_and_indices()
   const float(*lnors)[3] = static_cast<const float(*)[3]>(
       CustomData_get_layer(&export_mesh_->ldata, CD_NORMAL));
   for (int poly_index = 0; poly_index < export_mesh_->totpoly; ++poly_index) {
-    const MPoly &mpoly = mesh_polys_[poly_index];
-    bool need_per_loop_normals = lnors != nullptr || (mpoly.flag & ME_SMOOTH);
+    const MPoly &poly = mesh_polys_[poly_index];
+    bool need_per_loop_normals = lnors != nullptr || !(sharp_faces_[poly_index]);
     if (need_per_loop_normals) {
-      for (int loop_of_poly = 0; loop_of_poly < mpoly.totloop; ++loop_of_poly) {
+      for (int loop_of_poly = 0; loop_of_poly < poly.totloop; ++loop_of_poly) {
         float3 loop_normal;
-        int loop_index = mpoly.loopstart + loop_of_poly;
+        int loop_index = poly.loopstart + loop_of_poly;
         BLI_assert(loop_index < export_mesh_->totloop);
         copy_v3_v3(loop_normal, lnors[loop_index]);
         mul_m3_v3(world_and_axes_normal_transform_, loop_normal);
@@ -427,8 +434,8 @@ void OBJMesh::store_normal_coords_and_indices()
         normal_to_index.add(rounded_poly_normal, poly_norm_index);
         normal_coords_.append(rounded_poly_normal);
       }
-      for (int i = 0; i < mpoly.totloop; ++i) {
-        int loop_index = mpoly.loopstart + i;
+      for (int i = 0; i < poly.totloop; ++i) {
+        int loop_index = poly.loopstart + i;
         BLI_assert(loop_index < export_mesh_->totloop);
         loop_to_normal_index_[loop_index] = poly_norm_index;
       }
@@ -442,11 +449,11 @@ Vector<int> OBJMesh::calc_poly_normal_indices(const int poly_index) const
   if (loop_to_normal_index_.is_empty()) {
     return {};
   }
-  const MPoly &mpoly = mesh_polys_[poly_index];
-  const int totloop = mpoly.totloop;
+  const MPoly &poly = mesh_polys_[poly_index];
+  const int totloop = poly.totloop;
   Vector<int> r_poly_normal_indices(totloop);
   for (int poly_loop_index = 0; poly_loop_index < totloop; poly_loop_index++) {
-    int loop_index = mpoly.loopstart + poly_loop_index;
+    int loop_index = poly.loopstart + poly_loop_index;
     r_poly_normal_indices[poly_loop_index] = loop_to_normal_index_[loop_index];
   }
   return r_poly_normal_indices;
@@ -472,9 +479,9 @@ int16_t OBJMesh::get_poly_deform_group_index(const int poly_index,
 
   group_weights.fill(0);
   bool found_any_group = false;
-  const MPoly &mpoly = mesh_polys_[poly_index];
-  const MLoop *mloop = &mesh_loops_[mpoly.loopstart];
-  for (int loop_i = 0; loop_i < mpoly.totloop; ++loop_i, ++mloop) {
+  const MPoly &poly = mesh_polys_[poly_index];
+  const MLoop *mloop = &mesh_loops_[poly.loopstart];
+  for (int loop_i = 0; loop_i < poly.totloop; ++loop_i, ++mloop) {
     const MDeformVert &dv = dverts[mloop->v];
     for (int weight_i = 0; weight_i < dv.totweight; ++weight_i) {
       const auto group = dv.dw[weight_i].def_nr;

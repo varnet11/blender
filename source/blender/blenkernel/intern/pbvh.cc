@@ -151,19 +151,27 @@ static void update_node_vb(PBVH *pbvh, PBVHNode *node)
 //  BB_expand(&node->vb, co);
 //}
 
-static bool face_materials_match(const PBVH *pbvh, const int a, const int b)
+static bool face_materials_match(const PBVH *pbvh,
+                                 const bool *sharp_faces,
+                                 const int a,
+                                 const int b)
 {
   if (pbvh->material_indices) {
     if (pbvh->material_indices[a] != pbvh->material_indices[b]) {
       return false;
     }
   }
-  return (pbvh->mpoly[a].flag & ME_SMOOTH) == (pbvh->mpoly[b].flag & ME_SMOOTH);
+  if (sharp_faces) {
+    if (sharp_faces[a] != sharp_faces[b]) {
+      return false;
+    }
+  }
+  return true;
 }
 
 static bool grid_materials_match(const DMFlagMat *f1, const DMFlagMat *f2)
 {
-  return ((f1->flag & ME_SMOOTH) == (f2->flag & ME_SMOOTH) && (f1->mat_nr == f2->mat_nr));
+  return (f1->sharp == f2->sharp) && (f1->mat_nr == f2->mat_nr);
 }
 
 /* Adapted from BLI_kdopbvh.c */
@@ -229,7 +237,7 @@ static int partition_indices_grids(int *prim_indices,
 }
 
 /* Returns the index of the first element on the right of the partition */
-static int partition_indices_material(PBVH *pbvh, int lo, int hi)
+static int partition_indices_material(PBVH *pbvh, const bool *sharp_faces, int lo, int hi)
 {
   const MLoopTri *looptri = pbvh->looptri;
   const DMFlagMat *flagmats = pbvh->grid_flag_mats;
@@ -239,10 +247,10 @@ static int partition_indices_material(PBVH *pbvh, int lo, int hi)
   for (;;) {
     if (pbvh->looptri) {
       const int first = looptri[pbvh->prim_indices[lo]].poly;
-      for (; face_materials_match(pbvh, first, looptri[indices[i]].poly); i++) {
+      for (; face_materials_match(pbvh, sharp_faces, first, looptri[indices[i]].poly); i++) {
         /* pass */
       }
-      for (; !face_materials_match(pbvh, first, looptri[indices[j]].poly); j--) {
+      for (; !face_materials_match(pbvh, sharp_faces, first, looptri[indices[j]].poly); j--) {
         /* pass */
       }
     }
@@ -450,7 +458,7 @@ static void build_leaf(PBVH *pbvh, int node_index, BBC *prim_bbc, int offset, in
 
 /* Return zero if all primitives in the node can be drawn with the
  * same material (including flat/smooth shading), non-zero otherwise */
-static bool leaf_needs_material_split(PBVH *pbvh, int offset, int count)
+static bool leaf_needs_material_split(PBVH *pbvh, const bool *sharp_faces, int offset, int count)
 {
   if (count <= 1) {
     return false;
@@ -460,7 +468,7 @@ static bool leaf_needs_material_split(PBVH *pbvh, int offset, int count)
     const MLoopTri *first = &pbvh->looptri[pbvh->prim_indices[offset]];
     for (int i = offset + count - 1; i > offset; i--) {
       int prim = pbvh->prim_indices[i];
-      if (!face_materials_match(pbvh, first->poly, pbvh->looptri[prim].poly)) {
+      if (!face_materials_match(pbvh, sharp_faces, first->poly, pbvh->looptri[prim].poly)) {
         return true;
       }
     }
@@ -539,6 +547,7 @@ static void test_face_boundaries(PBVH *pbvh)
  */
 
 static void build_sub(PBVH *pbvh,
+                      const bool *sharp_faces,
                       int node_index,
                       BB *cb,
                       BBC *prim_bbc,
@@ -557,7 +566,7 @@ static void build_sub(PBVH *pbvh,
   /* Decide whether this is a leaf or not */
   const bool below_leaf_limit = count <= pbvh->leaf_limit || depth >= STACK_FIXED_DEPTH - 1;
   if (below_leaf_limit) {
-    if (!leaf_needs_material_split(pbvh, offset, count)) {
+    if (!leaf_needs_material_split(pbvh, sharp_faces, offset, count)) {
       build_leaf(pbvh, node_index, prim_bbc, offset, count);
 
       if (node_index == 0) {
@@ -610,11 +619,12 @@ static void build_sub(PBVH *pbvh,
   }
   else {
     /* Partition primitives by material */
-    end = partition_indices_material(pbvh, offset, offset + count - 1);
+    end = partition_indices_material(pbvh, sharp_faces, offset, offset + count - 1);
   }
 
   /* Build children */
   build_sub(pbvh,
+            sharp_faces,
             pbvh->nodes[node_index].children_offset,
             nullptr,
             prim_bbc,
@@ -623,6 +633,7 @@ static void build_sub(PBVH *pbvh,
             prim_scratch,
             depth + 1);
   build_sub(pbvh,
+            sharp_faces,
             pbvh->nodes[node_index].children_offset + 1,
             nullptr,
             prim_bbc,
@@ -636,7 +647,7 @@ static void build_sub(PBVH *pbvh,
   }
 }
 
-static void pbvh_build(PBVH *pbvh, BB *cb, BBC *prim_bbc, int totprim)
+static void pbvh_build(PBVH *pbvh, const bool *sharp_faces, BB *cb, BBC *prim_bbc, int totprim)
 {
   if (totprim != pbvh->totprim) {
     pbvh->totprim = totprim;
@@ -659,7 +670,7 @@ static void pbvh_build(PBVH *pbvh, BB *cb, BBC *prim_bbc, int totprim)
   }
 
   pbvh->totnode = 1;
-  build_sub(pbvh, 0, cb, prim_bbc, 0, totprim, nullptr, 0);
+  build_sub(pbvh, sharp_faces, 0, cb, prim_bbc, 0, totprim, nullptr, 0);
 }
 
 static void pbvh_draw_args_init(PBVH *pbvh, PBVH_GPU_Args *args, PBVHNode *node)
@@ -678,7 +689,7 @@ static void pbvh_draw_args_init(PBVH *pbvh, PBVH_GPU_Args *args, PBVHNode *node)
   args->face_sets_color_seed = pbvh->face_sets_color_seed;
   args->vert_positions = pbvh->vert_positions;
   args->mloop = pbvh->mloop;
-  args->mpoly = pbvh->mpoly;
+  args->polys = pbvh->polys;
   args->mlooptri = pbvh->looptri;
 
   if (ELEM(pbvh->header.type, PBVH_FACES, PBVH_GRIDS)) {
@@ -695,7 +706,7 @@ static void pbvh_draw_args_init(PBVH *pbvh, PBVH_GPU_Args *args, PBVHNode *node)
       args->pdata = pbvh->pdata;
       args->totprim = node->totprim;
       args->me = pbvh->mesh;
-      args->mpoly = pbvh->mpoly;
+      args->polys = pbvh->polys;
       args->vert_normals = pbvh->vert_normals;
 
       args->active_color = pbvh->mesh->active_color_attribute;
@@ -714,7 +725,7 @@ static void pbvh_draw_args_init(PBVH *pbvh, PBVH_GPU_Args *args, PBVHNode *node)
       args->grid_indices = node->prim_indices;
       args->subdiv_ccg = pbvh->subdiv_ccg;
       args->face_sets = pbvh->face_sets;
-      args->mpoly = pbvh->mpoly;
+      args->polys = pbvh->polys;
 
       args->active_color = pbvh->mesh->active_color_attribute;
       args->render_color = pbvh->mesh->default_color_attribute;
@@ -811,7 +822,7 @@ static void pbvh_validate_node_prims(PBVH *pbvh)
 
 void BKE_pbvh_build_mesh(PBVH *pbvh,
                          Mesh *mesh,
-                         const MPoly *mpoly,
+                         const MPoly *polys,
                          const MLoop *mloop,
                          float (*vert_positions)[3],
                          int totvert,
@@ -826,7 +837,7 @@ void BKE_pbvh_build_mesh(PBVH *pbvh,
 
   pbvh->mesh = mesh;
   pbvh->header.type = PBVH_FACES;
-  pbvh->mpoly = mpoly;
+  pbvh->polys = polys;
   pbvh->hide_poly = static_cast<bool *>(CustomData_get_layer_named_for_write(
       &mesh->pdata, CD_PROP_BOOL, ".hide_poly", mesh->totpoly));
   pbvh->material_indices = static_cast<const int *>(
@@ -881,7 +892,9 @@ void BKE_pbvh_build_mesh(PBVH *pbvh,
   }
 
   if (looptri_num) {
-    pbvh_build(pbvh, &cb, prim_bbc, looptri_num);
+    const bool *sharp_faces = (const bool *)CustomData_get_layer_named(
+        &mesh->pdata, CD_PROP_BOOL, "sharp_face");
+    pbvh_build(pbvh, sharp_faces, &cb, prim_bbc, looptri_num);
 
 #ifdef TEST_PBVH_FACE_SPLIT
     test_face_boundaries(pbvh);
@@ -940,7 +953,7 @@ void BKE_pbvh_build_grids(PBVH *pbvh,
   pbvh->ldata = &me->ldata;
   pbvh->pdata = &me->pdata;
 
-  pbvh->mpoly = me->polys().data();
+  pbvh->polys = me->polys().data();
   pbvh->mloop = me->loops().data();
 
   /* We also need the base mesh for PBVH draw. */
@@ -968,7 +981,9 @@ void BKE_pbvh_build_grids(PBVH *pbvh,
   }
 
   if (totgrid) {
-    pbvh_build(pbvh, &cb, prim_bbc, totgrid);
+    const bool *sharp_faces = (const bool *)CustomData_get_layer_named(
+        &me->pdata, CD_PROP_BOOL, "sharp_face");
+    pbvh_build(pbvh, sharp_faces, &cb, prim_bbc, totgrid);
 
 #ifdef TEST_PBVH_FACE_SPLIT
     test_face_boundaries(pbvh);
@@ -1410,8 +1425,8 @@ static void pbvh_update_normals_accum_task_cb(void *__restrict userdata,
 
       /* Face normal and mask */
       if (lt->poly != mpoly_prev) {
-        const MPoly *mp = &pbvh->mpoly[lt->poly];
-        BKE_mesh_calc_poly_normal(mp, &pbvh->mloop[mp->loopstart], pbvh->vert_positions, fn);
+        const MPoly &poly = pbvh->polys[lt->poly];
+        BKE_mesh_calc_poly_normal(&poly, &pbvh->mloop[poly.loopstart], pbvh->vert_positions, fn);
         mpoly_prev = lt->poly;
       }
 
@@ -3713,7 +3728,7 @@ static void pbvh_face_iter_step(PBVHFaceIter *fd, bool do_step)
       }
 
       fd->last_face_index_ = face_index;
-      const MPoly *mp = fd->mpoly_ + face_index;
+      const MPoly &poly = fd->polys_[face_index];
 
       fd->face.i = fd->index = face_index;
 
@@ -3724,15 +3739,15 @@ static void pbvh_face_iter_step(PBVHFaceIter *fd, bool do_step)
         fd->hide = fd->hide_poly_ + face_index;
       }
 
-      pbvh_face_iter_verts_reserve(fd, mp->totloop);
+      pbvh_face_iter_verts_reserve(fd, poly.totloop);
 
-      const MLoop *ml = fd->mloop_ + mp->loopstart;
+      const MLoop *ml = fd->mloop_ + poly.loopstart;
       const int grid_area = fd->subdiv_key_.grid_area;
 
-      for (int i = 0; i < mp->totloop; i++, ml++) {
+      for (int i = 0; i < poly.totloop; i++, ml++) {
         if (fd->pbvh_type_ == PBVH_GRIDS) {
           /* Grid corners. */
-          fd->verts[i].i = (mp->loopstart + i) * grid_area + grid_area - 1;
+          fd->verts[i].i = (poly.loopstart + i) * grid_area + grid_area - 1;
         }
         else {
           fd->verts[i].i = ml->v;
@@ -3763,7 +3778,7 @@ void BKE_pbvh_face_iter_init(PBVH *pbvh, PBVHNode *node, PBVHFaceIter *fd)
       fd->subdiv_key_ = pbvh->gridkey;
       ATTR_FALLTHROUGH;
     case PBVH_FACES:
-      fd->mpoly_ = pbvh->mpoly;
+      fd->polys_ = pbvh->polys;
       fd->mloop_ = pbvh->mloop;
       fd->looptri_ = pbvh->looptri;
       fd->hide_poly_ = pbvh->hide_poly;

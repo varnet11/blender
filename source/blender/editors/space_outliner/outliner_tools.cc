@@ -153,7 +153,7 @@ static void get_element_operation_type(
       case ID_NT:
       case ID_BR:
       case ID_PA:
-      case ID_GD:
+      case ID_GD_LEGACY:
       case ID_MC:
       case ID_MSK:
       case ID_PAL:
@@ -2861,7 +2861,7 @@ static const EnumPropertyItem outliner_lib_op_type_items[] = {
      "DELETE",
      ICON_X,
      "Delete",
-     "Delete this library and all its item.\n"
+     "Delete this library and all its items.\n"
      "Warning: No undo"},
     {OL_LIB_RELOCATE,
      "RELOCATE",
