@@ -1593,12 +1593,24 @@ typedef struct NodeGeometryUVUnwrap {
   uint8_t method;
 } NodeGeometryUVUnwrap;
 
+/* TODO: Add RAII */
+typedef struct NodeSimulationItem {
+  char *name;
+  /* #eNodeSocketDatatype. */
+  /* TODO: Use a different enum instead to support Byte colors, etc. */
+  short socket_type;
+  char _pad[6];
+} NodeSimulationItem;
+
 typedef struct NodeGeometrySimulationInput {
   int32_t output_node_id;
 } NodeGeometrySimulationInput;
 
 typedef struct NodeGeometrySimulationOutput {
+  NodeSimulationItem *items;
+  int items_num;
   int8_t use_persistent_cache;
+  char _pad[3];
 } NodeGeometrySimulationOutput;
 
 typedef struct NodeGeometryDistributePointsInVolume {

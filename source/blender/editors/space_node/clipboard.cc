@@ -238,6 +238,10 @@ static int node_clipboard_paste_exec(bContext *C, wmOperator *op)
   }
 
   for (bNode *new_node : node_map.values()) {
+    nodeDeclarationEnsure(&tree, new_node);
+  }
+
+  for (bNode *new_node : node_map.values()) {
     nodeSetSelected(new_node, true);
 
     /* The parent pointer must be redirected to new node. */

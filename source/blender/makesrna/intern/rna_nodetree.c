@@ -9742,8 +9742,22 @@ static void def_geo_set_curve_normal(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 }
 
-static void def_geo_simulation_input(StructRNA *srna)
+static void def_geo_simulation_input(StructRNA *UNUSED(srna))
 {
+}
+
+static void rna_def_simulation_state_item(BlenderRNA *brna)
+{
+  StructRNA *srna = RNA_def_struct(brna, "SimulationStateItem", NULL);
+  RNA_def_struct_ui_text(srna, "Simulation Sate Item", "");
+  RNA_def_struct_sdna(srna, "NodeSimulationItem");
+
+  PropertyRNA *prop;
+
+  prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
+  RNA_def_property_ui_text(prop, "Name", "");
+  RNA_def_struct_name_property(srna, prop);
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_NodeSocket_update");
 }
 
 static void def_geo_simulation_output(StructRNA *srna)
@@ -9755,6 +9769,11 @@ static void def_geo_simulation_output(StructRNA *srna)
   prop = RNA_def_property(srna, "use_persistent_cache", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_ui_text(prop, "Persistent Cache", "");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+  prop = RNA_def_property(srna, "state_items", PROP_COLLECTION, PROP_NONE);
+  RNA_def_property_collection_sdna(prop, NULL, "items", "items_num");
+  RNA_def_property_struct_type(prop, "SimulationStateItem");
+  RNA_def_property_ui_text(prop, "Inputs", "");
 }
 
 static void def_geo_curve_handle_type_selection(StructRNA *srna)
@@ -13052,6 +13071,7 @@ void RNA_def_nodetree(BlenderRNA *brna)
   rna_def_compositor_node(brna);
   rna_def_texture_node(brna);
   rna_def_geometry_node(brna);
+  rna_def_simulation_state_item(brna);
   rna_def_function_node(brna);
 
   rna_def_nodetree(brna);

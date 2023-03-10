@@ -453,10 +453,13 @@ static bool node_group_separate_selected(
   nodes_to_move.remove_if(
       [](const bNode *node) { return node->is_group_input() || node->is_group_output(); });
 
+  Set<bNode *> new_nodes;
+
   for (bNode *node : nodes_to_move) {
     bNode *newnode;
     if (make_copy) {
       newnode = bke::node_copy_with_mapping(&ntree, *node, LIB_ID_COPY_DEFAULT, true, socket_map);
+      new_nodes.add_new(newnode);
     }
     else {
       newnode = node;
@@ -492,6 +495,10 @@ static bool node_group_separate_selected(
   }
   if (!make_copy) {
     nodeRebuildIDVector(&ngroup);
+  }
+
+  for (bNode *node : new_nodes) {
+    nodeDeclarationEnsure(&ntree, node);
   }
 
   /* add internal links to the ntree */

@@ -173,6 +173,10 @@ static void ntree_copy_data(Main * /*bmain*/, ID *id_dst, const ID *id_src, cons
     }
   }
 
+  for (bNode *node : ntree_dst->all_nodes()) {
+    nodeDeclarationEnsure(ntree_dst, node);
+  }
+
   /* copy interface sockets */
   BLI_listbase_clear(&ntree_dst->inputs);
   LISTBASE_FOREACH (const bNodeSocket *, src_socket, &ntree_src->inputs) {
@@ -598,6 +602,14 @@ void ntreeBlendWrite(BlendWriter *writer, bNodeTree *ntree)
         BLO_write_struct(writer, NodeImageLayer, sock->storage);
       }
     }
+    if (node->type == GEO_NODE_SIMULATION_OUTPUT) {
+      const NodeGeometrySimulationOutput &storage =
+          *static_cast<const NodeGeometrySimulationOutput *>(node->storage);
+      BLO_write_struct_array(writer, NodeSimulationItem, storage.items_num, storage.items);
+      for (const NodeSimulationItem &item : Span(storage.items, storage.items_num)) {
+        BLO_write_string(writer, item.name);
+      }
+    }
   }
 
   LISTBASE_FOREACH (bNodeLink *, link, &ntree->links) {
@@ -773,6 +785,16 @@ void ntreeBlendReadData(BlendDataReader *reader, ID *owner_id, bNodeTree *ntree)
           BLO_read_data_address(reader, &storage->string);
           break;
         }
+        case GEO_NODE_SIMULATION_OUTPUT: {
+          NodeGeometrySimulationOutput &storage = *static_cast<NodeGeometrySimulationOutput *>(
+              node->storage);
+          BLO_read_data_address(reader, &storage.items);
+          for (const NodeSimulationItem &item : Span(storage.items, storage.items_num)) {
+            BLO_read_data_address(reader, &item.name);
+          }
+          break;
+        }
+
         default:
           break;
       }
@@ -1132,8 +1154,6 @@ static void node_init(const bContext *C, bNodeTree *ntree, bNode *node)
   BLI_strncpy(node->name, DATA_(ntype->ui_name), NODE_MAXSTR);
   nodeUniqueName(ntree, node);
 
-  node_add_sockets_from_type(ntree, node, ntype);
-
   if (ntype->initfunc != nullptr) {
     ntype->initfunc(ntree, node);
   }
@@ -1141,6 +1161,9 @@ static void node_init(const bContext *C, bNodeTree *ntree, bNode *node)
   if (ntree->typeinfo && ntree->typeinfo->node_add_init) {
     ntree->typeinfo->node_add_init(ntree, node);
   }
+
+  /* Run this after calling the init function in case the sockets depend on the node storage. */
+  node_add_sockets_from_type(ntree, node, ntype);
 
   if (node->id) {
     id_us_plus(node->id);
@@ -2352,7 +2375,9 @@ bNode *node_copy_with_mapping(bNodeTree *dst_tree,
 
   /* Reset the declaration of the new node in real tree. */
   if (dst_tree != nullptr) {
-    nodeDeclarationEnsure(dst_tree, node_dst);
+    /* TODO: Moved to caller because sometimes this depends on another node that isn't copid yet.
+     * Commit this separately or find a different solution. */
+    // nodeDeclarationEnsure(dst_tree, node_dst);
   }
 
   return node_dst;

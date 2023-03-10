@@ -108,4 +108,11 @@ class FieldAtIndexInput final : public bke::GeometryFieldInput {
   }
 };
 
+void socket_declarations_for_simulation_items(Span<NodeSimulationItem> items,
+                                              NodeDeclaration &r_declaration);
+
+/** \warning Return value will be reallocated when items are added or removed. */
+NodeSimulationItem *simulation_item_add_from_socket(NodeGeometrySimulationOutput &storage,
+                                                    const bNodeSocket &socket);
+
 }  // namespace blender::nodes
