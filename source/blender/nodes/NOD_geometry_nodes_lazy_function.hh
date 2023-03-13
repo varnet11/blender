@@ -227,6 +227,10 @@ class GeometryNodesLazyFunctionLogger : public fn::lazy_function::GraphExecutor:
                                const lf::Context &context) const override;
 };
 
+std::unique_ptr<LazyFunction> get_simulation_output_lazy_function(const bNode &node);
+std::unique_ptr<LazyFunction> get_simulation_input_lazy_function(const bNodeTree &node_tree,
+                                                                 const bNode &node);
+
 /**
  * Tells the lazy-function graph evaluator which nodes have side effects based on the current
  * context. For example, the same viewer node can have side effects in one context, but not in

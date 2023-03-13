@@ -94,11 +94,127 @@ NodeSimulationItem *simulation_item_add_from_socket(NodeGeometrySimulationOutput
   return &added_item;
 }
 
+const CPPType &get_simulation_item_cpp_type(const NodeSimulationItem &item)
+{
+  switch (item.socket_type) {
+    case SOCK_GEOMETRY:
+      return CPPType::get<GeometrySet>();
+    default:
+      BLI_assert_unreachable();
+      return CPPType::get<GeometrySet>();
+  }
+}
+
 }  // namespace blender::nodes
 
 namespace blender::nodes::node_geo_simulation_output_cc {
 
 NODE_STORAGE_FUNCS(NodeGeometrySimulationOutput);
+
+class LazyFunctionForSimulationOutputNode final : public LazyFunction {
+  int32_t node_id_;
+  Span<NodeSimulationItem> simulation_items_;
+  bool use_persistent_cache_ = false;
+
+ public:
+  LazyFunctionForSimulationOutputNode(const bNode &node) : node_id_(node.identifier)
+  {
+    const NodeGeometrySimulationOutput &storage = node_storage(node);
+    simulation_items_ = {storage.items, storage.items_num};
+    for (const NodeSimulationItem &item : Span(storage.items, storage.items_num)) {
+      const CPPType &type = get_simulation_item_cpp_type(item);
+      inputs_.append_as(item.name, type, lf::ValueUsage::Maybe);
+      outputs_.append_as(item.name, type);
+    }
+  }
+
+  void execute_impl(lf::Params &params, const lf::Context &context) const final
+  {
+    const GeoNodesLFUserData &user_data = *dynamic_cast<const GeoNodesLFUserData *>(
+        context.user_data);
+    const Scene *scene = DEG_get_input_scene(user_data.modifier_data->depsgraph);
+    const float scene_ctime = BKE_scene_ctime_get(scene);
+    const bke::sim::TimePoint time{int(scene_ctime), scene_ctime};
+
+    bke::sim::ComputeCaches &all_caches = *user_data.modifier_data->cache_per_frame;
+    const bke::NodeGroupComputeContext cache_context(user_data.compute_context, node_id_);
+    bke::sim::SimulationCache &cache = all_caches.ensure_for_context(cache_context.hash());
+
+    /* Retrieve cached items for the current exact time. If all items are cached, the cache is
+     * considered valid and no more evaluation has to be done. Otherwise it must be recreated. */
+    bool all_items_cached = true;
+    for (const int i : inputs_.index_range()) {
+      const StringRef name = simulation_items_[i].name;
+      const CPPType &type = *inputs_[i].type;
+      std::optional<GeometrySet> value = cache.value_at_time(name, time);
+      if (!value) {
+        all_items_cached = false;
+        continue;
+      }
+      void *output = params.get_output_data_ptr(i);
+      type.move_construct(&*value, output);
+      params.set_input_unused(i);
+      params.output_set(i);
+    }
+    if (all_items_cached) {
+      return;
+    }
+
+    if (use_persistent_cache_) {
+      /* TODO: This probably isn't right. */
+      if (!cache.is_empty()) {
+        if (time.time < cache.start_time()->time) {
+          cache.clear();
+        }
+      }
+    }
+
+    for (const int i : inputs_.index_range()) {
+      if (params.get_output_usage(i) != lf::ValueUsage::Used) {
+        continue;
+      }
+      if (params.output_was_set(i)) {
+        continue;
+      }
+      void *value = params.try_get_input_data_ptr_or_request(i);
+      if (!value) {
+        continue;
+      }
+
+      const StringRef name = simulation_items_[i].name;
+      const CPPType &type = *inputs_[i].type;
+
+      GeometrySet &geometry_set = *static_cast<GeometrySet *>(value);
+      geometry_set.ensure_owns_direct_data();
+      if (use_persistent_cache_) {
+        cache.store_persistent(name, time, geometry_set);
+      }
+      else {
+        cache.remove(name);
+        cache.store_temporary(name, time, geometry_set);
+      }
+
+      void *output = params.get_output_data_ptr(i);
+      type.move_construct(&geometry_set, output);
+      params.output_set(i);
+    }
+  }
+};
+
+}  // namespace blender::nodes::node_geo_simulation_output_cc
+
+namespace blender::nodes {
+
+std::unique_ptr<LazyFunction> get_simulation_output_lazy_function(const bNode &node)
+{
+  namespace file_ns = blender::nodes::node_geo_simulation_output_cc;
+  BLI_assert(node.type == GEO_NODE_SIMULATION_OUTPUT);
+  return std::make_unique<file_ns::LazyFunctionForSimulationOutputNode>(node);
+}
+
+}  // namespace blender::nodes
+
+namespace blender::nodes::node_geo_simulation_output_cc {
 
 static void node_declare_dynamic(const bNodeTree & /*node_tree*/,
                                  const bNode &node,
@@ -180,55 +296,6 @@ static bool node_insert_link(bNodeTree *ntree, bNode *node, bNodeLink *link)
   return true;
 }
 
-static void node_geo_exec(GeoNodeExecParams params)
-{
-  const bNode &node = params.node();
-  const NodeGeometrySimulationOutput &storage = node_storage(node);
-  const Scene *scene = DEG_get_input_scene(params.depsgraph());
-  const float scene_ctime = BKE_scene_ctime_get(scene);
-  const bke::sim::TimePoint time{int(scene_ctime), scene_ctime};
-
-  const GeoNodesLFUserData &lf_data = *params.user_data();
-  bke::sim::ComputeCaches &all_caches = *lf_data.modifier_data->cache_per_frame;
-
-  const bke::NodeGroupComputeContext cache_context(lf_data.compute_context, node.identifier);
-  bke::sim::SimulationCache &cache = all_caches.ensure_for_context(cache_context.hash());
-
-  /* TODO: All items. */
-  if (std::optional<GeometrySet> value = cache.value_at_time("Geometry", time)) {
-    params.set_output("Geometry", std::move(*value));
-    params.set_input_unused("Geometry");
-    return;
-  }
-
-  for (const NodeSimulationItem &item : Span(storage.items, storage.items_num)) {
-    if (params.lazy_require_input(item.name)) {
-      return;
-    }
-  }
-
-  /* TODO: All items. */
-  GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
-  geometry_set.ensure_owns_direct_data();
-  if (storage.use_persistent_cache) {
-    if (!cache.is_empty()) {
-      if (time.time < cache.start_time()->time) {
-        cache.clear();
-      }
-    }
-    /* If using the cache or there is no cached data yet, write the input in a new cache value. */
-    cache.store_persistent("Geometry", time, geometry_set);
-  }
-  else {
-    /* TODO: Maybe don't clear the whole cache here. */
-    /* TODO: Move the geometry set here if the output isn't needed. */
-    cache.clear();
-    cache.store_temporary("Geometry", time, geometry_set);
-  }
-
-  params.set_output("Geometry", std::move(geometry_set));
-}
-
 }  // namespace blender::nodes::node_geo_simulation_output_cc
 
 void register_node_type_geo_simulation_output()
@@ -240,13 +307,11 @@ void register_node_type_geo_simulation_output()
   geo_node_type_base(
       &ntype, GEO_NODE_SIMULATION_OUTPUT, "Simulation Output", NODE_CLASS_INTERFACE);
   ntype.initfunc = file_ns::node_init;
-  ntype.geometry_node_execute = file_ns::node_geo_exec;
   ntype.declare_dynamic = file_ns::node_declare_dynamic;
   ntype.insert_link = file_ns::node_insert_link;
   node_type_storage(&ntype,
                     "NodeGeometrySimulationOutput",
                     file_ns::node_free_storage,
                     file_ns::node_copy_storage);
-  ntype.geometry_node_execute_supports_laziness = true;
   nodeRegisterType(&ntype);
 }

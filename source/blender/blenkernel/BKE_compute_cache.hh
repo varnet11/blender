@@ -154,6 +154,11 @@ class SimulationCache {
     last_run_time_.reset();
   }
 
+  void remove(const StringRef name)
+  {
+    caches_.remove(name);
+  }
+
   bool is_empty() const
   {
     for (const CacheValues &values : caches_.values()) {
