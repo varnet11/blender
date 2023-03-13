@@ -2750,7 +2750,6 @@ static void count_multi_input_socket_links(bNodeTree &ntree, SpaceNode &snode)
   }
 }
 
-
 static float frame_node_label_height(const NodeFrame &frame_data)
 {
   return frame_data.label_size * U.dpi_fac;
