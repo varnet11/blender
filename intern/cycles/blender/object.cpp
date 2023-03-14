@@ -346,8 +346,11 @@ Object *BlenderSync::sync_object(BL::Depsgraph &b_depsgraph,
       object->set_random_id(hash_uint2(hash_string(object->name.c_str()), 0));
     }
 
-    /* lightgroup */
+    /* Light group and linking. */
     object->set_lightgroup(ustring(b_ob.lightgroup()));
+    /* TODO: replace with real mask. */
+    object->set_light_link_emitter_mask(b_ob.pass_index());
+    object->set_light_link_receiver_mask(b_ob.pass_index());
 
     object->tag_update(scene);
   }

@@ -672,8 +672,10 @@ ccl_device_forceinline void volume_integrate_heterogeneous(
 
   /* Write accumulated emission. */
   if (!is_zero(accum_emission)) {
-    film_write_volume_emission(
-        kg, state, accum_emission, render_buffer, object_lightgroup(kg, sd->object));
+    if (light_link_object_match(kg, light_link_receiver_forward(kg, state), sd->object)) {
+      film_write_volume_emission(
+          kg, state, accum_emission, render_buffer, object_lightgroup(kg, sd->object));
+    }
   }
 
 #  ifdef __DENOISING_FEATURES__
@@ -713,6 +715,7 @@ ccl_device_forceinline bool integrate_volume_equiangular_sample_light(
                                         sd->P,
                                         ray->D,
                                         ray->tmax - ray->tmin,
+                                        light_link_receiver_nee(kg, sd),
                                         bounce,
                                         path_flag,
                                         &ls)) {
@@ -776,6 +779,7 @@ ccl_device_forceinline void integrate_volume_direct_light(
                                     sd->time,
                                     P,
                                     zero_float3(),
+                                    light_link_receiver_nee(kg, sd),
                                     SD_BSDF_HAS_TRANSMISSION,
                                     bounce,
                                     path_flag,
@@ -981,6 +985,10 @@ ccl_device_forceinline bool integrate_volume_phase_scatter(
   INTEGRATOR_STATE_WRITE(state, path, mis_origin_n) = zero_float3();
   INTEGRATOR_STATE_WRITE(state, path, min_ray_pdf) = fminf(
       unguided_phase_pdf, INTEGRATOR_STATE(state, path, min_ray_pdf));
+
+  if (kernel_data.kernel_features & KERNEL_FEATURE_LIGHT_LINKING) {
+    INTEGRATOR_STATE_WRITE(state, path, mis_ray_object) = sd->object;
+  }
 
   path_state_next(kg, state, label, sd->flag);
   return true;

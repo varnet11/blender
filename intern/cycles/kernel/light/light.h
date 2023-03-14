@@ -21,6 +21,60 @@ ccl_device_inline bool light_select_reached_max_bounces(KernelGlobals kg, int in
   return (bounce > kernel_data_fetch(lights, index).max_bounces);
 }
 
+/* Light linking. */
+
+ccl_device_inline int light_link_receiver_nee(KernelGlobals kg, const ccl_private ShaderData *sd)
+{
+  if (!(kernel_data.kernel_features & KERNEL_FEATURE_LIGHT_LINKING)) {
+    return OBJECT_NONE;
+  }
+
+  return sd->object;
+}
+
+ccl_device_inline int light_link_receiver_forward(KernelGlobals kg, IntegratorState state)
+{
+  if (!(kernel_data.kernel_features & KERNEL_FEATURE_LIGHT_LINKING)) {
+    return OBJECT_NONE;
+  }
+
+  return INTEGRATOR_STATE(state, path, mis_ray_object);
+}
+
+ccl_device_inline bool light_link_light_match(KernelGlobals kg,
+                                              const int object_receiver,
+                                              const int light_emitter)
+{
+  if (object_receiver == OBJECT_NONE) {
+    return true;
+  }
+
+  const uint64_t emitter_mask = kernel_data_fetch(lights, light_emitter).light_link_emitter_mask;
+  if (emitter_mask == 0) {
+    return true;
+  }
+
+  return (kernel_data_fetch(objects, object_receiver).light_link_receiver_mask & emitter_mask) !=
+         0;
+}
+
+ccl_device_inline bool light_link_object_match(KernelGlobals kg,
+                                               const int object_receiver,
+                                               const int object_emitter)
+{
+  if (object_receiver == OBJECT_NONE) {
+    return true;
+  }
+
+  const uint64_t emitter_mask = kernel_data_fetch(objects, object_emitter).light_link_emitter_mask;
+  if (emitter_mask == 0) {
+    return true;
+  }
+
+  return (kernel_data_fetch(objects, object_receiver).light_link_receiver_mask & emitter_mask) !=
+         0;
+}
+
 /* Sample point on an individual light. */
 
 template<bool in_volume_segment>
@@ -105,6 +159,7 @@ ccl_device_noinline bool light_sample(KernelGlobals kg,
                                       const float randv,
                                       const float time,
                                       const float3 P,
+                                      const int object_receiver,
                                       const int bounce,
                                       const uint32_t path_flag,
                                       const int emitter_index,
@@ -136,6 +191,10 @@ ccl_device_noinline bool light_sample(KernelGlobals kg,
     /* Mesh light. */
     const int object = mesh_light.object_id;
 
+    if (!light_link_object_match(kg, object_receiver, object)) {
+      return false;
+    }
+
     /* Exclude synthetic meshes from shadow catcher pass. */
     if ((path_flag & PATH_RAY_SHADOW_CATCHER_PASS) &&
         !(kernel_data_fetch(object_flag, object) & SD_OBJECT_SHADOW_CATCHER)) {
@@ -149,11 +208,17 @@ ccl_device_noinline bool light_sample(KernelGlobals kg,
     ls->shader |= shader_flag;
   }
   else {
-    if (UNLIKELY(light_select_reached_max_bounces(kg, ~prim, bounce))) {
+    const int light = ~prim;
+
+    if (!light_link_light_match(kg, object_receiver, light)) {
       return false;
     }
 
-    if (!light_sample<in_volume_segment>(kg, ~prim, randu, randv, P, path_flag, ls)) {
+    if (UNLIKELY(light_select_reached_max_bounces(kg, light, bounce))) {
+      return false;
+    }
+
+    if (!light_sample<in_volume_segment>(kg, light, randu, randv, P, path_flag, ls)) {
       return false;
     }
   }
@@ -200,6 +265,11 @@ ccl_device bool lights_intersect(KernelGlobals kg,
       if (klight->shader_id & SHADER_EXCLUDE_SHADOW_CATCHER) {
         continue;
       }
+    }
+
+    /* Light linking. */
+    if (!light_link_light_match(kg, light_link_receiver_forward(kg, state), lamp)) {
+      continue;
     }
 
     LightType type = (LightType)klight->type;

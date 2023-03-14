@@ -1273,6 +1273,10 @@ typedef struct KernelObject {
 
   /* Volume velocity scale. */
   float velocity_scale;
+
+  /* TODO: separate array to avoid memory overhead when not used. */
+  uint64_t light_link_emitter_mask;
+  uint64_t light_link_receiver_mask;
 } KernelObject;
 static_assert_align(KernelObject, 16);
 
@@ -1338,6 +1342,8 @@ typedef struct KernelLight {
     KernelAreaLight area;
     KernelDistantLight distant;
   };
+  uint64_t light_link_emitter_mask;
+  uint64_t pad;
 } KernelLight;
 static_assert_align(KernelLight, 16);
 
@@ -1621,6 +1627,9 @@ enum KernelFeatureFlag : uint32_t {
 
   /* OSL. */
   KERNEL_FEATURE_OSL = (1U << 26U),
+
+  /* Light linking. */
+  KERNEL_FEATURE_LIGHT_LINKING = (1U << 27U),
 };
 
 /* Shader node feature mask, to specialize shader evaluation for kernels. */

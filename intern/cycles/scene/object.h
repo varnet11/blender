@@ -67,6 +67,8 @@ class Object : public Node {
   NODE_SOCKET_API(float, ao_distance)
 
   NODE_SOCKET_API(ustring, lightgroup)
+  NODE_SOCKET_API(uint64_t, light_link_receiver_mask)
+  NODE_SOCKET_API(uint64_t, light_link_emitter_mask)
 
   /* Set during device update. */
   bool intersects_volume;

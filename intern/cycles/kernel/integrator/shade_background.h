@@ -152,6 +152,10 @@ ccl_device_inline void integrate_distant_lights(KernelGlobals kg,
           continue;
       }
 #endif
+      /* Light linking. */
+      if (!light_link_light_match(kg, light_link_receiver_forward(kg, state), lamp)) {
+        continue;
+      }
 
 #ifdef __MNEE__
       if (INTEGRATOR_STATE(state, path, mnee) & PATH_MNEE_CULL_LIGHT_CONNECTION) {

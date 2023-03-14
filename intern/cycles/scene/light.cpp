@@ -136,6 +136,7 @@ NODE_DEFINE(Light)
   SOCKET_NODE(shader, "Shader", Shader::get_node_type());
 
   SOCKET_STRING(lightgroup, "Light Group", ustring());
+  SOCKET_UINT64(light_link_emitter_mask, "Light Link Emitter Mask", 0);
 
   return type;
 }
@@ -1119,6 +1120,8 @@ void LightManager::device_update_lights(Device *device, DeviceScene *dscene, Sce
     else {
       klights[light_index].lightgroup = LIGHTGROUP_NONE;
     }
+
+    klights[light_index].light_link_emitter_mask = light->light_link_emitter_mask;
 
     light_index++;
   }

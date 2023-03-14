@@ -558,6 +558,7 @@ ccl_device_noinline bool light_tree_sample(KernelGlobals kg,
                                            const float3 P,
                                            const float3 N_or_D,
                                            const float t,
+                                           const int object_receiver,
                                            const int shader_flags,
                                            const int bounce,
                                            const uint32_t path_flag,
@@ -609,8 +610,17 @@ ccl_device_noinline bool light_tree_sample(KernelGlobals kg,
 
   pdf_selection *= pdf_leaf;
 
-  return light_sample<in_volume_segment>(
-      kg, randu, randv, time, P, bounce, path_flag, selected_emitter, pdf_selection, ls);
+  return light_sample<in_volume_segment>(kg,
+                                         randu,
+                                         randv,
+                                         time,
+                                         P,
+                                         object_receiver,
+                                         bounce,
+                                         path_flag,
+                                         selected_emitter,
+                                         pdf_selection,
+                                         ls);
 }
 
 /* We need to be able to find the probability of selecting a given light for MIS. */

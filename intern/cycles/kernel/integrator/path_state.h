@@ -89,6 +89,10 @@ ccl_device_inline void path_state_init_integrator(KernelGlobals kg,
     INTEGRATOR_STATE_WRITE(state, path, denoising_feature_throughput) = one_spectrum();
   }
 #endif
+
+  if (kernel_data.kernel_features & KERNEL_FEATURE_LIGHT_LINKING) {
+    INTEGRATOR_STATE_WRITE(state, path, mis_ray_object) = OBJECT_NONE;
+  }
 }
 
 ccl_device_inline void path_state_next(KernelGlobals kg,

@@ -324,20 +324,32 @@ ccl_device_inline bool light_sample_from_volume_segment(KernelGlobals kg,
                                                         const float3 P,
                                                         const float3 D,
                                                         const float t,
+                                                        const int object_receiver,
                                                         const int bounce,
                                                         const uint32_t path_flag,
                                                         ccl_private LightSample *ls)
 {
 #ifdef __LIGHT_TREE__
   if (kernel_data.integrator.use_light_tree) {
-    return light_tree_sample<true>(
-        kg, randn, randu, randv, time, P, D, t, SD_BSDF_HAS_TRANSMISSION, bounce, path_flag, ls);
+    return light_tree_sample<true>(kg,
+                                   randn,
+                                   randu,
+                                   randv,
+                                   time,
+                                   P,
+                                   D,
+                                   t,
+                                   object_receiver,
+                                   SD_BSDF_HAS_TRANSMISSION,
+                                   bounce,
+                                   path_flag,
+                                   ls);
   }
   else
 #endif
   {
     return light_distribution_sample<true>(
-        kg, randn, randu, randv, time, P, bounce, path_flag, ls);
+        kg, randn, randu, randv, time, P, object_receiver, bounce, path_flag, ls);
   }
 }
 
@@ -349,6 +361,7 @@ ccl_device bool light_sample_from_position(KernelGlobals kg,
                                            const float time,
                                            const float3 P,
                                            const float3 N,
+                                           const int object_receiver,
                                            const int shader_flags,
                                            const int bounce,
                                            const uint32_t path_flag,
@@ -356,14 +369,25 @@ ccl_device bool light_sample_from_position(KernelGlobals kg,
 {
 #ifdef __LIGHT_TREE__
   if (kernel_data.integrator.use_light_tree) {
-    return light_tree_sample<false>(
-        kg, randn, randu, randv, time, P, N, 0, shader_flags, bounce, path_flag, ls);
+    return light_tree_sample<false>(kg,
+                                    randn,
+                                    randu,
+                                    randv,
+                                    time,
+                                    P,
+                                    N,
+                                    0.0f,
+                                    object_receiver,
+                                    shader_flags,
+                                    bounce,
+                                    path_flag,
+                                    ls);
   }
   else
 #endif
   {
     return light_distribution_sample<false>(
-        kg, randn, randu, randv, time, P, bounce, path_flag, ls);
+        kg, randn, randu, randv, time, P, object_receiver, bounce, path_flag, ls);
   }
 }
 
