@@ -799,8 +799,8 @@ void DepsgraphRelationBuilder::build_object(Object *object)
     build_collection(nullptr, object, object->instance_collection);
   }
 
-  /* Point caches. */
   build_object_pointcache(object);
+  build_object_light_linking(object);
 
   /* Synchronization back to original object. */
   OperationKey synchronize_key(
@@ -1200,6 +1200,13 @@ void DepsgraphRelationBuilder::build_object_pointcache(Object *object)
                  RELATION_FLAG_FLUSH_USER_EDIT_ONLY);
   }
   BLI_freelistN(&ptcache_id_list);
+}
+
+void DepsgraphRelationBuilder::build_object_light_linking(Object *object)
+{
+  if (object->light_linking.receiver_collection != nullptr) {
+    build_collection(nullptr, nullptr, object->light_linking.receiver_collection);
+  }
 }
 
 void DepsgraphRelationBuilder::build_constraints(ID *id,

@@ -1318,6 +1318,23 @@ class CYCLES_OBJECT_PT_lightgroup(CyclesButtonsPanel, Panel):
         sub.operator("scene.view_layer_add_lightgroup", icon='ADD', text="").name = ob.lightgroup
 
 
+class CYCLES_OBJECT_PT_light_linking(CyclesButtonsPanel, Panel):
+    bl_label = "Light Linking"
+    bl_parent_id = "CYCLES_OBJECT_PT_shading"
+    bl_context = "object"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+
+        object = context.object
+        light_linking = object.light_linking
+
+        col = layout.column()
+
+        col.prop(light_linking, "receiver_collection")
+
+
 class CYCLES_OBJECT_PT_visibility(CyclesButtonsPanel, Panel):
     bl_label = "Visibility"
     bl_context = "object"
@@ -2444,6 +2461,7 @@ classes = (
     CYCLES_OBJECT_PT_shading_gi_approximation,
     CYCLES_OBJECT_PT_shading_caustics,
     CYCLES_OBJECT_PT_lightgroup,
+    CYCLES_OBJECT_PT_light_linking,
     CYCLES_OBJECT_PT_visibility,
     CYCLES_OBJECT_PT_visibility_ray_visibility,
     CYCLES_OBJECT_PT_visibility_culling,

@@ -818,6 +818,7 @@ void DepsgraphNodeBuilder::build_object(int base_index,
       (object->pd->tex != nullptr)) {
     build_texture(object->pd->tex);
   }
+
   /* Object dupligroup. */
   if (object->instance_collection != nullptr) {
     build_object_instance_collection(object, is_visible);
@@ -825,6 +826,9 @@ void DepsgraphNodeBuilder::build_object(int base_index,
         &object->id, NodeType::DUPLI, OperationCode::DUPLI);
     op_node->flag |= OperationFlag::DEPSOP_FLAG_PINNED;
   }
+
+  build_object_light_linking(object);
+
   /* Synchronization back to original object. */
   add_operation_node(&object->id,
                      NodeType::SYNCHRONIZATION,
@@ -1082,6 +1086,18 @@ void DepsgraphNodeBuilder::build_object_pointcache(Object *object)
                      [scene_cow, object_cow](::Depsgraph *depsgraph) {
                        BKE_object_eval_ptcache_reset(depsgraph, scene_cow, object_cow);
                      });
+}
+
+void DepsgraphNodeBuilder::build_object_light_linking(Object *object)
+{
+  /* XXX: Operation to set the emitter/receiver flags. */
+
+  if (object->light_linking.receiver_collection != nullptr) {
+    /* TODO(sergey): Support some sort of weak referencing, so that receiver objects which are
+     * specified by this collection but not in the scene do not use extra memory. */
+
+    build_collection(nullptr, object->light_linking.receiver_collection);
+  }
 }
 
 void DepsgraphNodeBuilder::build_animdata(ID *id)

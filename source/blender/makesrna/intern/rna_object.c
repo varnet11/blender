@@ -2347,6 +2347,38 @@ void rna_Object_lightgroup_set(PointerRNA *ptr, const char *value)
   BKE_lightgroup_membership_set(&((Object *)ptr->owner_id)->lightgroup, value);
 }
 
+static void rna_LightLinking_receiver_collection_set(PointerRNA *ptr,
+                                                     PointerRNA value,
+                                                     struct ReportList *UNUSED(reports))
+{
+  LightLinking *light_linking = (LightLinking *)ptr->data;
+  Collection *collection = (Collection *)value.data;
+
+  if (light_linking->receiver_collection != NULL) {
+    id_us_min(&light_linking->receiver_collection->id);
+  }
+
+  light_linking->receiver_collection = collection;
+  if (light_linking->receiver_collection) {
+    id_us_plus(&light_linking->receiver_collection->id);
+  }
+}
+
+static void rna_LightLinking_receiver_collection_update(Main *bmain,
+                                                        Scene *UNUSED(scene),
+                                                        PointerRNA *ptr)
+{
+  /* XXX: Figure our the proper dependency graph tag.
+   *
+   * The tag is needed to both inform the render engine that it needs to
+   * re-synchronize some data, but also give the dependency graph ability to
+   * perform pre-calculation of data needed for the render engines. */
+  DEG_id_tag_update(ptr->owner_id, ID_RECALC_SHADING);
+
+  DEG_relations_tag_update(bmain);
+  WM_main_add_notifier(NC_OBJECT | ND_DRAW, ptr->owner_id);
+}
+
 #else
 
 static void rna_def_vertex_group(BlenderRNA *brna)
@@ -3874,6 +3906,12 @@ static void rna_def_object(BlenderRNA *brna)
   RNA_def_property_flag(prop, PROP_EDITABLE);
   RNA_def_property_ui_text(prop, "Lightgroup", "Lightgroup that the object belongs to");
 
+  /* Light Linking. */
+  prop = RNA_def_property(srna, "light_linking", PROP_POINTER, PROP_NONE);
+  RNA_def_property_flag(prop, PROP_NEVER_NULL);
+  RNA_def_property_struct_type(prop, "LightLinking");
+  RNA_def_property_ui_text(prop, "Light Linking", "Light linking settings");
+
   RNA_define_lib_overridable(false);
 
   /* anim */
@@ -3883,6 +3921,26 @@ static void rna_def_object(BlenderRNA *brna)
   rna_def_motionpath_common(srna);
 
   RNA_api_object(srna);
+}
+
+static void rna_def_object_light_linking(BlenderRNA *brna)
+{
+  StructRNA *srna;
+  PropertyRNA *prop;
+
+  srna = RNA_def_struct(brna, "LightLinking", NULL);
+  RNA_def_struct_sdna(srna, "LightLinking");
+  RNA_def_struct_ui_text(srna, "Light Linking", "");
+
+  prop = RNA_def_property(srna, "receiver_collection", PROP_POINTER, PROP_NONE);
+  RNA_def_property_struct_type(prop, "Collection");
+  RNA_def_property_flag(prop, PROP_EDITABLE);
+  RNA_def_property_pointer_funcs(
+      prop, NULL, "rna_LightLinking_receiver_collection_set", NULL, NULL);
+  RNA_def_property_ui_text(
+      prop, "Receiver Collection", "Collection of objects which receive light from this emitter");
+  RNA_def_property_update(
+      prop, NC_OBJECT | ND_DRAW, "rna_LightLinking_receiver_collection_update");
 }
 
 void RNA_def_object(BlenderRNA *brna)
@@ -3895,6 +3953,7 @@ void RNA_def_object(BlenderRNA *brna)
   rna_def_material_slot(brna);
   rna_def_object_display(brna);
   rna_def_object_lineart(brna);
+  rna_def_object_light_linking(brna);
   RNA_define_animate_sdna(true);
 }
 

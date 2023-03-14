@@ -29,6 +29,7 @@ extern "C" {
 
 struct AnimData;
 struct BoundBox;
+struct Collection;
 struct Curve;
 struct FluidsimSettings;
 struct GeometrySet;
@@ -246,6 +247,37 @@ enum eObjectLineArt_Flags {
   OBJECT_LRT_OWN_INTERSECTION_PRIORITY = (1 << 1),
 };
 
+typedef struct LightLinkingRuntime {
+  /* For objects which emit light: contains a single bit set at an index which corresponds to an
+   * unique identifier of an emitter with light linking enabled in the scene.
+   *
+   * For objects which are not an emitters with light linking configures is assigned to zero.
+   *
+   * NOTE: There could only be 64 emitters with light linking enabled in the scene. */
+  uint64_t emitter_mask;
+
+  /* For the receiver objects contains a bitmask of emitters from which this object receives light.
+   *
+   * Objects which are not explicitly specified as receiver this field is assigned to zero. */
+  uint64_t receiver_mask;
+} LightLinkingRuntime;
+
+typedef struct LightLinking {
+  /* Collection which contains objects (possibly via nested collection indirection) which receive
+   * light from this emitter.
+   *
+   * If the collection is a null pointer then all objects from the current scene are receiving
+   * light from this emitter.
+   *
+   * The emitter in this context is assumed to be either object of lamp type, or objects with
+   * surface which has emissive shader. */
+  struct Collection *receiver_collection;
+
+  void *_pad;
+
+  LightLinkingRuntime runtime;
+} LightLinking;
+
 typedef struct Object {
   DNA_DEFINE_CXX_METHODS(Object)
 
@@ -447,6 +479,8 @@ typedef struct Object {
 
   /** Lightgroup membership information. */
   struct LightgroupMembership *lightgroup;
+
+  LightLinking light_linking;
 
   /** Runtime evaluation data (keep last). */
   Object_Runtime runtime;
