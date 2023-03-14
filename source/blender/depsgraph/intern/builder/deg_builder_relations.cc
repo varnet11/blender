@@ -631,6 +631,7 @@ void DepsgraphRelationBuilder::build_collection(LayerCollection *from_layer_coll
   }
 
   build_idproperties(collection->id.properties);
+  build_parameters(&collection->id);
 
   const BuilderStack::ScopedEntry stack_entry = stack_.trace(collection->id);
 
@@ -1213,9 +1214,74 @@ void DepsgraphRelationBuilder::build_object_instance_collection(Object *object)
 
 void DepsgraphRelationBuilder::build_object_light_linking(Object *object)
 {
-  if (object->light_linking.receiver_collection != nullptr) {
-    build_collection(nullptr, object->light_linking.receiver_collection);
+  const OperationKey from_layer_entry_key(
+      &object->id, NodeType::OBJECT_FROM_LAYER, OperationCode::OBJECT_FROM_LAYER_ENTRY);
+
+  const OperationKey light_linking_key(
+      &object->id, NodeType::SHADING, OperationCode::LIGHT_LINKING_UPDATE);
+
+  LightLinking &light_linking = object->light_linking;
+  Collection *receiver_collection = light_linking.receiver_collection;
+
+  add_relation(from_layer_entry_key, light_linking_key, "Light Linking From Layer");
+
+  build_light_linking_receiver_collection(receiver_collection);
+
+  if (!receiver_collection) {
+    return;
   }
+
+  const OperationKey collection_light_linking_key(
+      &receiver_collection->id, NodeType::PARAMETERS, OperationCode::LIGHT_LINKING_UPDATE);
+
+  /* Order to ensure the emitter's light linking is only evaluated after the receiver collection.
+   * This is because the emitter mask is "cached" om the emitter object for the simplicity of
+   * access, but the mask is allocated per collection bases (so that if two emitters share the
+   * same receiving collection they share the same emitter_mask). */
+  add_relation(
+      collection_light_linking_key, light_linking_key, "Collection -> Object Light Linking");
+
+  /* Relation from the emitter to the receiving object.
+   * This allows the receiver to access emitter's bit mask. */
+  FOREACH_COLLECTION_OBJECT_RECURSIVE_BEGIN (receiver_collection, receiver) {
+    /* If the object has receiver collection configure do not consider it as a receiver, avoiding
+     * dependency cycles. */
+    if (receiver->light_linking.receiver_collection == nullptr) {
+
+      const OperationKey receiver_light_linking_key(
+          &receiver->id, NodeType::SHADING, OperationCode::LIGHT_LINKING_UPDATE);
+      add_relation(light_linking_key, receiver_light_linking_key, "Collection -> Light Linking");
+    }
+  }
+  FOREACH_COLLECTION_OBJECT_RECURSIVE_END;
+}
+
+void DepsgraphRelationBuilder::build_light_linking_receiver_collection(
+    Collection *receiver_collection)
+{
+  if (receiver_collection == nullptr) {
+    return;
+  }
+
+  const bool was_built = built_map_.checkIsBuilt(receiver_collection);
+
+  build_collection(nullptr, receiver_collection);
+
+  if (was_built) {
+    return;
+  }
+
+  const OperationKey parameters_entry_key(
+      &receiver_collection->id, NodeType::PARAMETERS, OperationCode::PARAMETERS_ENTRY);
+  const OperationKey parameters_exit_key(
+      &receiver_collection->id, NodeType::PARAMETERS, OperationCode::PARAMETERS_EXIT);
+
+  const OperationKey light_linking_key(
+      &receiver_collection->id, NodeType::PARAMETERS, OperationCode::LIGHT_LINKING_UPDATE);
+
+  /* Order of parameters evaluation within the receiver collection. */
+  add_relation(parameters_entry_key, light_linking_key, "Entry -> Collection Light Linking");
+  add_relation(light_linking_key, parameters_exit_key, "Collection Light Linking -> Exit");
 }
 
 void DepsgraphRelationBuilder::build_constraints(ID *id,

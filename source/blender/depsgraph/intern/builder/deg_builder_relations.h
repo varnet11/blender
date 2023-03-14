@@ -148,7 +148,10 @@ class DepsgraphRelationBuilder : public DepsgraphBuilder {
   virtual void build_object_parent(Object *object);
   virtual void build_object_pointcache(Object *object);
   virtual void build_object_instance_collection(Object *object);
+
   virtual void build_object_light_linking(Object *object);
+  virtual void build_light_linking_receiver_collection(Collection *receiver_collection);
+
   virtual void build_constraints(ID *id,
                                  NodeType component_type,
                                  const char *component_subdata,

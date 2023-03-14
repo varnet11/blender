@@ -163,6 +163,9 @@ enum class OperationCode {
   LIGHT_UPDATE,
   WORLD_UPDATE,
 
+  /* Light linking. ------------------------------------------------------- */
+  LIGHT_LINKING_UPDATE,
+
   /* Node Tree. ----------------------------------------------------------- */
   NTREE_OUTPUT,
   NTREE_GEOMETRY_PREPROCESS,

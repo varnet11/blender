@@ -107,6 +107,7 @@
 #include "intern/builder/deg_builder_key.h"
 #include "intern/builder/deg_builder_rna.h"
 #include "intern/depsgraph.h"
+#include "intern/depsgraph_light_linking.h"
 #include "intern/depsgraph_tag.h"
 #include "intern/depsgraph_type.h"
 #include "intern/eval/deg_eval_copy_on_write.h"
@@ -700,6 +701,7 @@ void DepsgraphNodeBuilder::build_collection(LayerCollection *from_layer_collecti
     id_node->is_visible_on_build = is_collection_visible;
 
     build_idproperties(collection->id.properties);
+    build_parameters(&collection->id);
     add_operation_node(&collection->id, NodeType::GEOMETRY, OperationCode::GEOMETRY_EVAL_DONE);
   }
   if (from_layer_collection != nullptr) {
@@ -1090,14 +1092,49 @@ void DepsgraphNodeBuilder::build_object_pointcache(Object *object)
 
 void DepsgraphNodeBuilder::build_object_light_linking(Object *object)
 {
-  /* XXX: Operation to set the emitter/receiver flags. */
+  /* For objects put the light linking update callback to the same component as the base flags.
+   * This way the light linking is updated on the view layer hierarchy change (which does not seem
+   * to have a dedicated tag). */
+  Object *object_cow = get_cow_datablock(object);
+  add_operation_node(&object->id,
+                     NodeType::SHADING,
+                     OperationCode::LIGHT_LINKING_UPDATE,
+                     [object_cow](::Depsgraph *depsgraph) {
+                       BKE_object_eval_light_linking(depsgraph, object_cow);
+                     });
 
-  if (object->light_linking.receiver_collection != nullptr) {
-    /* TODO(sergey): Support some sort of weak referencing, so that receiver objects which are
-     * specified by this collection but not in the scene do not use extra memory. */
+  graph_->light_linking_cache.add_emitter(object);
 
-    build_collection(nullptr, object->light_linking.receiver_collection);
+  build_light_linking_receiver_collection(object->light_linking.receiver_collection);
+}
+
+void DepsgraphNodeBuilder::build_light_linking_receiver_collection(Collection *receiver_collection)
+{
+  if (receiver_collection == nullptr) {
+    return;
   }
+
+  const bool was_built = built_map_.checkIsBuilt(receiver_collection);
+
+  /* TODO(sergey): Support some sort of weak referencing, so that receiver objects which are
+   * specified by this collection but not in the scene do not use extra memory.
+   *
+   * Until the better solution is implemented pull the objects indirectly, and keep them
+   * invisible. This has penalty of higher memory usage, but not a performance penalty. */
+
+  const bool is_current_parent_collection_visible = is_parent_collection_visible_;
+  is_parent_collection_visible_ = false;
+
+  build_collection(nullptr, receiver_collection);
+
+  is_parent_collection_visible_ = is_current_parent_collection_visible;
+
+  if (was_built) {
+    return;
+  }
+
+  add_operation_node(
+      &receiver_collection->id, NodeType::PARAMETERS, OperationCode::LIGHT_LINKING_UPDATE);
 }
 
 void DepsgraphNodeBuilder::build_animdata(ID *id)

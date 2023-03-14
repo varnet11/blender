@@ -2368,11 +2368,6 @@ static void rna_LightLinking_receiver_collection_update(Main *bmain,
                                                         Scene *UNUSED(scene),
                                                         PointerRNA *ptr)
 {
-  /* XXX: Figure our the proper dependency graph tag.
-   *
-   * The tag is needed to both inform the render engine that it needs to
-   * re-synchronize some data, but also give the dependency graph ability to
-   * perform pre-calculation of data needed for the render engines. */
   DEG_id_tag_update(ptr->owner_id, ID_RECALC_SHADING);
 
   DEG_relations_tag_update(bmain);
