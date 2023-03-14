@@ -27,6 +27,7 @@ struct SocketType {
     FLOAT,
     INT,
     UINT,
+    UINT64,
     COLOR,
     VECTOR,
     POINT,
@@ -191,6 +192,8 @@ struct NodeType {
   SOCKET_DEFINE(name, ui_name, default_value, int, SocketType::INT, 0, ##__VA_ARGS__)
 #define SOCKET_UINT(name, ui_name, default_value, ...) \
   SOCKET_DEFINE(name, ui_name, default_value, uint, SocketType::UINT, 0, ##__VA_ARGS__)
+#define SOCKET_UINT64(name, ui_name, default_value, ...) \
+  SOCKET_DEFINE(name, ui_name, default_value, uint64_t, SocketType::UINT64, 0, ##__VA_ARGS__)
 #define SOCKET_FLOAT(name, ui_name, default_value, ...) \
   SOCKET_DEFINE(name, ui_name, default_value, float, SocketType::FLOAT, 0, ##__VA_ARGS__)
 #define SOCKET_COLOR(name, ui_name, default_value, ...) \
