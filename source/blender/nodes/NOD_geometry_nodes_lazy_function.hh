@@ -230,6 +230,7 @@ class GeometryNodesLazyFunctionLogger : public fn::lazy_function::GraphExecutor:
 std::unique_ptr<LazyFunction> get_simulation_output_lazy_function(const bNode &node);
 std::unique_ptr<LazyFunction> get_simulation_input_lazy_function(const bNodeTree &node_tree,
                                                                  const bNode &node);
+std::unique_ptr<LazyFunction> get_switch_node_lazy_function(const bNode &node);
 
 /**
  * Tells the lazy-function graph evaluator which nodes have side effects based on the current
