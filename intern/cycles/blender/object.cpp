@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0
  * Copyright 2011-2022 Blender Foundation */
 
+#include "blender/light_linking.h"
 #include "blender/object_cull.h"
 #include "blender/sync.h"
 #include "blender/util.h"
@@ -348,9 +349,8 @@ Object *BlenderSync::sync_object(BL::Depsgraph &b_depsgraph,
 
     /* Light group and linking. */
     object->set_lightgroup(ustring(b_ob.lightgroup()));
-    /* TODO: replace with real mask. */
-    object->set_light_link_emitter_mask(b_ob.pass_index());
-    object->set_light_link_receiver_mask(b_ob.pass_index());
+    object->set_light_link_emitter_mask(light_linking_get_emitter_mask(b_ob));
+    object->set_light_link_receiver_mask(light_linking_get_receiver_mask(b_ob));
 
     object->tag_update(scene);
   }

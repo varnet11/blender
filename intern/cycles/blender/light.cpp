@@ -3,6 +3,7 @@
 
 #include "scene/light.h"
 
+#include "blender/light_linking.h"
 #include "blender/sync.h"
 #include "blender/util.h"
 
@@ -147,8 +148,7 @@ void BlenderSync::sync_light(BL::Object &b_parent,
 
   /* Light group and linking. */
   light->set_lightgroup(ustring(b_ob_info.real_object.lightgroup()));
-  /* TODO: replace with real mask. */
-  light->set_light_link_emitter_mask(b_ob_info.real_object.pass_index());
+  light->set_light_link_emitter_mask(light_linking_get_emitter_mask(b_ob_info.real_object));
 
   /* tag */
   light->tag_update(scene);
