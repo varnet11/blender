@@ -279,6 +279,9 @@ void ED_operatortypes_object(void)
   WM_operatortype_append(OBJECT_OT_voxel_size_edit);
 
   WM_operatortype_append(OBJECT_OT_quadriflow_remesh);
+
+  /* Light linking. */
+  WM_operatortype_append(OBJECT_OT_light_linking_receiver_collection_new);
 }
 
 void ED_operatormacros_object(void)

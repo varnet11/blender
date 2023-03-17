@@ -1332,7 +1332,14 @@ class CYCLES_OBJECT_PT_light_linking(CyclesButtonsPanel, Panel):
 
         col = layout.column()
 
-        col.prop(light_linking, "receiver_collection")
+        col.template_ID(
+            light_linking,
+            "receiver_collection",
+            new="object.light_linking_receiver_collection_new",
+            text="Receiver Collection")
+
+        col = layout.column()
+        col.template_light_linking_receiver_collection(light_linking, "receiver_collection")
 
 
 class CYCLES_OBJECT_PT_visibility(CyclesButtonsPanel, Panel):

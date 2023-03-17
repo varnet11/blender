@@ -1958,6 +1958,12 @@ void RNA_api_ui_layout(StructRNA *srna)
       "Operator properties to fill in for the custom drag operator passed to the template");
   RNA_def_parameter_flags(parm, 0, PARM_RNAPTR);
   RNA_def_function_output(func, parm);
+
+  func = RNA_def_function(srna,
+                          "template_light_linking_receiver_collection",
+                          "uiTemplateLightLinkingReceiverCollection");
+  RNA_def_function_ui_description(func, "Visualization of a content of a receiver collection");
+  api_ui_item_rna_common(func);
 }
 
 #endif

@@ -165,6 +165,10 @@ void COLLECTION_OT_objects_remove(struct wmOperatorType *ot);
 void COLLECTION_OT_objects_add_active(struct wmOperatorType *ot);
 void COLLECTION_OT_objects_remove_active(struct wmOperatorType *ot);
 
+/* object_light_linking_ops.cc */
+
+void OBJECT_OT_light_linking_receiver_collection_new(struct wmOperatorType *ot);
+
 /* object_modifier.c */
 
 bool edit_modifier_poll_generic(struct bContext *C,
