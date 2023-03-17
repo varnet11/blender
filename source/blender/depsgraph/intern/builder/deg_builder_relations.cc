@@ -1263,13 +1263,7 @@ void DepsgraphRelationBuilder::build_light_linking_receiver_collection(
     return;
   }
 
-  const bool was_built = built_map_.checkIsBuilt(receiver_collection);
-
   build_collection(nullptr, receiver_collection);
-
-  if (was_built) {
-    return;
-  }
 
   const OperationKey parameters_entry_key(
       &receiver_collection->id, NodeType::PARAMETERS, OperationCode::PARAMETERS_ENTRY);
@@ -1280,8 +1274,17 @@ void DepsgraphRelationBuilder::build_light_linking_receiver_collection(
       &receiver_collection->id, NodeType::PARAMETERS, OperationCode::LIGHT_LINKING_UPDATE);
 
   /* Order of parameters evaluation within the receiver collection. */
-  add_relation(parameters_entry_key, light_linking_key, "Entry -> Collection Light Linking");
-  add_relation(light_linking_key, parameters_exit_key, "Collection Light Linking -> Exit");
+  /* TODO(sergey): Can optimize this out by explicitly separating the different built tags. This
+   * needs to be done in all places where the collection is built (is not something that can be
+   * easily solved from just adding the light linking functionality). */
+  add_relation(parameters_entry_key,
+               light_linking_key,
+               "Entry -> Collection Light Linking",
+               RELATION_CHECK_BEFORE_ADD);
+  add_relation(light_linking_key,
+               parameters_exit_key,
+               "Collection Light Linking -> Exit",
+               RELATION_CHECK_BEFORE_ADD);
 }
 
 void DepsgraphRelationBuilder::build_constraints(ID *id,

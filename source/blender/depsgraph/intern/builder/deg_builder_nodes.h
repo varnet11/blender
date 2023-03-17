@@ -139,6 +139,7 @@ class DepsgraphNodeBuilder : public DepsgraphBuilder {
                           OperationCode opcode,
                           const char *name = "",
                           int name_tag = -1);
+  bool has_operation_node(ID *id, NodeType comp_type, OperationCode opcode);
 
   OperationNode *find_operation_node(const ID *id,
                                      NodeType comp_type,

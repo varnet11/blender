@@ -324,6 +324,13 @@ bool DepsgraphNodeBuilder::has_operation_node(ID *id,
   return find_operation_node(id, comp_type, comp_name, opcode, name, name_tag) != nullptr;
 }
 
+bool DepsgraphNodeBuilder::has_operation_node(ID *id,
+                                              const NodeType comp_type,
+                                              const OperationCode opcode)
+{
+  return find_operation_node(id, comp_type, opcode) != nullptr;
+}
+
 OperationNode *DepsgraphNodeBuilder::find_operation_node(const ID *id,
                                                          NodeType comp_type,
                                                          const char *comp_name,
@@ -1114,8 +1121,6 @@ void DepsgraphNodeBuilder::build_light_linking_receiver_collection(Collection *r
     return;
   }
 
-  const bool was_built = built_map_.checkIsBuilt(receiver_collection);
-
   /* TODO(sergey): Support some sort of weak referencing, so that receiver objects which are
    * specified by this collection but not in the scene do not use extra memory.
    *
@@ -1129,12 +1134,18 @@ void DepsgraphNodeBuilder::build_light_linking_receiver_collection(Collection *r
 
   is_parent_collection_visible_ = is_current_parent_collection_visible;
 
-  if (was_built) {
-    return;
+  /* Ensure the light linking component is created for the collection.
+   *
+   * Note that it is not possible to have early output check based on regular built flags because
+   * the collection might have been first built for the non-light-linking purposes. */
+  /* TODO(sergey): Can optimize this out by explicitly separating the different built tags. This
+   * needs to be done in all places where the collection is built (is not something that can be
+   * easily solved from just adding the light linking functionality). */
+  if (!has_operation_node(
+          &receiver_collection->id, NodeType::PARAMETERS, OperationCode::LIGHT_LINKING_UPDATE)) {
+    add_operation_node(
+        &receiver_collection->id, NodeType::PARAMETERS, OperationCode::LIGHT_LINKING_UPDATE);
   }
-
-  add_operation_node(
-      &receiver_collection->id, NodeType::PARAMETERS, OperationCode::LIGHT_LINKING_UPDATE);
 }
 
 void DepsgraphNodeBuilder::build_animdata(ID *id)
