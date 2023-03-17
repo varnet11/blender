@@ -20,10 +20,10 @@ namespace blender::draw {
  * \{ */
 
 struct MeshExtract_EdgeFac_Data {
-  uchar *vbo_data;
+  uint8_t *vbo_data;
   bool use_edge_render;
   /* Number of loop per edge. */
-  uchar *edge_loop_count;
+  uint8_t *edge_loop_count;
 };
 
 static float loop_edge_factor_get(const float f_no[3],
@@ -59,17 +59,9 @@ static void extract_edge_fac_init(const MeshRenderData *mr,
   MeshExtract_EdgeFac_Data *data = static_cast<MeshExtract_EdgeFac_Data *>(tls_data);
 
   if (mr->extract_type == MR_EXTRACT_MESH) {
-    data->edge_loop_count = static_cast<uchar *>(
-        MEM_callocN(sizeof(uint32_t) * mr->edge_len, __func__));
-
-    /* HACK(@fclem): Detecting the need for edge render.
-     * We could have a flag in the mesh instead or check the modifier stack. */
-    const MEdge *med = mr->medge;
-    for (int e_index = 0; e_index < mr->edge_len; e_index++, med++) {
-      if ((med->flag & ME_EDGEDRAW) == 0) {
-        data->use_edge_render = true;
-        break;
-      }
+    data->edge_loop_count = MEM_cnew_array<uint8_t>(mr->edge_len, __func__);
+    if (!mr->me->runtime->subsurf_optimal_display_edges.is_empty()) {
+      data->use_edge_render = true;
     }
   }
   else {
@@ -105,20 +97,19 @@ static void extract_edge_fac_iter_poly_bm(const MeshRenderData *mr,
 }
 
 static void extract_edge_fac_iter_poly_mesh(const MeshRenderData *mr,
-                                            const MPoly *mp,
-                                            const int mp_index,
+                                            const MPoly *poly,
+                                            const int poly_index,
                                             void *_data)
 {
   MeshExtract_EdgeFac_Data *data = static_cast<MeshExtract_EdgeFac_Data *>(_data);
+  const BitSpan optimal_display_edges = mr->me->runtime->subsurf_optimal_display_edges;
 
-  const MLoop *mloop = mr->mloop;
-  const int ml_index_end = mp->loopstart + mp->totloop;
-  for (int ml_index = mp->loopstart; ml_index < ml_index_end; ml_index += 1) {
-    const MLoop *ml = &mloop[ml_index];
+  const int ml_index_end = poly->loopstart + poly->totloop;
+  for (int ml_index = poly->loopstart; ml_index < ml_index_end; ml_index += 1) {
+    const MLoop *ml = &mr->loops[ml_index];
 
     if (data->use_edge_render) {
-      const MEdge *med = &mr->medge[ml->e];
-      data->vbo_data[ml_index] = (med->flag & ME_EDGEDRAW) ? 255 : 0;
+      data->vbo_data[ml_index] = optimal_display_edges[ml->e] ? 255 : 0;
     }
     else {
 
@@ -128,13 +119,13 @@ static void extract_edge_fac_iter_poly_mesh(const MeshRenderData *mr,
       }
       if (data->edge_loop_count[ml->e] == 2) {
         /* Manifold */
-        const int ml_index_last = mp->totloop + mp->loopstart - 1;
-        const int ml_index_other = (ml_index == ml_index_last) ? mp->loopstart : (ml_index + 1);
-        const MLoop *ml_next = &mr->mloop[ml_index_other];
-        const MVert *v1 = &mr->mvert[ml->v];
-        const MVert *v2 = &mr->mvert[ml_next->v];
-        float ratio = loop_edge_factor_get(
-            mr->poly_normals[mp_index], v1->co, mr->vert_normals[ml->v], v2->co);
+        const int ml_index_last = poly->totloop + poly->loopstart - 1;
+        const int ml_index_other = (ml_index == ml_index_last) ? poly->loopstart : (ml_index + 1);
+        const MLoop *ml_next = &mr->loops[ml_index_other];
+        float ratio = loop_edge_factor_get(mr->poly_normals[poly_index],
+                                           mr->vert_positions[ml->v],
+                                           mr->vert_normals[ml->v],
+                                           mr->vert_positions[ml_next->v]);
         data->vbo_data[ml_index] = ratio * 253 + 1;
       }
       else {
@@ -156,7 +147,7 @@ static void extract_edge_fac_iter_ledge_bm(const MeshRenderData *mr,
 }
 
 static void extract_edge_fac_iter_ledge_mesh(const MeshRenderData *mr,
-                                             const MEdge * /*med*/,
+                                             const MEdge * /*edge*/,
                                              const int ledge_index,
                                              void *_data)
 {
@@ -231,23 +222,23 @@ static void extract_edge_fac_init_subdiv(const DRWSubdivCache *subdiv_cache,
 
   /* Create a temporary buffer for the edge original indices if it was not requested. */
   const bool has_edge_idx = edge_idx != nullptr;
-  GPUVertBuf *loop_edge_idx = nullptr;
+  GPUVertBuf *loop_edge_draw_flag = nullptr;
   if (has_edge_idx) {
-    loop_edge_idx = edge_idx;
+    loop_edge_draw_flag = edge_idx;
   }
   else {
-    loop_edge_idx = GPU_vertbuf_calloc();
+    loop_edge_draw_flag = GPU_vertbuf_calloc();
     draw_subdiv_init_origindex_buffer(
-        loop_edge_idx,
-        static_cast<int *>(GPU_vertbuf_get_data(subdiv_cache->edges_orig_index)),
+        loop_edge_draw_flag,
+        static_cast<int *>(GPU_vertbuf_get_data(subdiv_cache->edges_draw_flag)),
         subdiv_cache->num_subdiv_loops,
         0);
   }
 
-  draw_subdiv_build_edge_fac_buffer(subdiv_cache, pos_nor, loop_edge_idx, vbo);
+  draw_subdiv_build_edge_fac_buffer(subdiv_cache, pos_nor, loop_edge_draw_flag, vbo);
 
   if (!has_edge_idx) {
-    GPU_vertbuf_discard(loop_edge_idx);
+    GPU_vertbuf_discard(loop_edge_draw_flag);
   }
 }
 

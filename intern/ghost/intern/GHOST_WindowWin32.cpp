@@ -15,6 +15,9 @@
 #include "utfconv.h"
 
 #include "GHOST_ContextWGL.h"
+#ifdef WITH_VULKAN_BACKEND
+#  include "GHOST_ContextVK.h"
+#endif
 
 #include <Dwmapi.h>
 
@@ -151,7 +154,7 @@ GHOST_WindowWin32::GHOST_WindowWin32(GHOST_SystemWin32 *system,
   }
 
   if (parentwindow) {
-    /* Release any parent capture to allow immediate interaction (T90110). */
+    /* Release any parent capture to allow immediate interaction (#90110). */
     ::ReleaseCapture();
     parentwindow->lostMouseCapture();
   }
@@ -632,6 +635,19 @@ GHOST_Context *GHOST_WindowWin32::newDrawingContext(GHOST_TDrawingContextType ty
     return context;
   }
 
+#ifdef WITH_VULKAN_BACKEND
+  else if (type == GHOST_kDrawingContextTypeVulkan) {
+    GHOST_Context *context = new GHOST_ContextVK(false, m_hWnd, 1, 0, m_debug_context);
+
+    if (context->initializeDrawingContext()) {
+      return context;
+    }
+    else {
+      delete context;
+    }
+  }
+#endif
+
   return NULL;
 }
 
@@ -882,7 +898,7 @@ GHOST_TSuccess GHOST_WindowWin32::hasCursorShape(GHOST_TStandardCursor cursorSha
 }
 
 GHOST_TSuccess GHOST_WindowWin32::getPointerInfo(
-    std::vector<GHOST_PointerInfoWin32> &outPointerInfo, WPARAM wParam, LPARAM lParam)
+    std::vector<GHOST_PointerInfoWin32> &outPointerInfo, WPARAM wParam, LPARAM /*lParam*/)
 {
   int32_t pointerId = GET_POINTERID_WPARAM(wParam);
   int32_t isPrimary = IS_POINTER_PRIMARY_WPARAM(wParam);
@@ -1093,8 +1109,13 @@ static uint16_t uns16ReverseBits(uint16_t shrt)
 }
 #endif
 
-GHOST_TSuccess GHOST_WindowWin32::setWindowCustomCursorShape(
-    uint8_t *bitmap, uint8_t *mask, int sizeX, int sizeY, int hotX, int hotY, bool canInvertColor)
+GHOST_TSuccess GHOST_WindowWin32::setWindowCustomCursorShape(uint8_t *bitmap,
+                                                             uint8_t *mask,
+                                                             int sizeX,
+                                                             int sizeY,
+                                                             int hotX,
+                                                             int hotY,
+                                                             bool /*canInvertColor*/)
 {
   uint32_t andData[32];
   uint32_t xorData[32];
@@ -1159,7 +1180,7 @@ GHOST_TSuccess GHOST_WindowWin32::endProgressBar()
 }
 
 #ifdef WITH_INPUT_IME
-void GHOST_WindowWin32::beginIME(int32_t x, int32_t y, int32_t w, int32_t h, bool completed)
+void GHOST_WindowWin32::beginIME(int32_t x, int32_t y, int32_t /*w*/, int32_t h, bool completed)
 {
   m_imeInput.BeginIME(m_hWnd, GHOST_Rect(x, y - h, x, y), completed);
 }

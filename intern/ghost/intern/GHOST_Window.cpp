@@ -77,6 +77,11 @@ GHOST_TSuccess GHOST_Window::setDrawingContextType(GHOST_TDrawingContextType typ
   return GHOST_kSuccess;
 }
 
+GHOST_IContext *GHOST_Window::getDrawingContext()
+{
+  return m_context;
+}
+
 GHOST_TSuccess GHOST_Window::swapBuffers()
 {
   return m_context->swapBuffers();
@@ -100,6 +105,12 @@ GHOST_Context *GHOST_Window::getContext()
 uint GHOST_Window::getDefaultFramebuffer()
 {
   return (m_context) ? m_context->getDefaultFramebuffer() : 0;
+}
+
+GHOST_TSuccess GHOST_Window::getVulkanBackbuffer(
+    void *image, void *framebuffer, void *render_pass, void *extent, uint32_t *fb_id)
+{
+  return m_context->getVulkanBackbuffer(image, framebuffer, render_pass, extent, fb_id);
 }
 
 GHOST_TSuccess GHOST_Window::activateDrawingContext()
@@ -159,7 +170,7 @@ GHOST_TSuccess GHOST_Window::setCursorGrab(GHOST_TGrabCursorMode mode,
   return GHOST_kFailure;
 }
 
-GHOST_TSuccess GHOST_Window::getCursorGrabBounds(GHOST_Rect &bounds)
+GHOST_TSuccess GHOST_Window::getCursorGrabBounds(GHOST_Rect &bounds) const
 {
   if (m_cursorGrab != GHOST_kGrabWrap) {
     return GHOST_kFailure;

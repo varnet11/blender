@@ -664,11 +664,16 @@ extern bool BLI_memory_is_zero(const void *arr, size_t arr_size);
 /** \name Unused Function/Argument Macros
  * \{ */
 
+#ifndef __cplusplus
 /* UNUSED macro, for function argument */
-#if defined(__GNUC__) || defined(__clang__)
-#  define UNUSED(x) UNUSED_##x __attribute__((__unused__))
-#else
-#  define UNUSED(x) UNUSED_##x
+#  if defined(__GNUC__) || defined(__clang__)
+#    define UNUSED(x) UNUSED_##x __attribute__((__unused__))
+#  elif defined(_MSC_VER)
+/* NOTE: This suppresses the warning for the line, not the attribute. */
+#    define UNUSED(x) UNUSED_##x __pragma(warning(suppress : 4100))
+#  else
+#    define UNUSED(x) UNUSED_##x
+#  endif
 #endif
 
 /**
@@ -803,6 +808,10 @@ extern bool BLI_memory_is_zero(const void *arr, size_t arr_size);
     inline _enum_type &operator&=(_enum_type &a, _enum_type b) \
     { \
       return a = (_enum_type)(uint64_t(a) & uint64_t(b)); \
+    } \
+    inline _enum_type &operator^=(_enum_type &a, _enum_type b) \
+    { \
+      return a = (_enum_type)(uint64_t(a) ^ uint64_t(b)); \
     } \
     } /* extern "C++" */
 

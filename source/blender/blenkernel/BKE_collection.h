@@ -154,6 +154,14 @@ bool BKE_collection_object_remove(struct Main *bmain,
                                   struct Object *object,
                                   bool free_us);
 /**
+ * Replace one object with another in a collection (managing user counts).
+ */
+bool BKE_collection_object_replace(struct Main *bmain,
+                                   struct Collection *collection,
+                                   struct Object *ob_old,
+                                   struct Object *ob_new);
+
+/**
  * Move object from a collection into another
  *
  * If source collection is NULL move it from all the existing collections.
@@ -173,18 +181,13 @@ bool BKE_scene_collections_object_remove(struct Main *bmain,
                                          bool free_us);
 
 /**
- * Check all collections in \a bmain (including embedded ones in scenes) for CollectionObject with
- * NULL object pointer, and remove them.
- */
-void BKE_collections_object_remove_nulls(struct Main *bmain);
-
-/**
- * Check all collections in \a bmain (including embedded ones in scenes) for duplicate
- * CollectionObject with a same object pointer within a same object, and remove them.
+ * Check all collections in \a bmain (including embedded ones in scenes) for invalid
+ * CollectionObject (either with NULL object pointer, or duplicates), and remove them.
  *
- * NOTE: Always keeps the first of the detected duplicates.
+ * \note In case of duplicates, the first CollectionObject in the list is kept, all others are
+ * removed.
  */
-void BKE_collections_object_remove_duplicates(struct Main *bmain);
+void BKE_collections_object_remove_invalids(struct Main *bmain);
 
 /**
  * Remove all NULL children from parent collections of changed \a collection.

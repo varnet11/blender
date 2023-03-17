@@ -165,7 +165,7 @@ void BKE_library_foreach_ID_embedded(LibraryForeachIDData *data, ID **id_pp)
   }
   else if (flag & IDWALK_RECURSE) {
     /* Defer handling into main loop, recursively calling BKE_library_foreach_ID_link in
-     * IDWALK_RECURSE case is troublesome, see T49553. */
+     * IDWALK_RECURSE case is troublesome, see #49553. */
     /* XXX note that this breaks the 'owner id' thing now, we likely want to handle that
      * differently at some point, but for now it should not be a problem in practice. */
     if (BLI_gset_add(data->ids_handled, id)) {
@@ -261,7 +261,7 @@ static bool library_foreach_ID_link(Main *bmain,
      * (the node tree), but re-use those generated for the 'owner' ID (the material). */
     if (inherit_data == NULL) {
       data.cb_flag = ID_IS_LINKED(id) ? IDWALK_CB_INDIRECT_USAGE : 0;
-      /* When an ID is defined as not refcounting its ID usages, it should never do it. */
+      /* When an ID is defined as not reference-counting its ID usages, it should never do it. */
       data.cb_flag_clear = (id->tag & LIB_TAG_NO_USER_REFCOUNT) ?
                                IDWALK_CB_USER | IDWALK_CB_USER_ONE :
                                0;
@@ -272,7 +272,7 @@ static bool library_foreach_ID_link(Main *bmain,
     }
 
     if (bmain != NULL && bmain->relations != NULL && (flag & IDWALK_READONLY) &&
-        (flag & IDWALK_DO_INTERNAL_RUNTIME_POINTERS) == 0 &&
+        (flag & (IDWALK_DO_INTERNAL_RUNTIME_POINTERS | IDWALK_DO_LIBRARY_POINTER)) == 0 &&
         (((bmain->relations->flag & MAINIDRELATIONS_INCLUDE_UI) == 0) ==
          ((data.flag & IDWALK_INCLUDE_UI) == 0))) {
       /* Note that this is minor optimization, even in worst cases (like id being an object with
@@ -294,8 +294,9 @@ static bool library_foreach_ID_link(Main *bmain,
       continue;
     }
 
-    /* NOTE: ID.lib pointer is purposefully fully ignored here...
-     * We may want to add it at some point? */
+    if (flag & IDWALK_DO_LIBRARY_POINTER) {
+      CALLBACK_INVOKE(id->lib, IDWALK_CB_NEVER_SELF);
+    }
 
     if (flag & IDWALK_DO_INTERNAL_RUNTIME_POINTERS) {
       CALLBACK_INVOKE_ID(id->newid, IDWALK_CB_INTERNAL);
@@ -395,7 +396,7 @@ uint64_t BKE_library_id_can_use_filter_id(const ID *id_owner)
     case ID_SCE:
       return FILTER_ID_OB | FILTER_ID_WO | FILTER_ID_SCE | FILTER_ID_MC | FILTER_ID_MA |
              FILTER_ID_GR | FILTER_ID_TXT | FILTER_ID_LS | FILTER_ID_MSK | FILTER_ID_SO |
-             FILTER_ID_GD | FILTER_ID_BR | FILTER_ID_PAL | FILTER_ID_IM | FILTER_ID_NT;
+             FILTER_ID_GD_LEGACY | FILTER_ID_BR | FILTER_ID_PAL | FILTER_ID_IM | FILTER_ID_NT;
     case ID_OB:
       /* Could be more specific, but simpler to just always say 'yes' here. */
       return FILTER_ID_ALL;
@@ -434,7 +435,7 @@ uint64_t BKE_library_id_can_use_filter_id(const ID *id_owner)
     case ID_PA:
       return FILTER_ID_OB | FILTER_ID_GR | FILTER_ID_TE;
     case ID_MC:
-      return FILTER_ID_GD | FILTER_ID_IM;
+      return FILTER_ID_GD_LEGACY | FILTER_ID_IM;
     case ID_MSK:
       /* WARNING! mask->parent.id, not typed. */
       return FILTER_ID_MC;
@@ -442,7 +443,7 @@ uint64_t BKE_library_id_can_use_filter_id(const ID *id_owner)
       return FILTER_ID_TE | FILTER_ID_OB;
     case ID_LP:
       return FILTER_ID_IM;
-    case ID_GD:
+    case ID_GD_LEGACY:
       return FILTER_ID_MA;
     case ID_WS:
       return FILTER_ID_SCE;
@@ -684,6 +685,15 @@ static void lib_query_unused_ids_tag_recurse(Main *bmain,
     return;
   }
 
+  if (ELEM(GS(id->name), ID_IM)) {
+    /* Images which have a 'viewer' source (e.g. render results) should not be considered as
+     * orphaned/unused data. */
+    Image *image = (Image *)id;
+    if (image->source == IMA_SRC_VIEWER) {
+      return;
+    }
+  }
+
   /* An ID user is 'valid' (i.e. may affect the 'used'/'not used' status of the ID it uses) if it
    * does not match `ignored_usages`, and does match `required_usages`. */
   const int ignored_usages = (IDWALK_CB_LOOPBACK | IDWALK_CB_EMBEDDED);
@@ -696,11 +706,10 @@ static void lib_query_unused_ids_tag_recurse(Main *bmain,
   bool has_valid_from_users = false;
   /* Preemptively consider this ID as unused. That way if there is a loop of dependency leading
    * back to it, it won't create a fake 'valid user' detection.
-   * NOTE: This can only be done for a subset of IDs, some types are never 'indirectly unused',
-   * same for IDs with a fake user. */
-  if ((id->flag & LIB_FAKEUSER) == 0 && !ELEM(GS(id->name), ID_SCE, ID_WM, ID_SCR, ID_WS, ID_LI)) {
-    id->tag |= tag;
-  }
+   * NOTE: there are some cases (like when fake user is set, or some ID types) which are never
+   * 'indirectly unused'. However, these have already been checked and early-returned above, so any
+   * ID reaching this point of the function can be tagged. */
+  id->tag |= tag;
   for (MainIDRelationsEntryItem *id_from_item = id_relations->from_ids; id_from_item != NULL;
        id_from_item = id_from_item->next) {
     if ((id_from_item->usage_flag & ignored_usages) != 0 ||
@@ -727,8 +736,7 @@ static void lib_query_unused_ids_tag_recurse(Main *bmain,
     id->tag &= ~tag;
   }
   else {
-    /* This ID has no 'valid' users, tag it as unused. */
-    id->tag |= tag;
+    /* This ID has no 'valid' users, its 'unused' tag preemptively set above can be kept. */
     if (r_num_tagged != NULL) {
       r_num_tagged[INDEX_ID_NULL]++;
       r_num_tagged[BKE_idtype_idcode_to_index(GS(id->name))]++;

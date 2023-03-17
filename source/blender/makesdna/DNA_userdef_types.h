@@ -15,6 +15,20 @@
 extern "C" {
 #endif
 
+/**
+ * Scaling factor for all UI elements, based on the "Resolution Scale" user preference and the
+ * DPI/OS Scale of each monitor. This is a read-only, run-time value calculated by
+ * `WM_window_set_dpi` at various times, including between the drawing of each window and so can
+ * vary between monitors.
+ */
+#define UI_SCALE_FAC ((void)0, U.scale_factor)
+
+/* Inverse of UI_SCALE_FAC ( 1 / UI_SCALE_FAC). */
+#define UI_INV_SCALE_FAC ((void)0, U.inv_scale_factor)
+
+/* 16 to copy ICON_DEFAULT_HEIGHT */
+#define UI_ICON_SIZE ((float)16 * U.scale_factor)
+
 /* Themes; defines in `BIF_resource.h`. */
 
 struct ColorBand;
@@ -272,7 +286,7 @@ typedef struct ThemeSpace {
   unsigned char edge[4], edge_select[4];
   unsigned char edge_seam[4], edge_sharp[4], edge_facesel[4], edge_crease[4], edge_bevel[4];
   /** Solid faces. */
-  unsigned char face[4], face_select[4], face_back[4], face_front[4];
+  unsigned char face[4], face_select[4], face_retopology[4], face_back[4], face_front[4];
   /** Selected color. */
   unsigned char face_dot[4];
   unsigned char extra_edge_len[4], extra_edge_angle[4], extra_face_angle[4], extra_face_area[4];
@@ -309,10 +323,10 @@ typedef struct ThemeSpace {
   unsigned char console_output[4], console_input[4], console_info[4], console_error[4];
   unsigned char console_cursor[4], console_select[4];
 
-  unsigned char vertex_size, outline_width, obcenter_dia, facedot_size;
+  unsigned char vertex_size, edge_width, outline_width, obcenter_dia, facedot_size;
   unsigned char noodle_curving;
   unsigned char grid_levels;
-  char _pad5[3];
+  char _pad5[2];
   float dash_alpha;
 
   /* Syntax for text-window and nodes. */
@@ -354,6 +368,7 @@ typedef struct ThemeSpace {
   unsigned char path_before[4], path_after[4];
   unsigned char path_keyframe_before[4], path_keyframe_after[4];
   unsigned char camera_path[4];
+  unsigned char camera_passepartout[4];
   unsigned char _pad1[6];
 
   unsigned char gp_vertex_size;
@@ -576,6 +591,9 @@ typedef struct bUserAssetLibrary {
 
   char name[64];   /* MAX_NAME */
   char path[1024]; /* FILE_MAX */
+
+  short import_method; /* eAssetImportMethod */
+  char _pad0[6];
 } bUserAssetLibrary;
 
 typedef struct SolidLight {
@@ -640,6 +658,7 @@ typedef struct UserDef_Experimental {
   char show_asset_debug_info;
   char no_asset_indexing;
   char use_viewport_debug;
+  char use_all_linked_data_direct;
   char SANITIZE_AFTER_HERE;
   /* The following options are automatically sanitized (set to 0)
    * when the release cycle is not alpha. */
@@ -651,10 +670,10 @@ typedef struct UserDef_Experimental {
   char use_override_templates;
   char enable_eevee_next;
   char use_sculpt_texture_paint;
-  char use_draw_manager_acquire_lock;
-  char use_realtime_compositor;
   char enable_gpencil_next;
-  char _pad[6];
+  char enable_workbench_next;
+  char use_new_volume_nodes;
+  char _pad[5];
   /** `makesdna` does not allow empty structs. */
 } UserDef_Experimental;
 
@@ -662,6 +681,8 @@ typedef struct UserDef_Experimental {
   (((userdef)->flag & USER_DEVELOPER_UI) && ((userdef)->experimental).member)
 
 typedef struct UserDef {
+  DNA_DEFINE_CXX_METHODS(UserDef)
+
   /** UserDef has separate do-version handling, and can be read from other files. */
   int versionfile, subversionfile;
 
@@ -686,7 +707,7 @@ typedef struct UserDef {
   /**
    * Optional user location for scripts.
    *
-   * This supports the same layout as Blender's scripts directory `release/scripts`.
+   * This supports the same layout as Blender's scripts directory `scripts`.
    *
    * \note Unlike most paths, changing this is not fully supported at run-time,
    * requiring a restart to properly take effect. Supporting this would cause complications as
@@ -741,10 +762,10 @@ typedef struct UserDef {
   int ui_line_width;
   /** Runtime, full DPI divided by `pixelsize`. */
   int dpi;
-  /** Runtime, multiplier to scale UI elements based on DPI (fractional). */
-  float dpi_fac;
-  /** Runtime, `1.0 / dpi_fac` */
-  float inv_dpi_fac;
+  /** Runtime multiplier to scale UI elements. Use macro UI_SCALE_FAC instead of this. */
+  float scale_factor;
+  /** Runtime, `1.0 / scale_factor` */
+  float inv_scale_factor;
   /** Runtime, calculated from line-width and point-size based on DPI (rounded to int). */
   float pixelsize;
   /** Deprecated, for forward compatibility. */
@@ -777,8 +798,10 @@ typedef struct UserDef {
 
   char keyconfigstr[64];
 
+  /** Index of the asset library being edited in the Preferences UI. */
+  short active_asset_library;
+
   short undosteps;
-  char _pad1[2];
   int undomemory;
   float gpu_viewport_quality DNA_DEPRECATED;
   short gp_manhattandist, gp_euclideandist, gp_eraser;
@@ -829,7 +852,10 @@ typedef struct UserDef {
   /** Seconds to zoom around current frame. */
   float view_frame_seconds;
 
-  char _pad7[6];
+  /** #eGPUBackendType */
+  short gpu_backend;
+
+  char _pad7[4];
 
   /** Private, defaults to 20 for 72 DPI setting. */
   short widget_unit;
@@ -955,7 +981,7 @@ extern UserDef U;
 /* ***************** USERDEF ****************** */
 
 /* Toggles for unfinished 2.8 UserPref design. */
-//#define WITH_USERDEF_WORKSPACES
+// #define WITH_USERDEF_WORKSPACES
 
 /** #UserDef_SpaceData.section_active (UI active_section) */
 typedef enum eUserPref_Section {
@@ -1209,6 +1235,8 @@ typedef enum eAutokey_Flag {
  */
 typedef enum eUserpref_Anim_Flags {
   USER_ANIM_SHOW_CHANNEL_GROUP_COLORS = (1 << 0),
+  USER_ANIM_ONLY_SHOW_SELECTED_CURVE_KEYS = (1 << 1),
+  USER_ANIM_HIGH_QUALITY_DRAWING = (1 << 2),
 } eUserpref_Anim_Flags;
 
 /** #UserDef.transopts */

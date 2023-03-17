@@ -10,12 +10,12 @@
 #include "BKE_customdata.h"
 #include "BKE_main.h"
 #include "BKE_material.h"
-#include "BKE_mesh.h"
+#include "BKE_mesh.hh"
 #include "BKE_object.h"
 
 #include "BLI_math.h"
 #include "BLI_math_geom.h"
-#include "BLI_math_vec_types.hh"
+#include "BLI_math_vector_types.hh"
 #include "BLI_span.hh"
 #include "BLI_string.h"
 
@@ -49,20 +49,6 @@ static const pxr::TfToken normalsPrimvar("normals", pxr::TfToken::Immortal);
 }  // namespace usdtokens
 
 namespace utils {
-/* Very similar to #blender::io::alembic::utils. */
-static void build_mat_map(const Main *bmain, std::map<std::string, Material *> *r_mat_map)
-{
-  if (r_mat_map == nullptr) {
-    return;
-  }
-
-  Material *material = static_cast<Material *>(bmain->materials.first);
-
-  for (; material; material = static_cast<Material *>(material->id.next)) {
-    /* We have to do this because the stored material name is coming directly from USD. */
-    (*r_mat_map)[pxr::TfMakeValidIdentifier(material->id.name + 2)] = material;
-  }
-}
 
 static pxr::UsdShadeMaterial compute_bound_material(const pxr::UsdPrim &prim)
 {
@@ -82,42 +68,6 @@ static pxr::UsdShadeMaterial compute_bound_material(const pxr::UsdPrim &prim)
   }
 
   return mtl;
-}
-
-/* Returns an existing Blender material that corresponds to the USD material with the given path.
- * Returns null if no such material exists. */
-static Material *find_existing_material(
-    const pxr::SdfPath &usd_mat_path,
-    const USDImportParams &params,
-    const std::map<std::string, Material *> &mat_map,
-    const std::map<std::string, std::string> &usd_path_to_mat_name)
-{
-  if (params.mtl_name_collision_mode == USD_MTL_NAME_COLLISION_MAKE_UNIQUE) {
-    /* Check if we've already created the Blender material with a modified name. */
-    std::map<std::string, std::string>::const_iterator path_to_name_iter =
-        usd_path_to_mat_name.find(usd_mat_path.GetAsString());
-
-    if (path_to_name_iter != usd_path_to_mat_name.end()) {
-      std::string mat_name = path_to_name_iter->second;
-      std::map<std::string, Material *>::const_iterator mat_iter = mat_map.find(mat_name);
-      if (mat_iter != mat_map.end()) {
-        return mat_iter->second;
-      }
-      /* We can't find the Blender material which was previously created for this USD
-       * material, which should never happen. */
-      BLI_assert_unreachable();
-    }
-  }
-  else {
-    std::string mat_name = usd_mat_path.GetName();
-    std::map<std::string, Material *>::const_iterator mat_iter = mat_map.find(mat_name);
-
-    if (mat_iter != mat_map.end()) {
-      return mat_iter->second;
-    }
-  }
-
-  return nullptr;
 }
 
 static void assign_materials(Main *bmain,
@@ -142,7 +92,7 @@ static void assign_materials(Main *bmain,
        it != mat_index_map.end();
        ++it) {
 
-    Material *assigned_mat = find_existing_material(
+    Material *assigned_mat = blender::io::usd::find_existing_material(
         it->first, params, mat_name_to_mat, usd_path_to_mat_name);
     if (!assigned_mat) {
       /* Blender material doesn't exist, so create it now. */
@@ -199,12 +149,12 @@ static void *add_customdata_cb(Mesh *mesh, const char *name, const int data_type
   int numloops;
 
   /* unsupported custom data type -- don't do anything. */
-  if (!ELEM(cd_data_type, CD_MLOOPUV, CD_PROP_BYTE_COLOR)) {
+  if (!ELEM(cd_data_type, CD_PROP_FLOAT2, CD_PROP_BYTE_COLOR)) {
     return nullptr;
   }
 
   loopdata = &mesh->ldata;
-  cd_ptr = CustomData_get_layer_named(loopdata, cd_data_type, name);
+  cd_ptr = CustomData_get_layer_named_for_write(loopdata, cd_data_type, name, mesh->totloop);
   if (cd_ptr != nullptr) {
     /* layer already exists, so just return it. */
     return cd_ptr;
@@ -212,8 +162,7 @@ static void *add_customdata_cb(Mesh *mesh, const char *name, const int data_type
 
   /* Create a new layer. */
   numloops = mesh->totloop;
-  cd_ptr = CustomData_add_layer_named(
-      loopdata, cd_data_type, CD_SET_DEFAULT, nullptr, numloops, name);
+  cd_ptr = CustomData_add_layer_named(loopdata, cd_data_type, CD_SET_DEFAULT, numloops, name);
   return cd_ptr;
 }
 
@@ -244,8 +193,10 @@ void USDMeshReader::read_object_data(Main *bmain, const double motionSampleTime)
   Mesh *mesh = (Mesh *)object_->data;
 
   is_initial_load_ = true;
-  Mesh *read_mesh = this->read_mesh(
-      mesh, motionSampleTime, import_params_.mesh_read_flag, nullptr);
+  const USDMeshReadParams params = create_mesh_read_params(motionSampleTime,
+                                                           import_params_.mesh_read_flag);
+
+  Mesh *read_mesh = this->read_mesh(mesh, params, nullptr);
 
   is_initial_load_ = false;
   if (read_mesh != mesh) {
@@ -272,7 +223,7 @@ void USDMeshReader::read_object_data(Main *bmain, const double motionSampleTime)
   }
 
   USDXformReader::read_object_data(bmain, motionSampleTime);
-}
+}  // namespace blender::io::usd
 
 bool USDMeshReader::valid() const
 {
@@ -325,7 +276,6 @@ void USDMeshReader::read_mpolys(Mesh *mesh)
 
     /* Polygons are always assumed to be smooth-shaded. If the mesh should be flat-shaded,
      * this is encoded in custom loop normals. */
-    poly.flag |= ME_SMOOTH;
 
     if (is_left_handed_) {
       int loop_end_index = loop_index + (face_size - 1);
@@ -364,7 +314,7 @@ void USDMeshReader::read_uvs(Mesh *mesh, const double motionSampleTime, const bo
     for (int layer_idx = 0; layer_idx < ldata->totlayer; layer_idx++) {
       const CustomDataLayer *layer = &ldata->layers[layer_idx];
       std::string layer_name = std::string(layer->name);
-      if (layer->type != CD_MLOOPUV) {
+      if (layer->type != CD_PROP_FLOAT2) {
         continue;
       }
 
@@ -411,7 +361,7 @@ void USDMeshReader::read_uvs(Mesh *mesh, const double motionSampleTime, const bo
 
       for (int layer_idx = 0; layer_idx < ldata->totlayer; layer_idx++) {
         const CustomDataLayer *layer = &ldata->layers[layer_idx];
-        if (layer->type != CD_MLOOPUV) {
+        if (layer->type != CD_PROP_FLOAT2) {
           continue;
         }
 
@@ -446,15 +396,15 @@ void USDMeshReader::read_uvs(Mesh *mesh, const double motionSampleTime, const bo
           continue;
         }
 
-        MLoopUV *mloopuv = static_cast<MLoopUV *>(layer->data);
+        float2 *mloopuv = static_cast<float2 *>(layer->data);
         if (is_left_handed_) {
           uv_index = rev_loop_index;
         }
         else {
           uv_index = loop_index;
         }
-        mloopuv[uv_index].uv[0] = sample.uvs[usd_uv_index][0];
-        mloopuv[uv_index].uv[1] = sample.uvs[usd_uv_index][1];
+        mloopuv[uv_index][0] = sample.uvs[usd_uv_index][0];
+        mloopuv[uv_index][1] = sample.uvs[usd_uv_index][1];
       }
     }
   }
@@ -581,7 +531,7 @@ void USDMeshReader::read_vertex_creases(Mesh *mesh, const double motionSampleTim
   }
 
   float *creases = static_cast<float *>(
-      CustomData_add_layer(&mesh->vdata, CD_CREASE, CD_SET_DEFAULT, nullptr, mesh->totvert));
+      CustomData_add_layer(&mesh->vdata, CD_CREASE, CD_SET_DEFAULT, mesh->totvert));
 
   for (size_t i = 0; i < corner_indices.size(); i++) {
     creases[corner_indices[i]] = corner_sharpnesses[i];
@@ -604,23 +554,21 @@ void USDMeshReader::process_normals_vertex_varying(Mesh *mesh)
     return;
   }
 
-  MutableSpan vert_normals{(float3 *)BKE_mesh_vertex_normals_for_write(mesh), mesh->totvert};
+  MutableSpan vert_normals{(float3 *)BKE_mesh_vert_normals_for_write(mesh), mesh->totvert};
   BLI_STATIC_ASSERT(sizeof(normals_[0]) == sizeof(float3), "Expected float3 normals size");
   vert_normals.copy_from({(float3 *)normals_.data(), int64_t(normals_.size())});
-  BKE_mesh_vertex_normals_clear_dirty(mesh);
+  BKE_mesh_vert_normals_clear_dirty(mesh);
 }
 
 void USDMeshReader::process_normals_face_varying(Mesh *mesh)
 {
   if (normals_.empty()) {
-    BKE_mesh_normals_tag_dirty(mesh);
     return;
   }
 
   /* Check for normals count mismatches to prevent crashes. */
   if (normals_.size() != mesh->totloop) {
     std::cerr << "WARNING: loop normal count mismatch for mesh " << mesh->id.name << std::endl;
-    BKE_mesh_normals_tag_dirty(mesh);
     return;
   }
 
@@ -658,14 +606,12 @@ void USDMeshReader::process_normals_face_varying(Mesh *mesh)
 void USDMeshReader::process_normals_uniform(Mesh *mesh)
 {
   if (normals_.empty()) {
-    BKE_mesh_normals_tag_dirty(mesh);
     return;
   }
 
   /* Check for normals count mismatches to prevent crashes. */
   if (normals_.size() != mesh->totpoly) {
     std::cerr << "WARNING: uniform normal count mismatch for mesh " << mesh->id.name << std::endl;
-    BKE_mesh_normals_tag_dirty(mesh);
     return;
   }
 
@@ -699,13 +645,11 @@ void USDMeshReader::read_mesh_sample(ImportSettings *settings,
    * in code that expect this data to be there. */
 
   if (new_mesh || (settings->read_flag & MOD_MESHSEQ_READ_VERT) != 0) {
-    MutableSpan<MVert> verts = mesh->verts_for_write();
+    MutableSpan<float3> vert_positions = mesh->vert_positions_for_write();
     for (int i = 0; i < positions_.size(); i++) {
-      MVert &mvert = verts[i];
-      mvert.co[0] = positions_[i][0];
-      mvert.co[1] = positions_[i][1];
-      mvert.co[2] = positions_[i][2];
+      vert_positions[i] = {positions_[i][0], positions_[i][1], positions_[i][2]};
     }
+    BKE_mesh_tag_positions_changed(mesh);
 
     read_vertex_creases(mesh, motionSampleTime);
   }
@@ -717,10 +661,6 @@ void USDMeshReader::read_mesh_sample(ImportSettings *settings,
     }
     else if (normal_interpolation_ == pxr::UsdGeomTokens->uniform) {
       process_normals_uniform(mesh);
-    }
-    else {
-      /* Default */
-      BKE_mesh_normals_tag_dirty(mesh);
     }
   }
 
@@ -815,7 +755,7 @@ void USDMeshReader::readFaceSetsSample(Main *bmain, Mesh *mesh, const double mot
   material_indices.finish();
   /* Build material name map if it's not built yet. */
   if (this->settings_->mat_name_to_mat.empty()) {
-    utils::build_mat_map(bmain, &this->settings_->mat_name_to_mat);
+    build_material_map(bmain, &this->settings_->mat_name_to_mat);
   }
   utils::assign_materials(bmain,
                           object_,
@@ -827,8 +767,7 @@ void USDMeshReader::readFaceSetsSample(Main *bmain, Mesh *mesh, const double mot
 }
 
 Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
-                               const double motionSampleTime,
-                               const int read_flag,
+                               const USDMeshReadParams params,
                                const char ** /* err_str */)
 {
   if (!mesh_prim_) {
@@ -845,7 +784,7 @@ Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
   std::vector<pxr::TfToken> uv_tokens;
 
   /* Currently we only handle UV primvars. */
-  if (read_flag & MOD_MESHSEQ_READ_UV) {
+  if (params.read_flags & MOD_MESHSEQ_READ_UV) {
 
     std::vector<pxr::UsdGeomPrimvar> primvars = primvarsAPI.GetPrimvars();
 
@@ -898,19 +837,20 @@ Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
    * the topology is consistent, as in the Alembic importer. */
 
   ImportSettings settings;
-  settings.read_flag |= read_flag;
+  settings.read_flag |= params.read_flags;
 
-  if (topology_changed(existing_mesh, motionSampleTime)) {
+  if (topology_changed(existing_mesh, params.motion_sample_time)) {
     new_mesh = true;
     active_mesh = BKE_mesh_new_nomain_from_template(
-        existing_mesh, positions_.size(), 0, 0, face_indices_.size(), face_counts_.size());
+        existing_mesh, positions_.size(), 0, face_indices_.size(), face_counts_.size());
 
     for (pxr::TfToken token : uv_tokens) {
-      add_customdata_cb(active_mesh, token.GetText(), CD_MLOOPUV);
+      add_customdata_cb(active_mesh, token.GetText(), CD_PROP_FLOAT2);
     }
   }
 
-  read_mesh_sample(&settings, active_mesh, motionSampleTime, new_mesh || is_initial_load_);
+  read_mesh_sample(
+      &settings, active_mesh, params.motion_sample_time, new_mesh || is_initial_load_);
 
   if (new_mesh) {
     /* Here we assume that the number of materials doesn't change, i.e. that
@@ -922,7 +862,8 @@ Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
       bke::MutableAttributeAccessor attributes = active_mesh->attributes_for_write();
       bke::SpanAttributeWriter<int> material_indices =
           attributes.lookup_or_add_for_write_span<int>("material_index", ATTR_DOMAIN_FACE);
-      assign_facesets_to_material_indices(motionSampleTime, material_indices.span, &mat_map);
+      assign_facesets_to_material_indices(
+          params.motion_sample_time, material_indices.span, &mat_map);
       material_indices.finish();
     }
   }

@@ -33,8 +33,8 @@ AssetMetaData *BKE_asset_metadata_create()
 
 void BKE_asset_metadata_free(AssetMetaData **asset_data)
 {
-  (*asset_data)->~AssetMetaData();
-  MEM_SAFE_FREE(*asset_data);
+  MEM_delete(*asset_data);
+  *asset_data = nullptr;
 }
 
 AssetMetaData::~AssetMetaData()
@@ -44,14 +44,9 @@ AssetMetaData::~AssetMetaData()
   }
   MEM_SAFE_FREE(author);
   MEM_SAFE_FREE(description);
+  MEM_SAFE_FREE(copyright);
+  MEM_SAFE_FREE(license);
   BLI_freelistN(&tags);
-}
-
-std::unique_ptr<AssetMetaData> BKE_asset_metadata_move_to_unique_ptr(AssetMetaData *asset_data)
-{
-  std::unique_ptr unique_asset_data = std::make_unique<AssetMetaData>(*asset_data);
-  *asset_data = *DNA_struct_default_get(AssetMetaData);
-  return unique_asset_data;
 }
 
 static AssetTag *asset_metadata_tag_add(AssetMetaData *asset_data, const char *const name)
@@ -168,13 +163,19 @@ void BKE_asset_metadata_write(BlendWriter *writer, AssetMetaData *asset_data)
   if (asset_data->properties) {
     IDP_BlendWrite(writer, asset_data->properties);
   }
-
   if (asset_data->author) {
     BLO_write_string(writer, asset_data->author);
   }
   if (asset_data->description) {
     BLO_write_string(writer, asset_data->description);
   }
+  if (asset_data->copyright) {
+    BLO_write_string(writer, asset_data->copyright);
+  }
+  if (asset_data->license) {
+    BLO_write_string(writer, asset_data->license);
+  }
+
   LISTBASE_FOREACH (AssetTag *, tag, &asset_data->tags) {
     BLO_write_struct(writer, AssetTag, tag);
   }
@@ -192,6 +193,8 @@ void BKE_asset_metadata_read(BlendDataReader *reader, AssetMetaData *asset_data)
 
   BLO_read_data_address(reader, &asset_data->author);
   BLO_read_data_address(reader, &asset_data->description);
+  BLO_read_data_address(reader, &asset_data->copyright);
+  BLO_read_data_address(reader, &asset_data->license);
   BLO_read_list(reader, &asset_data->tags);
   BLI_assert(BLI_listbase_count(&asset_data->tags) == asset_data->tot_tags);
 }

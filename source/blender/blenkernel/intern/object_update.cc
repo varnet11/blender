@@ -8,7 +8,7 @@
 #include "DNA_anim_types.h"
 #include "DNA_collection_types.h"
 #include "DNA_constraint_types.h"
-#include "DNA_gpencil_types.h"
+#include "DNA_gpencil_legacy_types.h"
 #include "DNA_key_types.h"
 #include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
@@ -29,8 +29,8 @@
 #include "BKE_displist.h"
 #include "BKE_editmesh.h"
 #include "BKE_effect.h"
-#include "BKE_gpencil.h"
-#include "BKE_gpencil_modifier.h"
+#include "BKE_gpencil_legacy.h"
+#include "BKE_gpencil_modifier_legacy.h"
 #include "BKE_image.h"
 #include "BKE_key.h"
 #include "BKE_lattice.h"
@@ -38,7 +38,7 @@
 #include "BKE_light.h"
 #include "BKE_material.h"
 #include "BKE_mball.h"
-#include "BKE_mesh.h"
+#include "BKE_mesh.hh"
 #include "BKE_object.h"
 #include "BKE_particle.h"
 #include "BKE_pointcache.h"
@@ -141,25 +141,23 @@ void BKE_object_handle_data_update(Depsgraph *depsgraph, Scene *scene, Object *o
       CustomData_MeshMasks cddata_masks = scene->customdata_mask;
       CustomData_MeshMasks_update(&cddata_masks, &CD_MASK_BAREMESH);
       /* Custom attributes should not be removed automatically. They might be used by the render
-       * engine or scripts. They can still be removed explicitly using geometry nodes.
-       * Crease can be be used in generic situations with geometry nodes as well. */
-      cddata_masks.vmask |= CD_MASK_PROP_ALL | CD_MASK_CREASE;
+       * engine or scripts. They can still be removed explicitly using geometry nodes. Crease and
+       * vertex groups can be used in arbitrary situations with geometry nodes as well. */
+      cddata_masks.vmask |= CD_MASK_PROP_ALL | CD_MASK_CREASE | CD_MASK_MDEFORMVERT;
       cddata_masks.emask |= CD_MASK_PROP_ALL | CD_MASK_CREASE;
       cddata_masks.fmask |= CD_MASK_PROP_ALL;
       cddata_masks.pmask |= CD_MASK_PROP_ALL;
       cddata_masks.lmask |= CD_MASK_PROP_ALL;
 
-      /* Make sure Freestyle edge/face marks appear in DM for render (see T40315).
+      /* Make sure Freestyle edge/face marks appear in DM for render (see #40315).
        * Due to Line Art implementation, edge marks should also be shown in viewport. */
 #ifdef WITH_FREESTYLE
       cddata_masks.emask |= CD_MASK_FREESTYLE_EDGE;
       cddata_masks.pmask |= CD_MASK_FREESTYLE_FACE;
-      cddata_masks.vmask |= CD_MASK_MDEFORMVERT;
 #endif
       if (DEG_get_mode(depsgraph) == DAG_EVAL_RENDER) {
         /* Always compute UVs, vertex colors as orcos for render. */
-        cddata_masks.lmask |= CD_MASK_MLOOPUV | CD_MASK_PROP_BYTE_COLOR;
-        cddata_masks.vmask |= CD_MASK_ORCO | CD_MASK_PROP_COLOR;
+        cddata_masks.vmask |= CD_MASK_ORCO;
       }
       makeDerivedMesh(depsgraph, scene, ob, &cddata_masks); /* was CD_MASK_BAREMESH */
       break;
@@ -183,7 +181,7 @@ void BKE_object_handle_data_update(Depsgraph *depsgraph, Scene *scene, Object *o
     case OB_LATTICE:
       BKE_lattice_modifiers_calc(depsgraph, scene, ob);
       break;
-    case OB_GPENCIL: {
+    case OB_GPENCIL_LEGACY: {
       BKE_gpencil_prepare_eval_data(depsgraph, scene, ob);
       BKE_gpencil_modifiers_calc(depsgraph, scene, ob);
       BKE_gpencil_update_layer_transforms(depsgraph, ob);
@@ -305,7 +303,7 @@ void BKE_object_batch_cache_dirty_tag(Object *ob)
       }
       break;
     }
-    case OB_GPENCIL:
+    case OB_GPENCIL_LEGACY:
       BKE_gpencil_batch_cache_dirty_tag((struct bGPdata *)ob->data);
       break;
     case OB_CURVES:

@@ -15,7 +15,7 @@
 #include "BKE_curve.h"
 #include "BKE_global.h"
 #include "BKE_mball.h"
-#include "BKE_mesh.h"
+#include "BKE_mesh.hh"
 #include "BKE_modifier.h"
 #include "BKE_movieclip.h"
 #include "BKE_object.h"
@@ -27,6 +27,7 @@
 #include "DNA_constraint_types.h"
 #include "DNA_curve_types.h"
 #include "DNA_fluid_types.h"
+#include "DNA_gpencil_modifier_types.h"
 #include "DNA_lightprobe_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meta_types.h"
@@ -122,6 +123,9 @@ void OVERLAY_extra_cache_init(OVERLAY_Data *vedata)
       cb->field_tube_limit = BUF_INSTANCE(grp_sub, format, DRW_cache_field_tube_limit_get());
       cb->field_vortex = BUF_INSTANCE(grp_sub, format, DRW_cache_field_vortex_get());
       cb->field_wind = BUF_INSTANCE(grp_sub, format, DRW_cache_field_wind_get());
+      cb->light_icon_inner = BUF_INSTANCE(grp_sub, format, DRW_cache_light_icon_inner_lines_get());
+      cb->light_icon_outer = BUF_INSTANCE(grp_sub, format, DRW_cache_light_icon_outer_lines_get());
+      cb->light_icon_sun_rays = BUF_INSTANCE(grp_sub, format, DRW_cache_light_icon_sun_rays_get());
       cb->light_area[0] = BUF_INSTANCE(grp_sub, format, DRW_cache_light_area_disk_lines_get());
       cb->light_area[1] = BUF_INSTANCE(grp_sub, format, DRW_cache_light_area_square_lines_get());
       cb->light_point = BUF_INSTANCE(grp_sub, format, DRW_cache_light_point_lines_get());
@@ -459,14 +463,14 @@ static void OVERLAY_texture_space(OVERLAY_ExtraCallBuffers *cb, Object *ob, cons
     case ID_CU_LEGACY: {
       Curve *cu = (Curve *)ob_data;
       BKE_curve_texspace_ensure(cu);
-      texcoloc = cu->loc;
-      texcosize = cu->size;
+      texcoloc = cu->texspace_location;
+      texcosize = cu->texspace_size;
       break;
     }
     case ID_MB: {
       MetaBall *mb = (MetaBall *)ob_data;
-      texcoloc = mb->loc;
-      texcosize = mb->size;
+      texcoloc = mb->texspace_location;
+      texcosize = mb->texspace_size;
       break;
     }
     case ID_CV:
@@ -604,8 +608,9 @@ void OVERLAY_light_cache_populate(OVERLAY_Data *vedata, Object *ob)
   Light *la = static_cast<Light *>(ob->data);
   float *color_p;
   DRW_object_wire_theme_get(ob, view_layer, &color_p);
+
   /* Remove the alpha. */
-  float color[4] = {UNPACK3(color_p), 1.0f};
+  float theme_color[4] = {UNPACK3(color_p), 1.0f};
   /* Pack render data into object matrix. */
   union {
     float mat[4][4];
@@ -635,33 +640,49 @@ void OVERLAY_light_cache_populate(OVERLAY_Data *vedata, Object *ob)
 
   DRW_buffer_add_entry(cb->groundline, instdata.pos);
 
+  float light_color[4] = {1.0f};
+  const bool show_light_colors = vedata->stl->pd->overlay.flag & V3D_OVERLAY_SHOW_LIGHT_COLORS;
+  if (show_light_colors) {
+    copy_v3_v3(light_color, &la->r);
+  }
+
+  /* Draw the outer ring of the light icon and the sun rays in `light_color`, if required. */
+  DRW_buffer_add_entry(
+      cb->light_icon_outer, show_light_colors ? light_color : theme_color, &instdata);
+  DRW_buffer_add_entry(cb->light_icon_inner, theme_color, &instdata);
+
   if (la->type == LA_LOCAL) {
-    instdata.area_size_x = instdata.area_size_y = la->area_size;
-    DRW_buffer_add_entry(cb->light_point, color, &instdata);
+    instdata.area_size_x = instdata.area_size_y = la->radius;
+    DRW_buffer_add_entry(cb->light_point, theme_color, &instdata);
   }
   else if (la->type == LA_SUN) {
-    DRW_buffer_add_entry(cb->light_sun, color, &instdata);
+    DRW_buffer_add_entry(cb->light_sun, theme_color, &instdata);
+    DRW_buffer_add_entry(
+        cb->light_icon_sun_rays, show_light_colors ? light_color : theme_color, &instdata);
   }
   else if (la->type == LA_SPOT) {
-    /* Previous implementation was using the clipend distance as cone size.
-     * We cannot do this anymore so we use a fixed size of 10. (see T72871) */
+    /* Previous implementation was using the clip-end distance as cone size.
+     * We cannot do this anymore so we use a fixed size of 10. (see #72871) */
     const float3 scale_vec = {10.0f, 10.0f, 10.0f};
     rescale_m4(instdata.mat, scale_vec);
-    /* For cycles and eevee the spot attenuation is
-     * y = (1/(1 + x^2) - a)/((1 - a) b)
+    /* For cycles and EEVEE the spot attenuation is:
+     * `y = (1/sqrt(1 + x^2) - a)/((1 - a) b)`
+     * x being the tangent of the angle between the light direction and the generatrix of the cone.
      * We solve the case where spot attenuation y = 1 and y = 0
-     * root for y = 1 is  (-1 - c) / c
-     * root for y = 0 is  (1 - a) / a
+     * root for y = 1 is sqrt(1/c^2 - 1)
+     * root for y = 0 is sqrt(1/a^2 - 1)
      * and use that to position the blend circle. */
     float a = cosf(la->spotsize * 0.5f);
     float b = la->spotblend;
     float c = a * b - a - b;
+    float a2 = a * a;
+    float c2 = c * c;
     /* Optimized version or root1 / root0 */
-    instdata.spot_blend = sqrtf((-a - c * a) / (c - c * a));
+    instdata.spot_blend = sqrtf((a2 - a2 * c2) / (c2 - a2 * c2));
     instdata.spot_cosine = a;
     /* HACK: We pack the area size in alpha color. This is decoded by the shader. */
-    color[3] = -max_ff(la->area_size, FLT_MIN);
-    DRW_buffer_add_entry(cb->light_spot, color, &instdata);
+    theme_color[3] = -max_ff(la->radius, FLT_MIN);
+    DRW_buffer_add_entry(cb->light_spot, theme_color, &instdata);
 
     if ((la->mode & LA_SHOW_CONE) && !DRW_state_is_select()) {
       const float color_inside[4] = {0.0f, 0.0f, 0.0f, 0.5f};
@@ -675,7 +696,7 @@ void OVERLAY_light_cache_populate(OVERLAY_Data *vedata, Object *ob)
     int sqr = ELEM(la->area_shape, LA_AREA_SQUARE, LA_AREA_RECT);
     instdata.area_size_x = la->area_size;
     instdata.area_size_y = uniform_scale ? la->area_size : la->area_sizey;
-    DRW_buffer_add_entry(cb->light_area[sqr], color, &instdata);
+    DRW_buffer_add_entry(cb->light_area[sqr], theme_color, &instdata);
   }
 }
 
@@ -859,7 +880,7 @@ static void camera_view3d_reconstruction(
                                ((v3d->shading.type != OB_SOLID) || !XRAY_FLAG_ENABLED(v3d));
 
   MovieTracking *tracking = &clip->tracking;
-  /* Index must start in 1, to mimic BKE_tracking_track_get_indexed. */
+  /* Index must start in 1, to mimic BKE_tracking_track_get_for_selection_index. */
   int track_index = 1;
 
   float bundle_color_custom[3];
@@ -893,8 +914,7 @@ static void camera_view3d_reconstruction(
       mul_m4_m4m4(tracking_object_mat, ob->object_to_world, object_imat);
     }
 
-    ListBase *tracksbase = BKE_tracking_object_get_tracks(tracking, tracking_object);
-    LISTBASE_FOREACH (MovieTrackingTrack *, track, tracksbase) {
+    LISTBASE_FOREACH (MovieTrackingTrack *, track, &tracking_object->tracks) {
       if ((track->flag & TRACK_HAS_BUNDLE) == 0) {
         continue;
       }
@@ -961,11 +981,10 @@ static void camera_view3d_reconstruction(
 
     if ((v3d->flag2 & V3D_SHOW_CAMERAPATH) && (tracking_object->flag & TRACKING_OBJECT_CAMERA) &&
         !is_select) {
-      MovieTrackingReconstruction *reconstruction;
-      reconstruction = BKE_tracking_object_get_reconstruction(tracking, tracking_object);
+      const MovieTrackingReconstruction *reconstruction = &tracking_object->reconstruction;
 
       if (reconstruction->camnr) {
-        MovieReconstructedCamera *camera = reconstruction->cameras;
+        const MovieReconstructedCamera *camera = reconstruction->cameras;
         float v0[3], v1[3];
         for (int a = 0; a < reconstruction->camnr; a++, camera++) {
           copy_v3_v3(v0, v1);
@@ -1273,6 +1292,20 @@ static void OVERLAY_relationship_lines(OVERLAY_ExtraCallBuffers *cb,
       OVERLAY_extra_point(cb, center, relation_color);
     }
   }
+  for (GpencilModifierData *md =
+           static_cast<GpencilModifierData *>(ob->greasepencil_modifiers.first);
+       md;
+       md = md->next) {
+    if (md->type == eGpencilModifierType_Hook) {
+      HookGpencilModifierData *hmd = (HookGpencilModifierData *)md;
+      float center[3];
+      mul_v3_m4v3(center, ob->object_to_world, hmd->cent);
+      if (hmd->object) {
+        OVERLAY_extra_line_dashed(cb, hmd->object->object_to_world[3], center, relation_color);
+      }
+      OVERLAY_extra_point(cb, center, relation_color);
+    }
+  }
 
   if (ob->rigidbody_constraint) {
     Object *rbc_ob1 = ob->rigidbody_constraint->ob1;
@@ -1539,11 +1572,12 @@ void OVERLAY_extra_cache_populate(OVERLAY_Data *vedata, Object *ob)
 
   const bool is_select_mode = DRW_state_is_select();
   const bool is_paint_mode = (draw_ctx->object_mode &
-                              (OB_MODE_ALL_PAINT | OB_MODE_ALL_PAINT_GPENCIL)) != 0;
+                              (OB_MODE_ALL_PAINT | OB_MODE_ALL_PAINT_GPENCIL |
+                               OB_MODE_SCULPT_CURVES)) != 0;
   const bool from_dupli = (ob->base_flag & (BASE_FROM_SET | BASE_FROM_DUPLI)) != 0;
   const bool has_bounds = !ELEM(ob->type, OB_LAMP, OB_CAMERA, OB_EMPTY, OB_SPEAKER, OB_LIGHTPROBE);
   const bool has_texspace = has_bounds &&
-                            !ELEM(ob->type, OB_EMPTY, OB_LATTICE, OB_ARMATURE, OB_GPENCIL);
+                            !ELEM(ob->type, OB_EMPTY, OB_LATTICE, OB_ARMATURE, OB_GPENCIL_LEGACY);
 
   const bool draw_relations = ((pd->v3d_flag & V3D_HIDE_HELPLINES) == 0) && !is_select_mode;
   const bool draw_obcenters = !is_paint_mode &&

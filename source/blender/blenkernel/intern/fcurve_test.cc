@@ -34,7 +34,7 @@ TEST(evaluate_fcurve, OnKeys)
   EXPECT_NEAR(evaluate_fcurve(fcu, 2.0f), 13.0f, EPSILON); /* hits 'between' function */
   EXPECT_NEAR(evaluate_fcurve(fcu, 3.0f), 19.0f, EPSILON); /* hits 'on or after last' function */
 
-  /* Also test within a specific time epsilon of the keys, as this was an issue in T39207.
+  /* Also test within a specific time epsilon of the keys, as this was an issue in #39207.
    * This epsilon is just slightly smaller than the epsilon given to
    * BKE_fcurve_bezt_binarysearch_index_ex() in fcurve_eval_between_keyframes(), so it should hit
    * the "exact" code path. */
@@ -342,6 +342,206 @@ TEST(BKE_fcurve, BKE_fcurve_keyframe_move_value_with_handles)
 
   EXPECT_FLOAT_EQ(fcu->bezt[1].vec[2][0], 10.342469f) << "Right handle should not move in time";
   EXPECT_FLOAT_EQ(fcu->bezt[1].vec[2][1], 47.0f) << "Right handle value should have been updated";
+
+  BKE_fcurve_free(fcu);
+}
+
+TEST(BKE_fcurve, BKE_fcurve_calc_range)
+{
+  FCurve *fcu = BKE_fcurve_create();
+
+  insert_vert_fcurve(fcu, 1.0f, 7.5f, BEZT_KEYTYPE_KEYFRAME, INSERTKEY_NO_USERPREF);
+  insert_vert_fcurve(fcu, 4.0f, -15.0f, BEZT_KEYTYPE_KEYFRAME, INSERTKEY_NO_USERPREF);
+  insert_vert_fcurve(fcu, 8.0f, 15.0f, BEZT_KEYTYPE_KEYFRAME, INSERTKEY_NO_USERPREF);
+  insert_vert_fcurve(fcu, 14.0f, 8.2f, BEZT_KEYTYPE_KEYFRAME, INSERTKEY_NO_USERPREF);
+  insert_vert_fcurve(fcu, 18.2f, -20.0f, BEZT_KEYTYPE_KEYFRAME, INSERTKEY_NO_USERPREF);
+
+  for (int i = 0; i < fcu->totvert; i++) {
+    fcu->bezt[i].f1 &= ~SELECT;
+    fcu->bezt[i].f2 &= ~SELECT;
+    fcu->bezt[i].f3 &= ~SELECT;
+  }
+
+  float min, max;
+  bool success;
+
+  /* All keys. */
+  success = BKE_fcurve_calc_range(fcu, &min, &max, false);
+  EXPECT_TRUE(success) << "A non-empty FCurve should have a range.";
+  EXPECT_FLOAT_EQ(fcu->bezt[0].vec[1][0], min);
+  EXPECT_FLOAT_EQ(fcu->bezt[4].vec[1][0], max);
+
+  /* Only selected. */
+  success = BKE_fcurve_calc_range(fcu, &min, &max, true);
+  EXPECT_FALSE(success)
+      << "Using selected keyframes only should not find a range if nothing is selected.";
+
+  fcu->bezt[1].f2 |= SELECT;
+  fcu->bezt[3].f2 |= SELECT;
+
+  success = BKE_fcurve_calc_range(fcu, &min, &max, true);
+  EXPECT_TRUE(success) << "Range of selected keyframes should have been found.";
+  EXPECT_FLOAT_EQ(fcu->bezt[1].vec[1][0], min);
+  EXPECT_FLOAT_EQ(fcu->bezt[3].vec[1][0], max);
+
+  /* Curve samples. */
+  const int sample_start = 1;
+  const int sample_end = 20;
+  fcurve_store_samples(fcu, nullptr, sample_start, sample_end, fcurve_samplingcb_evalcurve);
+
+  success = BKE_fcurve_calc_range(fcu, &min, &max, true);
+  EXPECT_TRUE(success) << "FCurve samples should have a range.";
+
+  EXPECT_FLOAT_EQ(sample_start, min);
+  EXPECT_FLOAT_EQ(sample_end, max);
+
+  BKE_fcurve_free(fcu);
+}
+
+TEST(BKE_fcurve, BKE_fcurve_calc_bounds)
+{
+  FCurve *fcu = BKE_fcurve_create();
+
+  insert_vert_fcurve(fcu, 1.0f, 7.5f, BEZT_KEYTYPE_KEYFRAME, INSERTKEY_NO_USERPREF);
+  insert_vert_fcurve(fcu, 4.0f, -15.0f, BEZT_KEYTYPE_KEYFRAME, INSERTKEY_NO_USERPREF);
+  insert_vert_fcurve(fcu, 8.0f, 15.0f, BEZT_KEYTYPE_KEYFRAME, INSERTKEY_NO_USERPREF);
+  insert_vert_fcurve(fcu, 14.0f, 8.2f, BEZT_KEYTYPE_KEYFRAME, INSERTKEY_NO_USERPREF);
+  insert_vert_fcurve(fcu, 18.2f, -20.0f, BEZT_KEYTYPE_KEYFRAME, INSERTKEY_NO_USERPREF);
+
+  for (int i = 0; i < fcu->totvert; i++) {
+    fcu->bezt[i].f1 &= ~SELECT;
+    fcu->bezt[i].f2 &= ~SELECT;
+    fcu->bezt[i].f3 &= ~SELECT;
+  }
+
+  fcu->bezt[0].vec[0][0] = -5.0f;
+  fcu->bezt[4].vec[2][0] = 25.0f;
+
+  rctf bounds;
+  bool success;
+
+  /* All keys. */
+  success = BKE_fcurve_calc_bounds(fcu,
+                                   false /* select only */,
+                                   false /* include handles */,
+                                   nullptr /* frame range */,
+                                   &bounds);
+  EXPECT_TRUE(success) << "A non-empty FCurve should have bounds.";
+  EXPECT_FLOAT_EQ(fcu->bezt[0].vec[1][0], bounds.xmin);
+  EXPECT_FLOAT_EQ(fcu->bezt[4].vec[1][0], bounds.xmax);
+  EXPECT_FLOAT_EQ(fcu->bezt[4].vec[1][1], bounds.ymin);
+  EXPECT_FLOAT_EQ(fcu->bezt[2].vec[1][1], bounds.ymax);
+
+  /* Only selected. */
+  success = BKE_fcurve_calc_bounds(fcu,
+                                   true /* select only */,
+                                   false /* include handles */,
+                                   nullptr /* frame range */,
+                                   &bounds);
+  EXPECT_FALSE(success)
+      << "Using selected keyframes only should not find bounds if nothing is selected.";
+
+  fcu->bezt[1].f2 |= SELECT;
+  fcu->bezt[3].f2 |= SELECT;
+
+  success = BKE_fcurve_calc_bounds(fcu,
+                                   true /* select only */,
+                                   false /* include handles */,
+                                   nullptr /* frame range */,
+                                   &bounds);
+  EXPECT_TRUE(success) << "Selected keys should have been found.";
+  EXPECT_FLOAT_EQ(fcu->bezt[1].vec[1][0], bounds.xmin);
+  EXPECT_FLOAT_EQ(fcu->bezt[3].vec[1][0], bounds.xmax);
+  EXPECT_FLOAT_EQ(fcu->bezt[1].vec[1][1], bounds.ymin);
+  EXPECT_FLOAT_EQ(fcu->bezt[3].vec[1][1], bounds.ymax);
+
+  /* Including handles. */
+  success = BKE_fcurve_calc_bounds(fcu,
+                                   false /* select only */,
+                                   true /* include handles */,
+                                   nullptr /* frame range */,
+                                   &bounds);
+  EXPECT_TRUE(success) << "A non-empty FCurve should have bounds including handles.";
+  EXPECT_FLOAT_EQ(fcu->bezt[0].vec[0][0], bounds.xmin);
+  EXPECT_FLOAT_EQ(fcu->bezt[4].vec[2][0], bounds.xmax);
+  EXPECT_FLOAT_EQ(fcu->bezt[4].vec[1][1], bounds.ymin);
+  EXPECT_FLOAT_EQ(fcu->bezt[2].vec[1][1], bounds.ymax);
+
+  /* Range. */
+  float range[2];
+
+  range[0] = 25;
+  range[1] = 30;
+  success = BKE_fcurve_calc_bounds(
+      fcu, false /* select only */, false /* include handles */, range /* frame range */, &bounds);
+  EXPECT_FALSE(success) << "A frame range outside the range of keyframes should not find bounds.";
+
+  range[0] = 0;
+  range[1] = 18.2f;
+  success = BKE_fcurve_calc_bounds(
+      fcu, false /* select only */, false /* include handles */, range /* frame range */, &bounds);
+  EXPECT_TRUE(success) << "A frame range within the range of keyframes should find bounds.";
+  EXPECT_FLOAT_EQ(fcu->bezt[0].vec[1][0], bounds.xmin);
+  EXPECT_FLOAT_EQ(fcu->bezt[3].vec[1][0], bounds.xmax);
+  EXPECT_FLOAT_EQ(fcu->bezt[1].vec[1][1], bounds.ymin);
+  EXPECT_FLOAT_EQ(fcu->bezt[2].vec[1][1], bounds.ymax);
+
+  /* Range and handles. */
+  success = BKE_fcurve_calc_bounds(
+      fcu, false /* select only */, true /* include handles */, range /* frame range */, &bounds);
+  EXPECT_TRUE(success)
+      << "A frame range within the range of keyframes should find bounds with handles.";
+  EXPECT_FLOAT_EQ(fcu->bezt[0].vec[0][0], bounds.xmin);
+  EXPECT_FLOAT_EQ(fcu->bezt[3].vec[2][0], bounds.xmax);
+  EXPECT_FLOAT_EQ(fcu->bezt[1].vec[1][1], bounds.ymin);
+  EXPECT_FLOAT_EQ(fcu->bezt[2].vec[1][1], bounds.ymax);
+
+  /* Range, handles and only selection. */
+  range[0] = 8.0f;
+  range[1] = 18.2f;
+  success = BKE_fcurve_calc_bounds(
+      fcu, true /* select only */, true /* include handles */, range /* frame range */, &bounds);
+  EXPECT_TRUE(success)
+      << "A frame range within the range of keyframes should find bounds of selected keyframes.";
+  EXPECT_FLOAT_EQ(fcu->bezt[3].vec[0][0], bounds.xmin);
+  EXPECT_FLOAT_EQ(fcu->bezt[3].vec[2][0], bounds.xmax);
+  EXPECT_FLOAT_EQ(fcu->bezt[3].vec[2][1], bounds.ymin);
+  EXPECT_FLOAT_EQ(fcu->bezt[3].vec[0][1], bounds.ymax);
+
+  /* Curve samples. */
+  const int sample_start = 1;
+  const int sample_end = 20;
+  fcurve_store_samples(fcu, nullptr, sample_start, sample_end, fcurve_samplingcb_evalcurve);
+
+  success = BKE_fcurve_calc_bounds(fcu,
+                                   false /* select only */,
+                                   false /* include handles */,
+                                   nullptr /* frame range */,
+                                   &bounds);
+  EXPECT_TRUE(success) << "FCurve samples should have a range.";
+
+  EXPECT_FLOAT_EQ(sample_start, bounds.xmin);
+  EXPECT_FLOAT_EQ(sample_end, bounds.xmax);
+  EXPECT_FLOAT_EQ(-20.0f, bounds.ymin);
+  EXPECT_FLOAT_EQ(15.0f, bounds.ymax);
+
+  range[0] = 8.0f;
+  range[1] = 20.0f;
+  success = BKE_fcurve_calc_bounds(
+      fcu, false /* select only */, false /* include handles */, range /* frame range */, &bounds);
+  EXPECT_TRUE(success) << "FCurve samples should have a range.";
+
+  EXPECT_FLOAT_EQ(range[0], bounds.xmin);
+  EXPECT_FLOAT_EQ(range[1], bounds.xmax);
+  EXPECT_FLOAT_EQ(-20.0f, bounds.ymin);
+  EXPECT_FLOAT_EQ(15.0f, bounds.ymax);
+
+  range[0] = 20.1f;
+  range[1] = 30.0f;
+  success = BKE_fcurve_calc_bounds(
+      fcu, false /* select only */, false /* include handles */, range /* frame range */, &bounds);
+  EXPECT_FALSE(success)
+      << "A frame range outside the range of keyframe samples should not have bounds.";
 
   BKE_fcurve_free(fcu);
 }

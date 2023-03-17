@@ -11,6 +11,8 @@
 #include "BLI_math_base.h"
 #include "BLI_math_color.h"
 
+#include "BLT_translation.h"
+
 #include "BKE_context.h"
 #include "BKE_lib_id.h"
 #include "BKE_tracking.h"
@@ -31,7 +33,8 @@ namespace blender::nodes::node_composite_keyingscreen_cc {
 
 static void cmp_node_keyingscreen_declare(NodeDeclarationBuilder &b)
 {
-  b.add_output<decl::Color>(N_("Screen"));
+  b.add_output<decl::Color>(CTX_N_(BLT_I18NCONTEXT_ID_SCREEN, "Screen"))
+      .translation_context(BLT_I18NCONTEXT_ID_SCREEN);
 }
 
 static void node_composit_init_keyingscreen(const bContext *C, PointerRNA *ptr)
@@ -89,6 +92,7 @@ class KeyingScreenOperation : public NodeOperation {
   void execute() override
   {
     get_result("Screen").allocate_invalid();
+    context().set_info_message("Viewport compositor setup not fully supported");
   }
 };
 
@@ -112,6 +116,8 @@ void register_node_type_cmp_keyingscreen()
   node_type_storage(
       &ntype, "NodeKeyingScreenData", node_free_standard_storage, node_copy_standard_storage);
   ntype.get_compositor_operation = file_ns::get_compositor_operation;
+  ntype.realtime_compositor_unsupported_message = N_(
+      "Node not supported in the Viewport compositor");
 
   nodeRegisterType(&ntype);
 }

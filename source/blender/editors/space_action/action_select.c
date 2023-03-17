@@ -18,7 +18,7 @@
 #include "BLI_utildefines.h"
 
 #include "DNA_anim_types.h"
-#include "DNA_gpencil_types.h"
+#include "DNA_gpencil_legacy_types.h"
 #include "DNA_mask_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
@@ -28,7 +28,7 @@
 
 #include "BKE_context.h"
 #include "BKE_fcurve.h"
-#include "BKE_gpencil.h"
+#include "BKE_gpencil_legacy.h"
 #include "BKE_nla.h"
 
 #include "UI_interface.h"
@@ -48,8 +48,9 @@
 
 #include "action_intern.h"
 
-/* ************************************************************************** */
-/* KEYFRAMES STUFF */
+/* -------------------------------------------------------------------- */
+/** \name Keyframes Stuff
+ * \{ */
 
 static bAnimListElem *actkeys_find_list_element_at_position(bAnimContext *ac,
                                                             int filter,
@@ -61,8 +62,14 @@ static bAnimListElem *actkeys_find_list_element_at_position(bAnimContext *ac,
   float view_x, view_y;
   int channel_index;
   UI_view2d_region_to_view(v2d, region_x, region_y, &view_x, &view_y);
-  UI_view2d_listview_view_to_cell(
-      0, ACHANNEL_STEP(ac), 0, ACHANNEL_FIRST_TOP(ac), view_x, view_y, NULL, &channel_index);
+  UI_view2d_listview_view_to_cell(0,
+                                  ANIM_UI_get_channel_step(),
+                                  0,
+                                  ANIM_UI_get_first_channel_top(v2d),
+                                  view_x,
+                                  view_y,
+                                  NULL,
+                                  &channel_index);
 
   ListBase anim_data = {NULL, NULL};
   ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
@@ -152,7 +159,7 @@ static void actkeys_find_key_in_list_element(bAnimContext *ac,
   AnimData *adt = ANIM_nla_mapping_get(ac, ale);
 
   /* standard channel height (to allow for some slop) */
-  float key_hsize = ACHANNEL_HEIGHT(ac) * 0.8f;
+  float key_hsize = ANIM_UI_get_channel_height() * 0.8f;
   /* half-size (for either side), but rounded up to nearest int (for easier targeting) */
   key_hsize = roundf(key_hsize / 2.0f);
 
@@ -212,12 +219,16 @@ static bool actkeys_is_key_at_position(bAnimContext *ac, float region_x, float r
   return found;
 }
 
-/* ******************** Deselect All Operator ***************************** */
-/* This operator works in one of three ways:
- * 1) (de)select all (AKEY) - test if select all or deselect all
- * 2) invert all (CTRL-IKEY) - invert selection of all keyframes
- * 3) (de)select all - no testing is done; only for use internal tools as normal function...
- */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Deselect All Operator
+ *
+ * This operator works in one of three ways:
+ * 1) (de)select all (AKEY) - test if select all or deselect all.
+ * 2) invert all (CTRL-IKEY) - invert selection of all keyframes.
+ * 3) (de)select all - no testing is done; only for use internal tools as normal function.
+ * \{ */
 
 /* Deselects keyframes in the action editor
  * - This is called by the deselect all operator, as well as other ones!
@@ -346,15 +357,18 @@ void ACTION_OT_select_all(wmOperatorType *ot)
   WM_operator_properties_select_all(ot);
 }
 
-/* ******************** Box Select Operator **************************** */
-/**
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Box Select Operator
+ *
  * This operator currently works in one of three ways:
  * - BKEY     - 1) all keyframes within region are selected #ACTKEYS_BORDERSEL_ALLKEYS.
  * - ALT-BKEY - depending on which axis of the region was larger...
  *   - 2) x-axis, so select all frames within frame range #ACTKEYS_BORDERSEL_FRAMERANGE.
  *   - 3) y-axis, so select all frames within channels that region included
  *     #ACTKEYS_BORDERSEL_CHANNELS.
- */
+ * \{ */
 
 /* defines for box_select mode */
 enum {
@@ -462,14 +476,15 @@ static void box_select_action(bAnimContext *ac, const rcti rect, short mode, sho
   /* init editing data */
   memset(&sel_data.ked, 0, sizeof(KeyframeEditData));
 
-  float ymax = ACHANNEL_FIRST_TOP(ac);
+  float ymax = ANIM_UI_get_first_channel_top(v2d);
+  const float channel_step = ANIM_UI_get_channel_step();
 
   /* loop over data, doing box select */
-  for (ale = anim_data.first; ale; ale = ale->next, ymax -= ACHANNEL_STEP(ac)) {
+  for (ale = anim_data.first; ale; ale = ale->next, ymax -= channel_step) {
     AnimData *adt = ANIM_nla_mapping_get(ac, ale);
 
     /* get new vertical minimum extent of channel */
-    float ymin = ymax - ACHANNEL_STEP(ac);
+    float ymin = ymax - channel_step;
 
     /* set horizontal range (if applicable) */
     if (ELEM(mode, ACTKEYS_BORDERSEL_FRAMERANGE, ACTKEYS_BORDERSEL_ALLKEYS)) {
@@ -599,11 +614,15 @@ void ACTION_OT_select_box(wmOperatorType *ot)
   RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 }
 
-/* ******************** Region Select Operators ***************************** */
-/* "Region Select" operators include the Lasso and Circle Select operators.
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Region Select Operators
+ *
+ * "Region Select" operators include the Lasso and Circle Select operators.
  * These two ended up being lumped together, as it was easier in the
  * original Graph Editor implementation of these to do it this way.
- */
+ * \{ */
 
 typedef struct RegionSelectData {
   bAnimContext *ac;
@@ -713,14 +732,15 @@ static void region_select_action_keys(
     sel_data.ked.data = &scaled_rectf;
   }
 
-  float ymax = ACHANNEL_FIRST_TOP(ac);
+  float ymax = ANIM_UI_get_first_channel_top(v2d);
+  const float channel_step = ANIM_UI_get_channel_step();
 
   /* loop over data, doing region select */
-  for (ale = anim_data.first; ale; ale = ale->next, ymax -= ACHANNEL_STEP(ac)) {
+  for (ale = anim_data.first; ale; ale = ale->next, ymax -= channel_step) {
     AnimData *adt = ANIM_nla_mapping_get(ac, ale);
 
     /* get new vertical minimum extent of channel */
-    float ymin = ymax - ACHANNEL_STEP(ac);
+    const float ymin = ymax - channel_step;
 
     /* compute midpoint of channel (used for testing if the key is in the region or not) */
     sel_data.ked.channel_y = (ymin + ymax) / 2.0f;
@@ -895,13 +915,17 @@ void ACTION_OT_select_circle(wmOperatorType *ot)
   WM_operator_properties_select_operation_simple(ot);
 }
 
-/* ******************** Column Select Operator **************************** */
-/* This operator works in one of four ways:
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Column Select Operator
+ *
+ * This operator works in one of four ways:
  * - 1) select all keyframes in the same frame as a selected one  (KKEY)
  * - 2) select all keyframes in the same frame as the current frame marker (CTRL-KKEY)
  * - 3) select all keyframes in the same frame as a selected markers (SHIFT-KKEY)
  * - 4) select all keyframes that occur between selected markers (ALT-KKEY)
- */
+ * \{ */
 
 /* defines for column-select mode */
 static const EnumPropertyItem prop_column_select_types[] = {
@@ -919,7 +943,7 @@ static const EnumPropertyItem prop_column_select_types[] = {
 /* ------------------- */
 
 /* Selects all visible keyframes between the specified markers */
-/* TODO(@campbellbarton): this is almost an _exact_ duplicate of a function of the same name in
+/* TODO(@ideasman42): this is almost an _exact_ duplicate of a function of the same name in
  * graph_select.c should de-duplicate. */
 static void markers_selectkeys_between(bAnimContext *ac)
 {
@@ -1132,7 +1156,11 @@ void ACTION_OT_select_column(wmOperatorType *ot)
   RNA_def_property_flag(ot->prop, PROP_HIDDEN);
 }
 
-/* ******************** Select Linked Operator *********************** */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Select Linked Operator
+ * \{ */
 
 static int actkeys_select_linked_exec(bContext *C, wmOperator *UNUSED(op))
 {
@@ -1191,7 +1219,11 @@ void ACTION_OT_select_linked(wmOperatorType *ot)
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
 
-/* ******************** Select More/Less Operators *********************** */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Select More/Less Operators
+ * \{ */
 
 /* Common code to perform selection */
 static void select_moreless_action_keys(bAnimContext *ac, short mode)
@@ -1314,8 +1346,13 @@ void ACTION_OT_select_less(wmOperatorType *ot)
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
 
-/* ******************** Select Left/Right Operator ************************* */
-/* Select keyframes left/right of the current frame indicator */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Select Left/Right Operator
+ *
+ * Select keyframes left/right of the current frame indicator.
+ * \{ */
 
 /* defines for left-right select tool */
 static const EnumPropertyItem prop_actkeys_leftright_select_types[] = {
@@ -1512,8 +1549,12 @@ void ACTION_OT_select_leftright(wmOperatorType *ot)
   RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 }
 
-/* ******************** Mouse-Click Select Operator *********************** */
-/* This operator works in one of three ways:
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Mouse-Click Select Operator
+ *
+ * This operator works in one of three ways:
  * - 1) keyframe under mouse - no special modifiers
  * - 2) all keyframes on the same side of current frame indicator as mouse - ALT modifier
  * - 3) column select all keyframes in frame under mouse - CTRL modifier
@@ -1521,9 +1562,7 @@ void ACTION_OT_select_leftright(wmOperatorType *ot)
  *
  * In addition to these basic options, the SHIFT modifier can be used to toggle the
  * selection mode between replacing the selection (without) and inverting the selection (with).
- */
-
-/* ------------------- */
+ * \{ */
 
 /* option 1) select keyframe directly under mouse */
 static void actkeys_mselect_single(bAnimContext *ac,
@@ -1776,7 +1815,7 @@ static int mouse_action_keys(bAnimContext *ac,
       /* apply selection to keyframes */
       if (column) {
         /* select all keyframes in the same frame as the one we hit on the active channel
-         * [T41077]: "frame" not "selx" here (i.e. no NLA corrections yet) as the code here
+         * [#41077]: "frame" not "selx" here (i.e. no NLA corrections yet) as the code here
          *            does that itself again as it needs to work on multiple data-blocks.
          */
         actkeys_mselect_column(ac, select_mode, frame);
@@ -1897,4 +1936,4 @@ void ACTION_OT_clickselect(wmOperatorType *ot)
   RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 }
 
-/* ************************************************************************** */
+/** \} */

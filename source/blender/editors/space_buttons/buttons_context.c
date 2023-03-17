@@ -256,7 +256,7 @@ static bool buttons_context_path_data(ButsContextPath *path, int type)
   if (RNA_struct_is_a(ptr->type, &RNA_LightProbe) && ELEM(type, -1, OB_LIGHTPROBE)) {
     return true;
   }
-  if (RNA_struct_is_a(ptr->type, &RNA_GreasePencil) && ELEM(type, -1, OB_GPENCIL)) {
+  if (RNA_struct_is_a(ptr->type, &RNA_GreasePencil) && ELEM(type, -1, OB_GPENCIL_LEGACY)) {
     return true;
   }
   if (RNA_struct_is_a(ptr->type, &RNA_Curves) && ELEM(type, -1, OB_CURVES)) {
@@ -297,7 +297,7 @@ static bool buttons_context_path_modifier(ButsContextPath *path)
              OB_FONT,
              OB_SURF,
              OB_LATTICE,
-             OB_GPENCIL,
+             OB_GPENCIL_LEGACY,
              OB_CURVES,
              OB_POINTCLOUD,
              OB_VOLUME)) {
@@ -319,7 +319,7 @@ static bool buttons_context_path_shaderfx(ButsContextPath *path)
   if (buttons_context_path_object(path)) {
     Object *ob = path->ptr[path->len - 1].data;
 
-    if (ob && ELEM(ob->type, OB_GPENCIL)) {
+    if (ob && ELEM(ob->type, OB_GPENCIL_LEGACY)) {
       return true;
     }
   }
@@ -965,7 +965,7 @@ int /*eContextResult*/ buttons_context(const bContext *C,
       Object *ob = ptr->data;
 
       if (ob && OB_TYPE_SUPPORT_MATERIAL(ob->type) && ob->totcol) {
-        /* a valid actcol isn't ensured T27526. */
+        /* a valid actcol isn't ensured #27526. */
         int matnr = ob->actcol - 1;
         if (matnr < 0) {
           matnr = 0;

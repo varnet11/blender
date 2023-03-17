@@ -26,7 +26,7 @@
 
 #include "DNA_brush_types.h"
 #include "DNA_collection_types.h"
-#include "DNA_gpencil_types.h"
+#include "DNA_gpencil_legacy_types.h"
 #include "DNA_material_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
@@ -41,9 +41,9 @@
 #include "BKE_colortools.h"
 #include "BKE_context.h"
 #include "BKE_deform.h"
-#include "BKE_gpencil.h"
-#include "BKE_gpencil_curve.h"
-#include "BKE_gpencil_geom.h"
+#include "BKE_gpencil_curve_legacy.h"
+#include "BKE_gpencil_geom_legacy.h"
+#include "BKE_gpencil_legacy.h"
 #include "BKE_main.h"
 #include "BKE_material.h"
 #include "BKE_object.h"
@@ -94,7 +94,7 @@ bGPdata **ED_gpencil_data_get_pointers_direct(ScrArea *area, Object *ob, Pointer
       case SPACE_TOPBAR:     /* Top-bar */
       case SPACE_VIEW3D:     /* 3D-View */
       {
-        if (ob && (ob->type == OB_GPENCIL)) {
+        if (ob && (ob->type == OB_GPENCIL_LEGACY)) {
           /* GP Object. */
           if (r_ptr) {
             RNA_id_pointer_create(&ob->id, r_ptr);
@@ -183,7 +183,9 @@ bGPdata **ED_annotation_data_get_pointers_direct(ID *screen_id,
 
         if (clip) {
           if (sc->gpencil_src == SC_GPENCIL_SRC_TRACK) {
-            MovieTrackingTrack *track = BKE_tracking_track_get_active(&clip->tracking);
+            const MovieTrackingObject *tracking_object = BKE_tracking_object_get_active(
+                &clip->tracking);
+            MovieTrackingTrack *track = tracking_object->active_track;
 
             if (!track) {
               return NULL;
@@ -242,7 +244,7 @@ bGPdata *ED_annotation_data_get_active_direct(ID *screen_id, ScrArea *area, Scen
 bGPdata *ED_gpencil_data_get_active(const bContext *C)
 {
   Object *ob = CTX_data_active_object(C);
-  if ((ob == NULL) || (ob->type != OB_GPENCIL)) {
+  if ((ob == NULL) || (ob->type != OB_GPENCIL_LEGACY)) {
     return NULL;
   }
   return ob->data;
@@ -279,7 +281,7 @@ bool ED_gpencil_data_owner_is_annotation(PointerRNA *owner_ptr)
 
 bool ED_gpencil_has_keyframe_v3d(Scene *UNUSED(scene), Object *ob, int cfra)
 {
-  if (ob && ob->data && (ob->type == OB_GPENCIL)) {
+  if (ob && ob->data && (ob->type == OB_GPENCIL_LEGACY)) {
     bGPDlayer *gpl = BKE_gpencil_layer_active_get(ob->data);
     if (gpl) {
       if (gpl->actframe) {
@@ -311,7 +313,7 @@ bool gpencil_add_poll(bContext *C)
 bool gpencil_active_layer_poll(bContext *C)
 {
   Object *ob = CTX_data_active_object(C);
-  if ((ob == NULL) || (ob->type != OB_GPENCIL)) {
+  if ((ob == NULL) || (ob->type != OB_GPENCIL_LEGACY)) {
     return false;
   }
   bGPdata *gpd = (bGPdata *)ob->data;
@@ -892,7 +894,7 @@ void ED_gpencil_drawing_reference_get(const Scene *scene,
 
   /* if using a gpencil object at cursor mode, can use the location of the object */
   if (align_flag & GP_PROJECT_VIEWSPACE) {
-    if (ob && (ob->type == OB_GPENCIL)) {
+    if (ob && (ob->type == OB_GPENCIL_LEGACY)) {
       /* fallback (no strokes) - use cursor or object location */
       if (align_flag & GP_PROJECT_CURSOR) {
         /* use 3D-cursor */
@@ -982,7 +984,7 @@ void ED_gpencil_project_stroke_to_plane(const Scene *scene,
   else if (axis < 3) {
     plane_normal[axis] = 1.0f;
     /* if object, apply object rotation */
-    if (ob && (ob->type == OB_GPENCIL)) {
+    if (ob && (ob->type == OB_GPENCIL_LEGACY)) {
       float mat[4][4];
       copy_m4_m4(mat, ob->object_to_world);
 
@@ -1204,7 +1206,7 @@ void ED_gpencil_project_point_to_plane(const Scene *scene,
   else if (axis < 3) {
     plane_normal[axis] = 1.0f;
     /* if object, apply object rotation */
-    if (ob && (ob->type == OB_GPENCIL)) {
+    if (ob && (ob->type == OB_GPENCIL_LEGACY)) {
       float mat[4][4];
       copy_m4_m4(mat, ob->object_to_world);
       if ((ts->gpencil_v3d_align & GP_PROJECT_CURSOR) == 0) {
@@ -1405,7 +1407,7 @@ Object *ED_gpencil_add_object(bContext *C, const float loc[3], ushort local_view
 {
   const float rot[3] = {0.0f};
 
-  Object *ob = ED_object_add_type(C, OB_GPENCIL, NULL, loc, rot, false, local_view_bits);
+  Object *ob = ED_object_add_type(C, OB_GPENCIL_LEGACY, NULL, loc, rot, false, local_view_bits);
 
   /* create default brushes and colors */
   ED_gpencil_add_defaults(C, ob);
@@ -1662,11 +1664,7 @@ static bool gpencil_check_cursor_region(bContext *C, const int mval_i[2])
   ScrArea *area = CTX_wm_area(C);
   Object *ob = CTX_data_active_object(C);
 
-  if ((ob == NULL) || !ELEM(ob->mode,
-                            OB_MODE_PAINT_GPENCIL,
-                            OB_MODE_SCULPT_GPENCIL,
-                            OB_MODE_WEIGHT_GPENCIL,
-                            OB_MODE_VERTEX_GPENCIL)) {
+  if ((ob == NULL) || ((ob->mode & OB_MODE_ALL_PAINT_GPENCIL) == 0)) {
     return false;
   }
 
@@ -1708,7 +1706,7 @@ void ED_gpencil_brush_draw_eraser(Brush *brush, int x, int y)
   immUniformColor4f(1.0f, 0.39f, 0.39f, 0.78f);
   immUniform1i("colors_len", 0); /* "simple" mode */
   immUniform1f("dash_width", 12.0f);
-  immUniform1f("dash_factor", 0.5f);
+  immUniform1f("udash_factor", 0.5f);
 
   imm_draw_circle_wire_2d(shdr_pos,
                           x,
@@ -1732,12 +1730,78 @@ static bool gpencil_brush_cursor_poll(bContext *C)
   return false;
 }
 
+float ED_gpencil_cursor_radius(bContext *C, int x, int y)
+{
+  Scene *scene = CTX_data_scene(C);
+  Object *ob = CTX_data_active_object(C);
+  ARegion *region = CTX_wm_region(C);
+  Brush *brush = brush = scene->toolsettings->gp_paint->paint.brush;
+  bGPdata *gpd = ED_gpencil_data_get_active(C);
+
+  /* Show brush size. */
+  tGPspoint point2D;
+  float p1[3];
+  float p2[3];
+  float distance;
+  float radius = 2.0f;
+
+  if (ELEM(NULL, gpd, brush)) {
+    return radius;
+  }
+
+  /* Strokes in screen space or world space? */
+  if ((gpd->flag & GP_DATA_STROKE_KEEPTHICKNESS) != 0) {
+    /* In screen space the cursor radius matches the brush size. */
+    radius = (float)brush->size * 0.5f;
+  }
+  else {
+    /* To calculate the brush size in world space, we have to establish the zoom level.
+     * For this we take two 2D screen coordinates with a fixed offset,
+     * convert them to 3D coordinates and measure the offset distance in 3D.
+     * A small distance means a high zoom level. */
+    point2D.m_xy[0] = (float)x;
+    point2D.m_xy[1] = (float)y;
+    gpencil_stroke_convertcoords_tpoint(scene, region, ob, &point2D, NULL, p1);
+    point2D.m_xy[0] = (float)(x + 64);
+    gpencil_stroke_convertcoords_tpoint(scene, region, ob, &point2D, NULL, p2);
+    /* Clip extreme zoom level (and avoid division by zero). */
+    distance = MAX2(len_v3v3(p1, p2), 0.001f);
+
+    /* Handle layer thickness change. */
+    float brush_size = (float)brush->size;
+    bGPDlayer *gpl = BKE_gpencil_layer_active_get(gpd);
+    if (gpl != NULL) {
+      brush_size = MAX2(1.0f, brush_size + gpl->line_change);
+    }
+
+    /* Convert the 3D offset distance to a brush radius. */
+    radius = (1 / distance) * 2.0f * gpd->pixfactor * (brush_size / 64);
+  }
+  return radius;
+}
+
+float ED_gpencil_radial_control_scale(struct bContext *C,
+                                      struct Brush *brush,
+                                      float initial_value,
+                                      const int mval[2])
+{
+  float scale_fac = 1.0f;
+  if ((brush && brush->gpencil_settings) && (brush->ob_mode == OB_MODE_PAINT_GPENCIL) &&
+      (brush->gpencil_tool == GPAINT_TOOL_DRAW)) {
+    float cursor_radius = ED_gpencil_cursor_radius(C, mval[0], mval[1]);
+    scale_fac = max_ff(cursor_radius, 1.0f) / max_ff(initial_value, 1.0f);
+  }
+
+  return scale_fac;
+}
+
 /**
  * Helper callback for drawing the cursor itself.
  */
 static void gpencil_brush_cursor_draw(bContext *C, int x, int y, void *customdata)
 {
   Scene *scene = CTX_data_scene(C);
+  ToolSettings *ts = scene->toolsettings;
   Object *ob = CTX_data_active_object(C);
   ARegion *region = CTX_wm_region(C);
   Paint *paint = BKE_paint_get_active_from_context(C);
@@ -1789,16 +1853,31 @@ static void gpencil_brush_cursor_draw(bContext *C, int x, int y, void *customdat
     if (ma) {
       gp_style = ma->gp_style;
 
-      /* after some testing, display the size of the brush is not practical because
-       * is too disruptive and the size of cursor does not change with zoom factor.
-       * The decision was to use a fix size, instead of brush->thickness value.
+      /* Follow user settings for the size of the draw cursor:
+       * - Fixed size, or
+       * - Brush size (i.e. stroke thickness)
        */
       if ((gp_style) && GPENCIL_PAINT_MODE(gpd) &&
           ((brush->gpencil_settings->flag & GP_BRUSH_STABILIZE_MOUSE) == 0) &&
           ((brush->gpencil_settings->flag & GP_BRUSH_STABILIZE_MOUSE_TEMP) == 0) &&
           (brush->gpencil_tool == GPAINT_TOOL_DRAW)) {
-        radius = 2.0f;
-        copy_v3_v3(color, gp_style->stroke_rgba);
+
+        const bool is_vertex_stroke =
+            (GPENCIL_USE_VERTEX_COLOR_STROKE(ts, brush) &&
+             (brush->gpencil_settings->brush_draw_mode != GP_BRUSH_MODE_MATERIAL)) ||
+            (!GPENCIL_USE_VERTEX_COLOR_STROKE(ts, brush) &&
+             (brush->gpencil_settings->brush_draw_mode == GP_BRUSH_MODE_VERTEXCOLOR));
+
+        /* Strokes in screen space or world space? */
+        if ((gpd->flag & GP_DATA_STROKE_KEEPTHICKNESS) != 0) {
+          /* In screen space the cursor radius matches the brush size. */
+          radius = (float)brush->size * 0.5f;
+        }
+        else {
+          radius = ED_gpencil_cursor_radius(C, x, y);
+        }
+
+        copy_v3_v3(color, is_vertex_stroke ? brush->rgb : gp_style->stroke_rgba);
       }
       else {
         /* Only Tint tool must show big cursor. */
@@ -1878,15 +1957,7 @@ static void gpencil_brush_cursor_draw(bContext *C, int x, int y, void *customdat
 
   /* Inner Ring: Color from UI panel */
   immUniformColor4f(color[0], color[1], color[2], 0.8f);
-  if ((gp_style) && GPENCIL_PAINT_MODE(gpd) &&
-      ((brush->gpencil_settings->flag & GP_BRUSH_STABILIZE_MOUSE) == 0) &&
-      ((brush->gpencil_settings->flag & GP_BRUSH_STABILIZE_MOUSE_TEMP) == 0) &&
-      (brush->gpencil_tool == GPAINT_TOOL_DRAW)) {
-    imm_draw_circle_fill_2d(pos, x, y, radius, 40);
-  }
-  else {
-    imm_draw_circle_wire_2d(pos, x, y, radius, 40);
-  }
+  imm_draw_circle_wire_2d(pos, x, y, radius, 40);
 
   /* Outer Ring: Dark color for contrast on light backgrounds (e.g. gray on white) */
   mul_v3_v3fl(darkcolor, color, 0.40f);
@@ -2053,7 +2124,7 @@ void ED_gpencil_update_color_uv(Main *bmain, Material *mat)
   Material *gps_ma = NULL;
   /* Read all strokes. */
   for (Object *ob = bmain->objects.first; ob; ob = ob->id.next) {
-    if (ob->type == OB_GPENCIL) {
+    if (ob->type == OB_GPENCIL_LEGACY) {
       bGPdata *gpd = ob->data;
       if (gpd == NULL) {
         continue;
@@ -2690,7 +2761,7 @@ void ED_gpencil_tag_scene_gpencil(Scene *scene)
   /* Mark all grease pencil data-blocks of the scene. */
   FOREACH_SCENE_COLLECTION_BEGIN (scene, collection) {
     FOREACH_COLLECTION_OBJECT_RECURSIVE_BEGIN (collection, ob) {
-      if (ob->type == OB_GPENCIL) {
+      if (ob->type == OB_GPENCIL_LEGACY) {
         bGPdata *gpd = (bGPdata *)ob->data;
         gpd->flag |= GP_DATA_CACHE_IS_DIRTY;
         DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
@@ -3256,6 +3327,14 @@ void ED_gpencil_layer_merge(bGPdata *gpd,
       gpf_dst->key_type = gpf_src->key_type;
       BLI_ghash_insert(gh_frames_dst, POINTER_FROM_INT(gpf_src->framenum), gpf_dst);
     }
+
+    /* Copy current source frame to further frames
+     * that are keyframes in destination layer and not in source layer
+     * to keep the image equals. */
+    if (gpf_dst->next && (!gpf_src->next || (gpf_dst->next->framenum < gpf_src->next->framenum))) {
+      gpf_dst = gpf_dst->next;
+      BKE_gpencil_layer_frame_get(gpl_src, gpf_dst->framenum, GP_GETFRAME_ADD_COPY);
+    }
   }
 
   /* Read all frames from merge layer and add strokes. */
@@ -3298,4 +3377,39 @@ void ED_gpencil_layer_merge(bGPdata *gpd,
   if (gpl_dst->mask_layers.first) {
     BKE_gpencil_layer_mask_sort(gpd, gpl_dst);
   }
+}
+
+static void gpencil_layer_new_name_get(bGPdata *gpd, char *rname)
+{
+  int index = 0;
+  LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
+    if (strstr(gpl->info, "GP_Layer")) {
+      index++;
+    }
+  }
+
+  if (index == 0) {
+    BLI_strncpy(rname, "GP_Layer", 128);
+    return;
+  }
+  char *name = BLI_sprintfN("%.*s.%03d", 128, "GP_Layer", index);
+  BLI_strncpy(rname, name, 128);
+  MEM_freeN(name);
+}
+
+int ED_gpencil_new_layer_dialog(bContext *C, wmOperator *op)
+{
+  Object *ob = CTX_data_active_object(C);
+  PropertyRNA *prop;
+  if (RNA_int_get(op->ptr, "layer") == -1) {
+    prop = RNA_struct_find_property(op->ptr, "new_layer_name");
+    if (!RNA_property_is_set(op->ptr, prop)) {
+      char name[MAX_NAME];
+      bGPdata *gpd = ob->data;
+      gpencil_layer_new_name_get(gpd, name);
+      RNA_property_string_set(op->ptr, prop, name);
+      return WM_operator_props_dialog_popup(C, op, 200);
+    }
+  }
+  return 0;
 }

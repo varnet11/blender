@@ -22,7 +22,7 @@
 #include "BLI_utildefines.h"
 
 #include "DNA_armature_types.h"
-#include "DNA_gpencil_types.h"
+#include "DNA_gpencil_legacy_types.h"
 #include "DNA_lattice_types.h"
 #include "DNA_listBase.h"
 #include "DNA_mesh_types.h"
@@ -270,7 +270,7 @@ static void armature_vert_task_with_dvert(const ArmatureUserdata *data,
   float *vec = NULL, (*smat)[3] = NULL;
   float contrib = 0.0f;
   float armature_weight = 1.0f; /* default to 1 if no overall def group */
-  float prevco_weight = 1.0f;   /* weight for optional cached vertexcos */
+  float prevco_weight = 0.0f;   /* weight for optional cached vertexcos */
 
   if (use_quaternion) {
     memset(&sumdq, 0, sizeof(DualQuat));
@@ -295,7 +295,9 @@ static void armature_vert_task_with_dvert(const ArmatureUserdata *data,
 
     /* hackish: the blending factor can be used for blending with vert_coords_prev too */
     if (vert_coords_prev) {
-      prevco_weight = armature_weight;
+      /* This weight specifies the contribution from the coordinates at the start of this
+       * modifier evaluation, while armature_weight is normally the opposite of that. */
+      prevco_weight = 1.0f - armature_weight;
       armature_weight = 1.0f;
     }
   }
@@ -513,7 +515,7 @@ static void armature_deform_coords_impl(const Object *ob_arm,
         dverts_len = lt->pntsu * lt->pntsv * lt->pntsw;
       }
     }
-    else if (ob_target->type == OB_GPENCIL) {
+    else if (ob_target->type == OB_GPENCIL_LEGACY) {
       target_data_id = (const ID *)ob_target->data;
       dverts = gps_target->dvert;
       if (dverts) {

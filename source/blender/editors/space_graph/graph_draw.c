@@ -84,12 +84,12 @@ static void draw_fcurve_modifier_controls_envelope(FModifier *fcm,
 
   float viewport_size[4];
   GPU_viewport_size_get_f(viewport_size);
-  immUniform2f("viewport_size", viewport_size[2] / UI_DPI_FAC, viewport_size[3] / UI_DPI_FAC);
+  immUniform2f("viewport_size", viewport_size[2] / UI_SCALE_FAC, viewport_size[3] / UI_SCALE_FAC);
 
   immUniform1i("colors_len", 0); /* Simple dashes. */
   immUniformColor3f(0.0f, 0.0f, 0.0f);
   immUniform1f("dash_width", 10.0f);
-  immUniform1f("dash_factor", 0.5f);
+  immUniform1f("udash_factor", 0.5f);
 
   /* draw two black lines showing the standard reference levels */
 
@@ -235,7 +235,7 @@ static void draw_fcurve_keyframe_vertices(FCurve *fcu, View2D *v2d, bool edit, u
 {
   immBindBuiltinProgram(GPU_SHADER_2D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_AA);
 
-  immUniform1f("size", UI_GetThemeValuef(TH_VERTEX_SIZE) * U.dpi_fac);
+  immUniform1f("size", UI_GetThemeValuef(TH_VERTEX_SIZE) * UI_SCALE_FAC);
 
   draw_fcurve_selected_keyframe_vertices(fcu, v2d, edit, false, pos);
   draw_fcurve_selected_keyframe_vertices(fcu, v2d, edit, true, pos);
@@ -332,8 +332,8 @@ static void draw_fcurve_handle_vertices(FCurve *fcu, View2D *v2d, bool sel_handl
   immBindBuiltinProgram(GPU_SHADER_2D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_OUTLINE_AA);
 
   /* set handle size */
-  immUniform1f("size", (1.4f * UI_GetThemeValuef(TH_HANDLE_VERTEX_SIZE)) * U.dpi_fac);
-  immUniform1f("outlineWidth", 1.5f * U.dpi_fac);
+  immUniform1f("size", (1.4f * UI_GetThemeValuef(TH_HANDLE_VERTEX_SIZE)) * UI_SCALE_FAC);
+  immUniform1f("outlineWidth", 1.5f * UI_SCALE_FAC);
 
   draw_fcurve_selected_handle_vertices(fcu, v2d, false, sel_handle_only, pos);
   draw_fcurve_selected_handle_vertices(fcu, v2d, true, sel_handle_only, pos);
@@ -389,10 +389,7 @@ static bool draw_fcurve_handles_check(SpaceGraph *sipo, FCurve *fcu)
       (fcu->flag & FCURVE_INT_VALUES) ||
 #endif
       /* group that curve belongs to is not editable */
-      ((fcu->grp) && (fcu->grp->flag & AGRP_PROTECTED)) ||
-      /* Do not show handles if there is only 1 keyframe,
-       * otherwise they all clump together in an ugly ball. */
-      (fcu->totvert <= 1)) {
+      ((fcu->grp) && (fcu->grp->flag & AGRP_PROTECTED))) {
     return false;
   }
   return true;
@@ -409,7 +406,7 @@ static void draw_fcurve_handles(SpaceGraph *sipo, FCurve *fcu)
   uint color = GPU_vertformat_attr_add(
       format, "color", GPU_COMP_U8, 4, GPU_FETCH_INT_TO_FLOAT_UNIT);
   immBindBuiltinProgram(GPU_SHADER_3D_FLAT_COLOR);
-  if ((sipo->flag & SIPO_BEAUTYDRAW_OFF) == 0) {
+  if (U.animation_flag & USER_ANIM_HIGH_QUALITY_DRAWING) {
     GPU_line_smooth(true);
   }
   GPU_blend(GPU_BLEND_ALPHA);
@@ -485,7 +482,7 @@ static void draw_fcurve_handles(SpaceGraph *sipo, FCurve *fcu)
   immEnd();
   immUnbindProgram();
   GPU_blend(GPU_BLEND_NONE);
-  if ((sipo->flag & SIPO_BEAUTYDRAW_OFF) == 0) {
+  if (U.animation_flag & USER_ANIM_HIGH_QUALITY_DRAWING) {
     GPU_line_smooth(false);
   }
 }
@@ -518,7 +515,7 @@ static void draw_fcurve_sample_control(
 }
 
 /* helper func - draw keyframe vertices only for an F-Curve */
-static void draw_fcurve_samples(SpaceGraph *sipo, ARegion *region, FCurve *fcu)
+static void draw_fcurve_samples(ARegion *region, FCurve *fcu)
 {
   FPoint *first, *last;
   float hsize, xscale, yscale;
@@ -534,7 +531,7 @@ static void draw_fcurve_samples(SpaceGraph *sipo, ARegion *region, FCurve *fcu)
   /* draw */
   if (first && last) {
     /* anti-aliased lines for more consistent appearance */
-    if ((sipo->flag & SIPO_BEAUTYDRAW_OFF) == 0) {
+    if (U.animation_flag & USER_ANIM_HIGH_QUALITY_DRAWING) {
       GPU_line_smooth(true);
     }
     GPU_blend(GPU_BLEND_ALPHA);
@@ -550,7 +547,7 @@ static void draw_fcurve_samples(SpaceGraph *sipo, ARegion *region, FCurve *fcu)
     immUnbindProgram();
 
     GPU_blend(GPU_BLEND_NONE);
-    if ((sipo->flag & SIPO_BEAUTYDRAW_OFF) == 0) {
+    if (U.animation_flag & USER_ANIM_HIGH_QUALITY_DRAWING) {
       GPU_line_smooth(false);
     }
   }
@@ -568,7 +565,6 @@ static void draw_fcurve_curve(bAnimContext *ac,
                               const bool use_nla_remap,
                               const bool draw_extrapolation)
 {
-  SpaceGraph *sipo = (SpaceGraph *)ac->sl;
   short mapping_flag = ANIM_get_normalization_flags(ac);
 
   /* when opening a blend file on a different sized screen or while dragging the toolbar this can
@@ -596,7 +592,7 @@ static void draw_fcurve_curve(bAnimContext *ac,
    *
    * If the automatically determined sampling frequency is likely to cause an infinite
    * loop (i.e. too close to 0), then clamp it to a determined "safe" value. The value
-   *  chosen here is just the coarsest value which still looks reasonable...
+   * chosen here is just the coarsest value which still looks reasonable.
    */
 
   /* TODO: perhaps we should have 1.0 frames
@@ -604,12 +600,12 @@ static void draw_fcurve_curve(bAnimContext *ac,
   float pixels_per_sample = 1.5f;
   float samplefreq = pixels_per_sample / UI_view2d_scale_get_x(v2d);
 
-  if (sipo->flag & SIPO_BEAUTYDRAW_OFF) {
+  if (!(U.animation_flag & USER_ANIM_HIGH_QUALITY_DRAWING)) {
     /* Low Precision = coarse lower-bound clamping
      *
      * Although the "Beauty Draw" flag was originally for AA'd
      * line drawing, the sampling rate here has a much greater
-     * impact on performance (e.g. for T40372)!
+     * impact on performance (e.g. for #40372)!
      *
      * This one still amounts to 10 sample-frames for each 1-frame interval
      * which should be quite a decent approximation in many situations.
@@ -619,7 +615,7 @@ static void draw_fcurve_curve(bAnimContext *ac,
     }
   }
   else {
-    /* "Higher Precision" but slower - especially on larger windows (e.g. T40372) */
+    /* "Higher Precision" but slower - especially on larger windows (e.g. #40372) */
     if (samplefreq < 0.00001f) {
       samplefreq = 0.00001f;
     }
@@ -636,7 +632,7 @@ static void draw_fcurve_curve(bAnimContext *ac,
   if (!draw_extrapolation) {
     float fcu_start = 0;
     float fcu_end = 0;
-    BKE_fcurve_calc_range(fcu_, &fcu_start, &fcu_end, false, false);
+    BKE_fcurve_calc_range(fcu_, &fcu_start, &fcu_end, false);
 
     fcu_start = BKE_nla_tweakedit_remap(adt, fcu_start, NLATIME_CONVERT_MAP);
     fcu_end = BKE_nla_tweakedit_remap(adt, fcu_end, NLATIME_CONVERT_MAP);
@@ -707,7 +703,7 @@ static void draw_fcurve_curve_samples(bAnimContext *ac,
                                       const uint shdr_pos,
                                       const bool draw_extrapolation)
 {
-  if (!draw_extrapolation && fcu->totvert == 1) {
+  if (!draw_extrapolation) {
     return;
   }
 
@@ -820,7 +816,7 @@ static bool fcurve_can_use_simple_bezt_drawing(FCurve *fcu)
 static void draw_fcurve_curve_bezts(
     bAnimContext *ac, ID *id, FCurve *fcu, View2D *v2d, uint pos, const bool draw_extrapolation)
 {
-  if (!draw_extrapolation && fcu->totvert == 1) {
+  if (!draw_extrapolation) {
     return;
   }
 
@@ -852,7 +848,7 @@ static void draw_fcurve_curve_bezts(
 
     /* y-value depends on the interpolation */
     if ((fcu->extend == FCURVE_EXTRAPOLATE_CONSTANT) || (prevbezt->ipo == BEZT_IPO_CONST) ||
-        (fcu->totvert == 1)) {
+        (prevbezt->ipo == BEZT_IPO_LIN && fcu->totvert == 1)) {
       /* just extend across the first keyframe's value */
       v1[1] = prevbezt->vec[1][1];
     }
@@ -971,7 +967,8 @@ static void draw_fcurve_curve_bezts(
 
     /* y-value depends on the interpolation */
     if ((fcu->extend == FCURVE_EXTRAPOLATE_CONSTANT) || (fcu->flag & FCURVE_INT_VALUES) ||
-        (prevbezt->ipo == BEZT_IPO_CONST) || (fcu->totvert == 1)) {
+        (prevbezt->ipo == BEZT_IPO_CONST) ||
+        (prevbezt->ipo == BEZT_IPO_LIN && fcu->totvert == 1)) {
       /* based on last keyframe's value */
       v1[1] = prevbezt->vec[1][1];
     }
@@ -1032,7 +1029,7 @@ static void draw_fcurve(bAnimContext *ac, SpaceGraph *sipo, ARegion *region, bAn
     }
 
     /* anti-aliased lines for less jagged appearance */
-    if ((sipo->flag & SIPO_BEAUTYDRAW_OFF) == 0) {
+    if (U.animation_flag & USER_ANIM_HIGH_QUALITY_DRAWING) {
       GPU_line_smooth(true);
     }
     GPU_blend(GPU_BLEND_ALPHA);
@@ -1046,10 +1043,11 @@ static void draw_fcurve(bAnimContext *ac, SpaceGraph *sipo, ARegion *region, bAn
     if (BKE_fcurve_is_protected(fcu)) {
       /* Protected curves (non editable) are drawn with dotted lines. */
       immBindBuiltinProgram(GPU_SHADER_3D_LINE_DASHED_UNIFORM_COLOR);
-      immUniform2f("viewport_size", viewport_size[2] / UI_DPI_FAC, viewport_size[3] / UI_DPI_FAC);
+      immUniform2f(
+          "viewport_size", viewport_size[2] / UI_SCALE_FAC, viewport_size[3] / UI_SCALE_FAC);
       immUniform1i("colors_len", 0); /* Simple dashes. */
       immUniform1f("dash_width", 4.0f);
-      immUniform1f("dash_factor", 0.5f);
+      immUniform1f("udash_factor", 0.5f);
     }
     else {
       immBindBuiltinProgram(GPU_SHADER_3D_POLYLINE_UNIFORM_COLOR);
@@ -1107,7 +1105,7 @@ static void draw_fcurve(bAnimContext *ac, SpaceGraph *sipo, ARegion *region, bAn
 
     immUnbindProgram();
 
-    if ((sipo->flag & SIPO_BEAUTYDRAW_OFF) == 0) {
+    if (U.animation_flag & USER_ANIM_HIGH_QUALITY_DRAWING) {
       GPU_line_smooth(false);
     }
     GPU_blend(GPU_BLEND_NONE);
@@ -1117,7 +1115,8 @@ static void draw_fcurve(bAnimContext *ac, SpaceGraph *sipo, ARegion *region, bAn
    * - If the option to only show controls if the F-Curve is selected is enabled,
    *   we must obey this.
    */
-  if (!(sipo->flag & SIPO_SELCUVERTSONLY) || (fcu->flag & FCURVE_SELECTED)) {
+  if (!(U.animation_flag & USER_ANIM_ONLY_SHOW_SELECTED_CURVE_KEYS) ||
+      (fcu->flag & FCURVE_SELECTED)) {
     if (!BKE_fcurve_are_keyframes_usable(fcu) && !(fcu->fpt && fcu->totvert)) {
       /* only draw controls if this is the active modifier */
       if ((fcu->flag & FCURVE_ACTIVE) && (fcm)) {
@@ -1155,7 +1154,7 @@ static void draw_fcurve(bAnimContext *ac, SpaceGraph *sipo, ARegion *region, bAn
       }
       else {
         /* samples: only draw two indicators at either end as indicators */
-        draw_fcurve_samples(sipo, region, fcu);
+        draw_fcurve_samples(region, fcu);
       }
 
       GPU_matrix_pop();
@@ -1194,7 +1193,7 @@ static void graph_draw_driver_debug(bAnimContext *ac, ID *id, FCurve *fcu)
 
   float viewport_size[4];
   GPU_viewport_size_get_f(viewport_size);
-  immUniform2f("viewport_size", viewport_size[2] / UI_DPI_FAC, viewport_size[3] / UI_DPI_FAC);
+  immUniform2f("viewport_size", viewport_size[2] / UI_SCALE_FAC, viewport_size[3] / UI_SCALE_FAC);
 
   immUniform1i("colors_len", 0); /* Simple dashes. */
 
@@ -1208,7 +1207,7 @@ static void graph_draw_driver_debug(bAnimContext *ac, ID *id, FCurve *fcu)
     immUniformColor3fv(fcu->color);
 
     immUniform1f("dash_width", 40.0f);
-    immUniform1f("dash_factor", 0.5f);
+    immUniform1f("udash_factor", 0.5f);
     GPU_line_width(2.0f);
 
     /* draw 1-1 line, stretching just past the screen limits
@@ -1238,7 +1237,7 @@ static void graph_draw_driver_debug(bAnimContext *ac, ID *id, FCurve *fcu)
       /* draw dotted lines leading towards this point from both axes ....... */
       immUniformColor3f(0.9f, 0.9f, 0.9f);
       immUniform1f("dash_width", 10.0f);
-      immUniform1f("dash_factor", 0.5f);
+      immUniform1f("udash_factor", 0.5f);
       GPU_line_width(1.0f);
 
       immBegin(GPU_PRIM_LINES, (y <= v2d->cur.ymax) ? 4 : 2);
@@ -1302,7 +1301,7 @@ void graph_draw_ghost_curves(bAnimContext *ac, SpaceGraph *sipo, ARegion *region
   GPU_line_width(3.0f);
 
   /* anti-aliased lines for less jagged appearance */
-  if ((sipo->flag & SIPO_BEAUTYDRAW_OFF) == 0) {
+  if (U.animation_flag & USER_ANIM_HIGH_QUALITY_DRAWING) {
     GPU_line_smooth(true);
   }
   GPU_blend(GPU_BLEND_ALPHA);
@@ -1314,11 +1313,11 @@ void graph_draw_ghost_curves(bAnimContext *ac, SpaceGraph *sipo, ARegion *region
 
   float viewport_size[4];
   GPU_viewport_size_get_f(viewport_size);
-  immUniform2f("viewport_size", viewport_size[2] / UI_DPI_FAC, viewport_size[3] / UI_DPI_FAC);
+  immUniform2f("viewport_size", viewport_size[2] / UI_SCALE_FAC, viewport_size[3] / UI_SCALE_FAC);
 
   immUniform1i("colors_len", 0); /* Simple dashes. */
   immUniform1f("dash_width", 20.0f);
-  immUniform1f("dash_factor", 0.5f);
+  immUniform1f("udash_factor", 0.5f);
 
   const bool draw_extrapolation = (sipo->flag & SIPO_NO_DRAW_EXTRAPOLATION) == 0;
   /* the ghost curves are simply sampled F-Curves stored in sipo->runtime.ghost_curves */
@@ -1335,7 +1334,7 @@ void graph_draw_ghost_curves(bAnimContext *ac, SpaceGraph *sipo, ARegion *region
 
   immUnbindProgram();
 
-  if ((sipo->flag & SIPO_BEAUTYDRAW_OFF) == 0) {
+  if (U.animation_flag & USER_ANIM_HIGH_QUALITY_DRAWING) {
     GPU_line_smooth(false);
   }
   GPU_blend(GPU_BLEND_NONE);
@@ -1400,16 +1399,17 @@ void graph_draw_channel_names(bContext *C, bAnimContext *ac, ARegion *region)
   /* Update max-extent of channels here (taking into account scrollers):
    * - this is done to allow the channel list to be scrollable, but must be done here
    *   to avoid regenerating the list again and/or also because channels list is drawn first */
-  height = ACHANNEL_TOT_HEIGHT(ac, items);
+  height = ANIM_UI_get_channels_total_height(v2d, items);
   v2d->tot.ymin = -height;
+  const float channel_step = ANIM_UI_get_channel_step();
 
   /* Loop through channels, and set up drawing depending on their type. */
   { /* first pass: just the standard GL-drawing for backdrop + text */
     size_t channel_index = 0;
-    float ymax = ACHANNEL_FIRST_TOP(ac);
+    float ymax = ANIM_UI_get_first_channel_top(v2d);
 
-    for (ale = anim_data.first; ale; ale = ale->next, ymax -= ACHANNEL_STEP(ac), channel_index++) {
-      float ymin = ymax - ACHANNEL_HEIGHT(ac);
+    for (ale = anim_data.first; ale; ale = ale->next, ymax -= channel_step, channel_index++) {
+      const float ymin = ymax - ANIM_UI_get_channel_height();
 
       /* check if visible */
       if (IN_RANGE(ymin, v2d->cur.ymin, v2d->cur.ymax) ||
@@ -1422,13 +1422,13 @@ void graph_draw_channel_names(bContext *C, bAnimContext *ac, ARegion *region)
   { /* second pass: widgets */
     uiBlock *block = UI_block_begin(C, region, __func__, UI_EMBOSS);
     size_t channel_index = 0;
-    float ymax = ACHANNEL_FIRST_TOP(ac);
+    float ymax = ANIM_UI_get_first_channel_top(v2d);
 
     /* set blending again, as may not be set in previous step */
     GPU_blend(GPU_BLEND_ALPHA);
 
-    for (ale = anim_data.first; ale; ale = ale->next, ymax -= ACHANNEL_STEP(ac), channel_index++) {
-      float ymin = ymax - ACHANNEL_HEIGHT(ac);
+    for (ale = anim_data.first; ale; ale = ale->next, ymax -= channel_step, channel_index++) {
+      const float ymin = ymax - ANIM_UI_get_channel_height();
 
       /* check if visible */
       if (IN_RANGE(ymin, v2d->cur.ymin, v2d->cur.ymax) ||

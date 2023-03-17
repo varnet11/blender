@@ -156,6 +156,9 @@ typedef enum {
 #ifdef __APPLE__
   GHOST_kDrawingContextTypeMetal,
 #endif
+#ifdef WITH_VULKAN_BACKEND
+  GHOST_kDrawingContextTypeVulkan,
+#endif
 } GHOST_TDrawingContextType;
 
 typedef enum {
@@ -174,20 +177,53 @@ typedef enum {
 typedef enum {
   GHOST_kEventUnknown = 0,
 
-  GHOST_kEventCursorMove, /* Mouse move event. */
-  GHOST_kEventButtonDown, /* Mouse button event. */
-  GHOST_kEventButtonUp,   /* Mouse button event. */
-  GHOST_kEventWheel,      /* Mouse wheel event. */
-  GHOST_kEventTrackpad,   /* Trackpad event. */
+  /** Mouse move event.
+   *
+   * \note #GHOST_GetEventData returns #GHOST_TEventCursorData.
+   */
+  GHOST_kEventCursorMove,
+  /** Mouse button down event. */
+  GHOST_kEventButtonDown,
+  /** Mouse button up event. */
+  GHOST_kEventButtonUp,
+  /**
+   * Mouse wheel event.
+   *
+   * \note #GHOST_GetEventData returns #GHOST_TEventWheelData.
+   */
+  GHOST_kEventWheel,
+  /**
+   * Trackpad event.
+   *
+   * \note #GHOST_GetEventData returns #GHOST_TEventTrackpadData.
+   */
+  GHOST_kEventTrackpad,
 
 #ifdef WITH_INPUT_NDOF
-  GHOST_kEventNDOFMotion, /* N degree of freedom device motion event. */
-  GHOST_kEventNDOFButton, /* N degree of freedom device button event. */
+  /**
+   * N degree of freedom device motion event.
+   *
+   * \note #GHOST_GetEventData returns #GHOST_TEventNDOFMotionData.
+   */
+  GHOST_kEventNDOFMotion,
+  /**
+   * N degree of freedom device button event.
+   *
+   * \note #GHOST_GetEventData returns #GHOST_TEventNDOFButtonData.
+   */
+  GHOST_kEventNDOFButton,
 #endif
 
+  /**
+   * Keyboard up/down events.
+   *
+   * Includes repeat events, check #GHOST_TEventKeyData::is_repeat
+   * if detecting repeat events is needed.
+   *
+   * \note #GHOST_GetEventData returns #GHOST_TEventKeyData.
+   */
   GHOST_kEventKeyDown,
   GHOST_kEventKeyUp,
-  //  GHOST_kEventKeyAuto,
 
   GHOST_kEventQuitRequest,
 
@@ -195,6 +231,8 @@ typedef enum {
   GHOST_kEventWindowActivate,
   GHOST_kEventWindowDeactivate,
   GHOST_kEventWindowUpdate,
+  /** Client side window decorations have changed and need to be redrawn. */
+  GHOST_kEventWindowUpdateDecor,
   GHOST_kEventWindowSize,
   GHOST_kEventWindowMove,
   GHOST_kEventWindowDPIHintChanged,

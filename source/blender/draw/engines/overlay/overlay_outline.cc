@@ -8,11 +8,11 @@
 #include "DRW_render.h"
 
 #include "BKE_global.h"
-#include "BKE_gpencil.h"
+#include "BKE_gpencil_legacy.h"
 
 #include "BKE_object.h"
 
-#include "DNA_gpencil_types.h"
+#include "DNA_gpencil_legacy_types.h"
 
 #include "UI_resources.h"
 
@@ -235,7 +235,7 @@ static void gpencil_stroke_cache_populate(bGPDlayer * /*gpl*/,
   if (show_stroke) {
     int vfirst = gps->runtime.stroke_start * 3;
     bool is_cyclic = ((gps->flag & GP_STROKE_CYCLIC) != 0) && (gps->totpoints > 2);
-    int vcount = (gps->totpoints + (int)is_cyclic) * 2 * 3;
+    int vcount = (gps->totpoints + int(is_cyclic)) * 2 * 3;
     DRW_shgroup_call_range(iter->stroke_grp, iter->ob, geom, vfirst, vcount);
   }
 }
@@ -311,7 +311,7 @@ void OVERLAY_outline_cache_populate(OVERLAY_Data *vedata,
     return;
   }
 
-  if (ob->type == OB_GPENCIL) {
+  if (ob->type == OB_GPENCIL_LEGACY) {
     OVERLAY_outline_gpencil(pd, ob);
     return;
   }

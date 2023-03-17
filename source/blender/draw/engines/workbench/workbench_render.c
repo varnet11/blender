@@ -64,9 +64,11 @@ static bool workbench_render_framebuffers_init(void)
   /* When doing a multi view rendering the first view will allocate the buffers
    * the other views will reuse these buffers */
   if (dtxl->color == NULL) {
+    eGPUTextureUsage usage = GPU_TEXTURE_USAGE_SHADER_READ | GPU_TEXTURE_USAGE_ATTACHMENT;
     BLI_assert(dtxl->depth == NULL);
-    dtxl->color = GPU_texture_create_2d("txl.color", UNPACK2(size), 1, GPU_RGBA16F, NULL);
-    dtxl->depth = GPU_texture_create_2d("txl.depth", UNPACK2(size), 1, GPU_DEPTH24_STENCIL8, NULL);
+    dtxl->color = GPU_texture_create_2d("txl.color", UNPACK2(size), 1, GPU_RGBA16F, usage, NULL);
+    dtxl->depth = GPU_texture_create_2d(
+        "txl.depth", UNPACK2(size), 1, GPU_DEPTH24_STENCIL8, usage, NULL);
   }
 
   if (!(dtxl->depth && dtxl->color)) {
@@ -118,7 +120,7 @@ static void workbench_render_result_z(struct RenderLayer *rl,
 
     int pix_num = BLI_rcti_size_x(rect) * BLI_rcti_size_y(rect);
 
-    /* Convert ogl depth [0..1] to view Z [near..far] */
+    /* Convert GPU depth [0..1] to view Z [near..far] */
     if (DRW_view_is_persp_get(NULL)) {
       for (int i = 0; i < pix_num; i++) {
         if (rp->rect[i] == 1.0f) {
@@ -214,4 +216,7 @@ void workbench_render(void *ved, RenderEngine *engine, RenderLayer *render_layer
 void workbench_render_update_passes(RenderEngine *engine, Scene *scene, ViewLayer *view_layer)
 {
   RE_engine_register_pass(engine, scene, view_layer, RE_PASSNAME_COMBINED, 4, "RGBA", SOCK_RGBA);
+  if ((view_layer->passflag & SCE_PASS_Z) != 0) {
+    RE_engine_register_pass(engine, scene, view_layer, RE_PASSNAME_Z, 1, "Z", SOCK_FLOAT);
+  }
 }

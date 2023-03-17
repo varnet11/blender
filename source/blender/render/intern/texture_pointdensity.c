@@ -155,7 +155,8 @@ static void pointdensity_cache_psys(
   ParticleSimulationData sim = {NULL};
   ParticleData *pa = NULL;
   float cfra = BKE_scene_ctime_get(scene);
-  int i /*, Childexists*/ /* UNUSED */;
+  int i;
+  // int childexists = 0; /* UNUSED */
   int total_particles;
   int data_used;
   float *data_vel, *data_life;
@@ -353,7 +354,7 @@ static void pointdensity_cache_vertex_weight(PointDensity *pd,
 static void pointdensity_cache_vertex_normal(Mesh *mesh, float *data_color)
 {
   BLI_assert(data_color);
-  const float(*vert_normals)[3] = BKE_mesh_vertex_normals_ensure(mesh);
+  const float(*vert_normals)[3] = BKE_mesh_vert_normals_ensure(mesh);
   memcpy(data_color, vert_normals, sizeof(float[3]) * mesh->totvert);
 }
 
@@ -361,7 +362,6 @@ static void pointdensity_cache_object(PointDensity *pd, Object *ob)
 {
   float *data_color;
   int i;
-  const MVert *mvert = NULL, *mv;
   Mesh *mesh = ob->data;
 
 #if 0 /* UNUSED */
@@ -377,7 +377,7 @@ static void pointdensity_cache_object(PointDensity *pd, Object *ob)
   }
 #endif
 
-  mvert = BKE_mesh_verts(mesh); /* local object space */
+  const float(*positions)[3] = BKE_mesh_vert_positions(mesh); /* local object space */
   pd->totpoints = mesh->totvert;
   if (pd->totpoints == 0) {
     return;
@@ -387,10 +387,10 @@ static void pointdensity_cache_object(PointDensity *pd, Object *ob)
   alloc_point_data(pd);
   point_data_pointers(pd, NULL, NULL, &data_color);
 
-  for (i = 0, mv = mvert; i < pd->totpoints; i++, mv++) {
+  for (i = 0; i < pd->totpoints; i++) {
     float co[3];
 
-    copy_v3_v3(co, mv->co);
+    copy_v3_v3(co, positions[i]);
 
     switch (pd->ob_cache_space) {
       case TEX_PD_OBJECTSPACE:

@@ -41,6 +41,7 @@
 #include "BKE_lib_query.h"
 #include "BKE_lib_remap.h"
 #include "BKE_main.h"
+#include "BKE_main_namemap.h"
 #include "BKE_material.h"
 #include "BKE_object.h"
 #include "BKE_report.h"
@@ -76,6 +77,10 @@ typedef struct BlendfileLinkAppendContextItem {
   /** Library ID from which the #new_id has been linked (NULL until it has been successfully
    * linked). */
   Library *source_library;
+  /** Liboverride of the linked ID (NULL until it has been successfully created or an existing one
+   * has been found). */
+  ID *liboverride_id;
+
   /** Opaque user data pointer. */
   void *userdata;
 } BlendfileLinkAppendContextItem;
@@ -351,6 +356,12 @@ ID *BKE_blendfile_link_append_context_item_newid_get(
   return item->new_id;
 }
 
+ID *BKE_blendfile_link_append_context_item_liboverrideid_get(
+    BlendfileLinkAppendContext *UNUSED(lapp_context), BlendfileLinkAppendContextItem *item)
+{
+  return item->liboverride_id;
+}
+
 short BKE_blendfile_link_append_context_item_idcode_get(
     struct BlendfileLinkAppendContext *UNUSED(lapp_context),
     struct BlendfileLinkAppendContextItem *item)
@@ -574,7 +585,8 @@ static void loose_data_instantiate_obdata_preprocess(
  * (return false). */
 static bool loose_data_instantiate_collection_parents_check_recursive(Collection *collection)
 {
-  for (CollectionParent *parent_collection = collection->parents.first; parent_collection != NULL;
+  for (CollectionParent *parent_collection = collection->runtime.parents.first;
+       parent_collection != NULL;
        parent_collection = parent_collection->next) {
     if ((parent_collection->collection->id.tag & LIB_TAG_DOIT) != 0) {
       return true;
@@ -612,10 +624,10 @@ static void loose_data_instantiate_collection_process(
     }
 
     /* Forced instantiation of indirectly appended collections is not wanted. Users can now
-     * easily instantiate collections (and their objects) as needed by themselves. See T67032. */
+     * easily instantiate collections (and their objects) as needed by themselves. See #67032. */
     /* We need to check that objects in that collections are already instantiated in a scene.
      * Otherwise, it's better to add the collection to the scene's active collection, than to
-     * instantiate its objects in active scene's collection directly. See T61141.
+     * instantiate its objects in active scene's collection directly. See #61141.
      *
      * NOTE: We only check object directly into that collection, not recursively into its
      * children.
@@ -624,7 +636,7 @@ static void loose_data_instantiate_collection_process(
     /* The collection could be linked/appended together with an Empty object instantiating it,
      * better not instantiate the collection in the view-layer in that case.
      *
-     * Can easily happen when copy/pasting such instantiating empty, see T93839. */
+     * Can easily happen when copy/pasting such instantiating empty, see #93839. */
     const bool collection_is_instantiated = collection_instantiated_by_any_object(bmain,
                                                                                   collection);
     /* Always consider adding collections directly selected by the user. */
@@ -750,7 +762,7 @@ static void loose_data_instantiate_object_process(LooseDataInstantiateContext *i
      * While this is not ideal (in theory no object should remain un-owned), in case of indirectly
      * linked objects, the other solution would be to add them to a local collection, which would
      * make them directly linked. Think for now keeping them indirectly linked is more important.
-     * Ref. T93757.
+     * Ref. #93757.
      */
     if (is_linking && (item->tag & LINK_APPEND_TAG_INDIRECT) != 0) {
       continue;
@@ -934,7 +946,7 @@ static int foreach_libblock_link_append_callback(LibraryIDLinkCallbackData *cb_d
      * the dependency here. Indeed, either they are both linked in another way (through their own
      * meshes for shape keys e.g.), or this is an unsupported case (two shape-keys depending on
      * each-other need to be also 'linked' in by their respective meshes, independent shape-keys
-     * are not allowed). ref T96048. */
+     * are not allowed). ref #96048. */
     if (id != cb_data->id_self && BKE_idtype_idcode_is_linkable(GS(cb_data->id_self->name))) {
       BKE_library_foreach_ID_link(
           cb_data->bmain, id, foreach_libblock_link_append_callback, data, IDWALK_NOP);
@@ -996,14 +1008,13 @@ static void blendfile_link_append_proxies_convert(Main *bmain, ReportList *repor
 
   if (bf_reports.count.proxies_to_lib_overrides_success != 0 ||
       bf_reports.count.proxies_to_lib_overrides_failures != 0) {
-    BKE_reportf(
-        bf_reports.reports,
-        RPT_WARNING,
-        "Proxies have been removed from Blender (%d proxies were automatically converted "
-        "to library overrides, %d proxies could not be converted and were cleared). "
-        "Please consider re-saving any library .blend file with the newest Blender version",
-        bf_reports.count.proxies_to_lib_overrides_success,
-        bf_reports.count.proxies_to_lib_overrides_failures);
+    BKE_reportf(bf_reports.reports,
+                RPT_WARNING,
+                "Proxies have been removed from Blender (%d proxies were automatically converted "
+                "to library overrides, %d proxies could not be converted and were cleared). "
+                "Consider re-saving any library .blend file with the newest Blender version",
+                bf_reports.count.proxies_to_lib_overrides_success,
+                bf_reports.count.proxies_to_lib_overrides_failures);
   }
 }
 
@@ -1244,7 +1255,7 @@ void BKE_blendfile_link(BlendfileLinkAppendContext *lapp_context, ReportList *re
     mainl = BLO_library_link_begin(&blo_handle, libname, lapp_context->params);
     lib = mainl->curlib;
     BLI_assert(lib != NULL);
-    /* In case lib was already existing but not found originally, see T99820. */
+    /* In case lib was already existing but not found originally, see #99820. */
     lib->id.tag &= ~LIB_TAG_MISSING;
 
     if (mainl->versionfile < 250) {
@@ -1316,6 +1327,92 @@ void BKE_blendfile_link(BlendfileLinkAppendContext *lapp_context, ReportList *re
   if ((lapp_context->params->flag & FILE_LINK) != 0) {
     blendfile_link_append_proxies_convert(lapp_context->params->bmain, reports);
   }
+
+  BKE_main_namemap_clear(lapp_context->params->bmain);
+}
+
+void BKE_blendfile_override(BlendfileLinkAppendContext *lapp_context,
+                            const eBKELibLinkOverride flags,
+                            ReportList *UNUSED(reports))
+{
+  if (lapp_context->num_items == 0) {
+    /* Nothing to override. */
+    return;
+  }
+
+  Main *bmain = lapp_context->params->bmain;
+
+  /* Liboverride only makes sense if data was linked, not appended. */
+  BLI_assert((lapp_context->params->flag & FILE_LINK) != 0);
+
+  const bool set_runtime = (flags & BKE_LIBLINK_OVERRIDE_CREATE_RUNTIME) != 0;
+  const bool do_use_exisiting_liboverrides = (flags &
+                                              BKE_LIBLINK_OVERRIDE_USE_EXISTING_LIBOVERRIDES) != 0;
+
+  GHash *linked_ids_to_local_liboverrides = NULL;
+  if (do_use_exisiting_liboverrides) {
+    linked_ids_to_local_liboverrides = BLI_ghash_ptr_new(__func__);
+
+    ID *id_iter;
+    FOREACH_MAIN_ID_BEGIN (bmain, id_iter) {
+      if (ID_IS_LINKED(id_iter)) {
+        continue;
+      }
+      if (!ID_IS_OVERRIDE_LIBRARY_REAL(id_iter)) {
+        continue;
+      }
+      /* Do not consider regular liboverrides if runtime ones are requested, and vice-versa. */
+      if ((set_runtime && (id_iter->tag & LIB_TAG_RUNTIME) == 0) ||
+          (!set_runtime && (id_iter->tag & LIB_TAG_RUNTIME) != 0)) {
+        continue;
+      }
+
+      /* In case several liboverrides exist of the same data, only consider the first found one. */
+      ID **id_ptr;
+      if (BLI_ghash_ensure_p(linked_ids_to_local_liboverrides,
+                             id_iter->override_library->reference,
+                             (void ***)&id_ptr)) {
+        continue;
+      }
+      *id_ptr = id_iter;
+    }
+    FOREACH_MAIN_ID_END;
+  }
+
+  for (LinkNode *itemlink = lapp_context->items.list; itemlink; itemlink = itemlink->next) {
+    BlendfileLinkAppendContextItem *item = itemlink->link;
+    ID *id = item->new_id;
+    if (id == NULL) {
+      continue;
+    }
+    BLI_assert(item->userdata == NULL);
+
+    if (do_use_exisiting_liboverrides) {
+      item->liboverride_id = BLI_ghash_lookup(linked_ids_to_local_liboverrides, id);
+    }
+    if (item->liboverride_id == NULL) {
+      item->liboverride_id = BKE_lib_override_library_create_from_id(bmain, id, false);
+      if (set_runtime) {
+        item->liboverride_id->tag |= LIB_TAG_RUNTIME;
+        if ((id->tag & LIB_TAG_PRE_EXISTING) == 0) {
+          /* If the linked ID is newly linked, in case its override is runtime-only, assume its
+           * reference to be indirectly linked.
+           *
+           * This is more of an heuristic for 'as best as possible' user feedback in the UI
+           * (Outliner), which is expected to be valid in almost all practical use-cases. Direct or
+           * indirect linked status is properly checked before saving .blend file. */
+          id->tag &= ~LIB_TAG_EXTERN;
+          id->tag |= LIB_TAG_INDIRECT;
+        }
+      }
+    }
+  }
+
+  if (do_use_exisiting_liboverrides) {
+    BLI_ghash_free(linked_ids_to_local_liboverrides, NULL, NULL);
+  }
+
+  BKE_main_namemap_clear(bmain);
 }
 
 /** \} */
@@ -1424,8 +1521,8 @@ void BKE_blendfile_library_relocate(BlendfileLinkAppendContext *lapp_context,
 
   /* All override rules need to be up to date, since there will be no do_version here, otherwise
    * older, now-invalid rules might be applied and likely fail, or some changes might be missing,
-   * etc. See T93353. */
-  BKE_lib_override_library_main_operations_create(bmain, true);
+   * etc. See #93353. */
+  BKE_lib_override_library_main_operations_create(bmain, true, NULL);
 
   /* Remove all IDs to be reloaded from Main. */
   lba_idx = set_listbasepointers(bmain, lbarray);
@@ -1559,6 +1656,24 @@ void BKE_blendfile_library_relocate(BlendfileLinkAppendContext *lapp_context,
         continue;
       }
 
+      /* In case the active scene was reloaded, the context pointers in
+       * `lapp_context->params->context` need to be updated before the old Scene ID is freed. */
+      if (old_id == &lapp_context->params->context.scene->id) {
+        BLI_assert(GS(old_id->name) == ID_SCE);
+        Scene *new_scene = (Scene *)item->new_id;
+        BLI_assert(new_scene != NULL);
+        lapp_context->params->context.scene = new_scene;
+        if (lapp_context->params->context.view_layer != NULL) {
+          ViewLayer *new_view_layer = BKE_view_layer_find(
+              new_scene, lapp_context->params->context.view_layer->name);
+          lapp_context->params->context.view_layer = (new_view_layer != NULL) ?
+                                                         new_view_layer :
+                                                         new_scene->view_layers.first;
+        }
+        /* lapp_context->params->context.v3d should never become invalid by newly linked data here.
+         */
+      }
+
       if (old_id->us == 0) {
         old_id->tag |= LIB_TAG_DOIT;
         item->userdata = NULL;
@@ -1635,7 +1750,7 @@ void BKE_blendfile_library_relocate(BlendfileLinkAppendContext *lapp_context,
                                              .reports = reports,
                                          });
     /* We need to rebuild some of the deleted override rules (for UI feedback purpose). */
-    BKE_lib_override_library_main_operations_create(bmain, true);
+    BKE_lib_override_library_main_operations_create(bmain, true, NULL);
   }
 
   BKE_main_collection_sync(bmain);

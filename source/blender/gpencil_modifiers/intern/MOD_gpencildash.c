@@ -13,15 +13,16 @@
 #include "BLI_string.h"
 
 #include "DNA_defaults.h"
+#include "DNA_gpencil_legacy_types.h"
 #include "DNA_gpencil_modifier_types.h"
-#include "DNA_gpencil_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
+#include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
 
-#include "BKE_gpencil.h"
-#include "BKE_gpencil_geom.h"
-#include "BKE_gpencil_modifier.h"
+#include "BKE_gpencil_geom_legacy.h"
+#include "BKE_gpencil_legacy.h"
+#include "BKE_gpencil_modifier_legacy.h"
 #include "BKE_lib_query.h"
 #include "BKE_main.h"
 #include "BKE_modifier.h"
@@ -42,6 +43,7 @@
 #include "MOD_gpencil_util.h"
 
 #include "DEG_depsgraph.h"
+#include "DEG_depsgraph_query.h"
 
 #include "WM_api.h"
 
@@ -146,6 +148,7 @@ static bool stroke_dash(const bGPDstroke *gps,
 
     bGPDstroke *stroke = BKE_gpencil_stroke_new(
         ds->mat_nr < 0 ? gps->mat_nr : ds->mat_nr, size, gps->thickness);
+    stroke->runtime.gps_orig = gps->runtime.gps_orig;
     if (ds->flag & GP_DASH_USE_CYCLIC) {
       stroke->flag |= GP_STROKE_CYCLIC;
     }
@@ -157,6 +160,9 @@ static bool stroke_dash(const bGPDstroke *gps,
       stroke->points[is].z = p->z;
       stroke->points[is].pressure = p->pressure * ds->radius;
       stroke->points[is].strength = p->strength * ds->opacity;
+      /* Assign original point pointers. */
+      stroke->points[is].runtime.idx_orig = p->runtime.idx_orig;
+      stroke->points[is].runtime.pt_orig = p->runtime.pt_orig;
       copy_v4_v4(stroke->points[is].vert_color, p->vert_color);
     }
     BLI_addtail(r_strokes, stroke);
@@ -250,11 +256,11 @@ static bool isDisabled(GpencilModifierData *md, int UNUSED(userRenderParams))
 /* Generic "generateStrokes" callback */
 static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Object *ob)
 {
+  Scene *scene = DEG_get_evaluated_scene(depsgraph);
   bGPdata *gpd = ob->data;
 
   LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
-    BKE_gpencil_frame_active_set(depsgraph, gpd);
-    bGPDframe *gpf = gpl->actframe;
+    bGPDframe *gpf = BKE_gpencil_frame_retime_get(depsgraph, scene, ob, gpl);
     if (gpf == NULL) {
       continue;
     }
@@ -363,25 +369,25 @@ static void panelRegister(ARegionType *region_type)
 }
 
 GpencilModifierTypeInfo modifierType_Gpencil_Dash = {
-    /* name */ N_("Dot Dash"),
-    /* structName */ "DashGpencilModifierData",
-    /* structSize */ sizeof(DashGpencilModifierData),
-    /* type */ eGpencilModifierTypeType_Gpencil,
-    /* flags */ eGpencilModifierTypeFlag_SupportsEditmode,
+    /*name*/ N_("Dot Dash"),
+    /*structName*/ "DashGpencilModifierData",
+    /*structSize*/ sizeof(DashGpencilModifierData),
+    /*type*/ eGpencilModifierTypeType_Gpencil,
+    /*flags*/ eGpencilModifierTypeFlag_SupportsEditmode,
 
-    /* copyData */ copyData,
+    /*copyData*/ copyData,
 
-    /* deformStroke */ NULL,
-    /* generateStrokes */ generateStrokes,
-    /* bakeModifier */ bakeModifier,
-    /* remapTime */ NULL,
+    /*deformStroke*/ NULL,
+    /*generateStrokes*/ generateStrokes,
+    /*bakeModifier*/ bakeModifier,
+    /*remapTime*/ NULL,
 
-    /* initData */ initData,
-    /* freeData */ freeData,
-    /* isDisabled */ isDisabled,
-    /* updateDepsgraph */ NULL,
-    /* dependsOnTime */ NULL,
-    /* foreachIDLink */ foreachIDLink,
-    /* foreachTexLink */ NULL,
-    /* panelRegister */ panelRegister,
+    /*initData*/ initData,
+    /*freeData*/ freeData,
+    /*isDisabled*/ isDisabled,
+    /*updateDepsgraph*/ NULL,
+    /*dependsOnTime*/ NULL,
+    /*foreachIDLink*/ foreachIDLink,
+    /*foreachTexLink*/ NULL,
+    /*panelRegister*/ panelRegister,
 };

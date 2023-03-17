@@ -9,17 +9,27 @@
 
 #include "gpu_vertex_buffer_private.hh"
 
+#include "vk_buffer.hh"
+
 namespace blender::gpu {
 
 class VKVertexBuffer : public VertBuf {
+  VKBuffer buffer_;
+
  public:
+  ~VKVertexBuffer();
+
   void bind_as_ssbo(uint binding) override;
   void bind_as_texture(uint binding) override;
   void wrap_handle(uint64_t handle) override;
 
   void update_sub(uint start, uint len, const void *data) override;
-  const void *read() const override;
-  void *unmap(const void *mapped_data) const override;
+  void read(void *data) const override;
+
+  VkBuffer vk_handle() const
+  {
+    return buffer_.vk_handle();
+  }
 
  protected:
   void acquire_data() override;
@@ -27,6 +37,9 @@ class VKVertexBuffer : public VertBuf {
   void release_data() override;
   void upload_data() override;
   void duplicate_data(VertBuf *dst) override;
+
+ private:
+  void allocate(VKContext &context);
 };
 
 }  // namespace blender::gpu

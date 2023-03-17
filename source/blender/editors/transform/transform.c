@@ -9,7 +9,7 @@
 
 #include "MEM_guardedalloc.h"
 
-#include "DNA_gpencil_types.h"
+#include "DNA_gpencil_legacy_types.h"
 #include "DNA_mask_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_screen_types.h"
@@ -52,6 +52,7 @@
 #include "transform_constraints.h"
 #include "transform_convert.h"
 #include "transform_draw_cursors.h"
+#include "transform_gizmo.h"
 #include "transform_mode.h"
 #include "transform_orientations.h"
 #include "transform_snap.h"
@@ -65,7 +66,8 @@ bool transdata_check_local_islands(TransInfo *t, short around)
   if (t->options & (CTX_CURSOR | CTX_TEXTURE_SPACE)) {
     return false;
   }
-  return ((around == V3D_AROUND_LOCAL_ORIGINS) && ELEM(t->obedit_type, OB_MESH, OB_GPENCIL));
+  return ((around == V3D_AROUND_LOCAL_ORIGINS) &&
+          ELEM(t->obedit_type, OB_MESH, OB_GPENCIL_LEGACY));
 }
 
 /* ************************** SPACE DEPENDENT CODE **************************** */
@@ -343,7 +345,7 @@ void projectFloatViewEx(TransInfo *t, const float vec[3], float adr[2], const eV
         adr[1] = vec[1];
       }
       else if (t->region->regiontype == RGN_TYPE_WINDOW) {
-        /* allow points behind the view T33643. */
+        /* allow points behind the view #33643. */
         if (ED_view3d_project_float_global(t->region, vec, adr, flag) != V3D_PROJ_RET_OK) {
           /* XXX, 2.64 and prior did this, weak! */
           adr[0] = t->region->winx / 2.0f;
@@ -534,27 +536,6 @@ static void viewRedrawPost(bContext *C, TransInfo *t)
     /* XXX(ton): temp, first hack to get auto-render in compositor work. */
     WM_event_add_notifier(C, NC_SCENE | ND_TRANSFORM_DONE, CTX_data_scene(C));
   }
-
-#if 0 /* TRANSFORM_FIX_ME */
-  if (t->spacetype == SPACE_VIEW3D) {
-    allqueue(REDRAWBUTSOBJECT, 0);
-    allqueue(REDRAWVIEW3D, 0);
-  }
-  else if (t->spacetype == SPACE_IMAGE) {
-    allqueue(REDRAWIMAGE, 0);
-    allqueue(REDRAWVIEW3D, 0);
-  }
-  else if (ELEM(t->spacetype, SPACE_ACTION, SPACE_NLA, SPACE_GRAPH)) {
-    allqueue(REDRAWVIEW3D, 0);
-    allqueue(REDRAWACTION, 0);
-    allqueue(REDRAWNLA, 0);
-    allqueue(REDRAWIPO, 0);
-    allqueue(REDRAWTIME, 0);
-    allqueue(REDRAWBUTSOBJECT, 0);
-  }
-
-  scrarea_queue_headredraw(curarea);
-#endif
 }
 
 /* ************************************************* */
@@ -620,14 +601,9 @@ static bool transform_modal_item_poll(const wmOperator *op, int value)
       }
       break;
     }
-    case TFM_MODAL_EDGESLIDE_UP:
-    case TFM_MODAL_EDGESLIDE_DOWN: {
-      if (t->mode != TFM_EDGE_SLIDE) {
-        return false;
-      }
-      break;
-    }
-    case TFM_MODAL_INSERTOFS_TOGGLE_DIR: {
+    case TFM_MODAL_INSERTOFS_TOGGLE_DIR:
+    case TFM_MODAL_NODE_ATTACH_ON:
+    case TFM_MODAL_NODE_ATTACH_OFF: {
       if (t->spacetype != SPACE_NODE) {
         return false;
       }
@@ -642,8 +618,48 @@ static bool transform_modal_item_poll(const wmOperator *op, int value)
     }
     case TFM_MODAL_TRANSLATE:
     case TFM_MODAL_ROTATE:
-    case TFM_MODAL_RESIZE: {
+    case TFM_MODAL_RESIZE:
+    case TFM_MODAL_VERT_EDGE_SLIDE:
+    case TFM_MODAL_TRACKBALL: {
       if (!transform_mode_is_changeable(t->mode)) {
+        return false;
+      }
+      if (value == TFM_MODAL_TRANSLATE && t->mode == TFM_TRANSLATION) {
+        /* The tracking transform in MovieClip has an alternate translate that modifies the offset
+         * of the tracks. */
+        return t->data_type == &TransConvertType_Tracking;
+      }
+      if (value == TFM_MODAL_ROTATE && t->mode == TFM_ROTATION) {
+        return false;
+      }
+      if (value == TFM_MODAL_RESIZE && t->mode == TFM_RESIZE) {
+        return false;
+      }
+      if (value == TFM_MODAL_VERT_EDGE_SLIDE &&
+          (t->data_type != &TransConvertType_Mesh ||
+           /* WORKAROUND: Avoid repeated keys in status bar.
+            *
+            * Previously, `Vert/Edge Slide` and `Move` were triggered by the same modal key.
+            * But now, to fix #100129 (Status bar incorrectly shows "[G] Move"), `Vert/Edge Slide`
+            * has its own modal key. However by default it uses the same key as `Move` (G). So, to
+            * avoid displaying the same key twice (G and G), only display this modal key during the
+            * `Move` operation.
+            *
+            * Ideally we should check if it really uses the same key. */
+           t->mode != TFM_TRANSLATION)) {
+        return false;
+      }
+      if (value == TFM_MODAL_TRACKBALL &&
+          /* WORKAROUND: Avoid repeated keys in status bar.
+           *
+           * Previously, `Trackball` and `Rotate` were triggered by the same modal key.
+           * But to fix the status bar incorrectly showing "[R] Rotate", `Trackball` has now its
+           * own modal key. However by default it uses the same key as `Rotate` (R). So, to avoid
+           * displaying the same key twice (R and R), only display this modal key during the
+           * `Rotate` operation.
+           *
+           * Ideally we should check if it really uses the same key. */
+          t->mode != TFM_ROTATION) {
         return false;
       }
       break;
@@ -683,16 +699,18 @@ wmKeyMap *transform_modal_keymap(wmKeyConfig *keyconf)
        0,
        "Decrease Max AutoIK Chain Length",
        ""},
-      {TFM_MODAL_EDGESLIDE_UP, "EDGESLIDE_EDGE_NEXT", 0, "Select Next Edge Slide Edge", ""},
-      {TFM_MODAL_EDGESLIDE_DOWN, "EDGESLIDE_PREV_NEXT", 0, "Select Previous Edge Slide Edge", ""},
       {TFM_MODAL_PROPSIZE, "PROPORTIONAL_SIZE", 0, "Adjust Proportional Influence", ""},
       {TFM_MODAL_INSERTOFS_TOGGLE_DIR,
        "INSERTOFS_TOGGLE_DIR",
        0,
        "Toggle Direction for Node Auto-Offset",
        ""},
+      {TFM_MODAL_NODE_ATTACH_ON, "NODE_ATTACH_ON", 0, "Node Attachment", ""},
+      {TFM_MODAL_NODE_ATTACH_OFF, "NODE_ATTACH_OFF", 0, "Node Attachment (Off)", ""},
       {TFM_MODAL_TRANSLATE, "TRANSLATE", 0, "Move", ""},
+      {TFM_MODAL_VERT_EDGE_SLIDE, "VERT_EDGE_SLIDE", 0, "Vert/Edge Slide", ""},
       {TFM_MODAL_ROTATE, "ROTATE", 0, "Rotate", ""},
+      {TFM_MODAL_TRACKBALL, "TRACKBALL", 0, "TrackBall", ""},
       {TFM_MODAL_RESIZE, "RESIZE", 0, "Resize", ""},
       {TFM_MODAL_AUTOCONSTRAINT, "AUTOCONSTRAIN", 0, "Automatic Constraint", ""},
       {TFM_MODAL_AUTOCONSTRAINTPLANE, "AUTOCONSTRAINPLANE", 0, "Automatic Constraint Plane", ""},
@@ -888,6 +906,9 @@ static bool transform_event_modal_constraint(TransInfo *t, short modal_type)
     else {
       setUserConstraint(t, constraint_new, msg_3d);
     }
+
+    /* Take the opportunity to update the gizmo. */
+    transform_gizmo_3d_model_from_constraint_and_mode_set(t);
   }
   t->redraw |= TREDRAW_HARD;
   return true;
@@ -935,8 +956,15 @@ int transformEvent(TransInfo *t, const wmEvent *event)
         handled = true;
         break;
       case TFM_MODAL_TRANSLATE:
+      case TFM_MODAL_VERT_EDGE_SLIDE:
         /* only switch when... */
-        if (t->mode == TFM_TRANSLATION) {
+        if (!transform_mode_is_changeable(t->mode)) {
+          break;
+        }
+        if (event->val == TFM_MODAL_VERT_EDGE_SLIDE) {
+          if (ELEM(t->mode, TFM_VERT_SLIDE, TFM_EDGE_SLIDE)) {
+            break;
+          }
           if ((t->obedit_type == OB_MESH) && (t->spacetype == SPACE_VIEW3D)) {
             restoreTransObjects(t);
             resetTransModal(t);
@@ -962,15 +990,18 @@ int transformEvent(TransInfo *t, const wmEvent *event)
             t->redraw |= TREDRAW_HARD;
             handled = true;
           }
-          else if (t->options & (CTX_MOVIECLIP | CTX_MASK)) {
-            restoreTransObjects(t);
-
-            t->flag ^= T_ALT_TRANSFORM;
-            t->redraw |= TREDRAW_HARD;
-            handled = true;
-          }
         }
-        else if (transform_mode_is_changeable(t->mode)) {
+        else {
+          if (t->mode == TFM_TRANSLATION) {
+            if (t->data_type == &TransConvertType_Tracking) {
+              restoreTransObjects(t);
+
+              t->flag ^= T_ALT_TRANSFORM;
+              t->redraw |= TREDRAW_HARD;
+              handled = true;
+            }
+            break;
+          }
           restoreTransObjects(t);
           resetTransModal(t);
           resetTransRestrictions(t);
@@ -981,23 +1012,33 @@ int transformEvent(TransInfo *t, const wmEvent *event)
         }
         break;
       case TFM_MODAL_ROTATE:
+      case TFM_MODAL_TRACKBALL:
         /* only switch when... */
-        if (!(t->options & CTX_TEXTURE_SPACE) && !(t->options & (CTX_MOVIECLIP | CTX_MASK))) {
-          if (transform_mode_is_changeable(t->mode)) {
-            restoreTransObjects(t);
-            resetTransModal(t);
-            resetTransRestrictions(t);
-
-            if (t->mode == TFM_ROTATION) {
-              transform_mode_init(t, NULL, TFM_TRACKBALL);
-            }
-            else {
-              transform_mode_init(t, NULL, TFM_ROTATION);
-            }
-            initSnapping(t, NULL); /* need to reinit after mode change */
-            t->redraw |= TREDRAW_HARD;
-            handled = true;
+        if (!transform_mode_is_changeable(t->mode)) {
+          break;
+        }
+        if (event->val == TFM_MODAL_TRACKBALL) {
+          if (t->mode == TFM_TRACKBALL) {
+            break;
           }
+        }
+        else if (t->mode == TFM_ROTATION) {
+          break;
+        }
+        if (!(t->options & CTX_TEXTURE_SPACE) && !(t->options & (CTX_MOVIECLIP | CTX_MASK))) {
+          restoreTransObjects(t);
+          resetTransModal(t);
+          resetTransRestrictions(t);
+
+          if (event->val == TFM_MODAL_TRACKBALL) {
+            transform_mode_init(t, NULL, TFM_TRACKBALL);
+          }
+          else {
+            transform_mode_init(t, NULL, TFM_ROTATION);
+          }
+          initSnapping(t, NULL); /* need to reinit after mode change */
+          t->redraw |= TREDRAW_HARD;
+          handled = true;
         }
         break;
       case TFM_MODAL_RESIZE:
@@ -1012,7 +1053,7 @@ int transformEvent(TransInfo *t, const wmEvent *event)
           }
         }
         else if (transform_mode_is_changeable(t->mode)) {
-          /* Scale isn't normally very useful after extrude along normals, see T39756 */
+          /* Scale isn't normally very useful after extrude along normals, see #39756 */
           if ((t->con.mode & CON_APPLY) && (t->orient[t->orient_curr].type == V3D_ORIENT_NORMAL)) {
             stopConstraint(t);
           }
@@ -1142,6 +1183,17 @@ int transformEvent(TransInfo *t, const wmEvent *event)
           t->redraw |= TREDRAW_SOFT;
         }
         break;
+      case TFM_MODAL_NODE_ATTACH_ON:
+        t->modifiers |= MOD_NODE_ATTACH;
+        t->redraw |= TREDRAW_HARD;
+        handled = true;
+        break;
+      case TFM_MODAL_NODE_ATTACH_OFF:
+        t->modifiers &= ~MOD_NODE_ATTACH;
+        t->redraw |= TREDRAW_HARD;
+        handled = true;
+        break;
+
       case TFM_MODAL_AUTOCONSTRAINT:
       case TFM_MODAL_AUTOCONSTRAINTPLANE:
         if ((t->flag & T_RELEASE_CONFIRM) && (event->prev_val == KM_RELEASE) &&
@@ -1206,9 +1258,6 @@ int transformEvent(TransInfo *t, const wmEvent *event)
           t->redraw |= TREDRAW_HARD;
         }
         break;
-      /* Those two are only handled in transform's own handler, see T44634! */
-      case TFM_MODAL_EDGESLIDE_UP:
-      case TFM_MODAL_EDGESLIDE_DOWN:
       default:
         break;
     }
@@ -1317,7 +1366,7 @@ int transformEvent(TransInfo *t, const wmEvent *event)
 
   /* Per transform event, if present */
   if (t->handleEvent && (!handled ||
-                         /* Needed for vertex slide, see T38756. */
+                         /* Needed for vertex slide, see #38756. */
                          (event->type == MOUSEMOVE))) {
     t->redraw |= t->handleEvent(t, event);
   }
@@ -1348,7 +1397,7 @@ bool calculateTransformCenter(bContext *C, int centerMode, float cent3d[3], floa
 
   t->state = TRANS_RUNNING;
 
-  /* avoid calculating PET */
+  /* Avoid calculating proportional editing. */
   t->options = CTX_NO_PET;
 
   t->mode = TFM_DUMMY;
@@ -1392,7 +1441,7 @@ bool calculateTransformCenter(bContext *C, int centerMode, float cent3d[3], floa
 
 static bool transinfo_show_overlay(const struct bContext *C, TransInfo *t, ARegion *region)
 {
-  /* Don't show overlays when not the active view and when overlay is disabled: T57139 */
+  /* Don't show overlays when not the active view and when overlay is disabled: #57139 */
   bool ok = false;
   if (region == t->region) {
     ok = true;
@@ -1499,6 +1548,12 @@ static void drawTransformPixel(const struct bContext *C, ARegion *region, void *
 
 void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
 {
+  if (t->state == TRANS_CANCEL) {
+    /* No need to edit operator properties or tool settings if we are canceling the operation.
+     * These properties must match the original ones. */
+    return;
+  }
+
   ToolSettings *ts = CTX_data_tool_settings(C);
   PropertyRNA *prop;
 
@@ -1591,9 +1646,9 @@ void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
     if ((prop = RNA_struct_find_property(op->ptr, "snap_elements"))) {
       RNA_property_enum_set(op->ptr, prop, t->tsnap.mode);
       RNA_boolean_set(op->ptr, "use_snap_project", t->tsnap.project);
-      RNA_enum_set(op->ptr, "snap_target", t->tsnap.source_select);
+      RNA_enum_set(op->ptr, "snap_target", t->tsnap.source_operation);
 
-      eSnapTargetSelect target = t->tsnap.target_select;
+      eSnapTargetOP target = t->tsnap.target_operation;
       RNA_boolean_set(op->ptr, "use_snap_self", (target & SCE_SNAP_TARGET_NOT_ACTIVE) == 0);
       RNA_boolean_set(op->ptr, "use_snap_edit", (target & SCE_SNAP_TARGET_NOT_EDITED) == 0);
       RNA_boolean_set(op->ptr, "use_snap_nonedit", (target & SCE_SNAP_TARGET_NOT_NONEDITED) == 0);
@@ -1604,7 +1659,7 @@ void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
     /* Update `ToolSettings` for properties that change during modal. */
     if (t->flag & T_MODAL) {
       /* Do we check for parameter? */
-      if (transformModeUseSnap(t)) {
+      if (transformModeUseSnap(t) && !(t->modifiers & MOD_SNAP_FORCED)) {
         if (!(t->modifiers & MOD_SNAP) != !(t->tsnap.flag & SCE_SNAP)) {
           /* Type is #eSnapFlag, but type must match various snap attributes in #ToolSettings. */
           short *snap_flag_ptr;
@@ -1868,12 +1923,10 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
      *
      * Do this only for translation/rotation/resize because only these
      * modes are available from gizmo and doing such check could
-     * lead to keymap conflicts for other modes (see T31584)
+     * lead to keymap conflicts for other modes (see #31584)
      */
     if (ELEM(mode, TFM_TRANSLATION, TFM_ROTATION, TFM_RESIZE)) {
-      wmKeyMapItem *kmi;
-
-      for (kmi = t->keymap->items.first; kmi; kmi = kmi->next) {
+      LISTBASE_FOREACH (const wmKeyMapItem *, kmi, &t->keymap->items) {
         if (kmi->flag & KMI_INACTIVE) {
           continue;
         }
@@ -1886,6 +1939,28 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
               (ELEM(kmi->type, EVT_LEFTALTKEY, EVT_RIGHTALTKEY) && (event->modifier & KM_ALT)) ||
               ((kmi->type == EVT_OSKEY) && (event->modifier & KM_OSKEY))) {
             t->modifiers |= MOD_SNAP_INVERT;
+          }
+          break;
+        }
+      }
+    }
+    if (t->data_type == &TransConvertType_Node) {
+      /* Set the initial auto-attach flag based on whether the chosen keymap key is pressed at the
+       * start of the operator. */
+      t->modifiers |= MOD_NODE_ATTACH;
+      LISTBASE_FOREACH (const wmKeyMapItem *, kmi, &t->keymap->items) {
+        if (kmi->flag & KMI_INACTIVE) {
+          continue;
+        }
+
+        if (kmi->propvalue == TFM_MODAL_NODE_ATTACH_OFF && kmi->val == KM_PRESS) {
+          if ((ELEM(kmi->type, EVT_LEFTCTRLKEY, EVT_RIGHTCTRLKEY) &&
+               (event->modifier & KM_CTRL)) ||
+              (ELEM(kmi->type, EVT_LEFTSHIFTKEY, EVT_RIGHTSHIFTKEY) &&
+               (event->modifier & KM_SHIFT)) ||
+              (ELEM(kmi->type, EVT_LEFTALTKEY, EVT_RIGHTALTKEY) && (event->modifier & KM_ALT)) ||
+              ((kmi->type == EVT_OSKEY) && (event->modifier & KM_OSKEY))) {
+            t->modifiers &= ~MOD_NODE_ATTACH;
           }
           break;
         }
@@ -2055,6 +2130,8 @@ int transformEnd(bContext *C, TransInfo *t)
     viewRedrawPost(C, t);
 
     viewRedrawForce(C, t);
+
+    transform_gizmo_3d_model_from_constraint_and_mode_restore(t);
   }
 
   t->context = NULL;

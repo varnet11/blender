@@ -18,18 +18,19 @@ set(INC_SYS
   ${JPEG_INCLUDE_DIR}
   ${PNG_INCLUDE_DIRS}
   ${ZLIB_INCLUDE_DIRS}
+  ${OPENIMAGEIO_INCLUDE_DIRS}
 )
 
 set(SRC
   intern/allocimbuf.c
   intern/anim_movie.c
   intern/bmp.c
-  intern/cache.c
   intern/colormanagement.c
   intern/colormanagement_inline.c
   intern/divers.c
   intern/filetype.c
   intern/filter.c
+  intern/format_psd.cc
   intern/imageprocess.c
   intern/indexer.c
   intern/iris.c
@@ -75,6 +76,7 @@ set(LIB
   bf_blenkernel
   bf_blenlib
   bf_blenloader
+  bf_imbuf_openimageio
   bf_intern_guardedalloc
   bf_intern_memutil
   bf_intern_opencolorio
@@ -105,14 +107,6 @@ if(WITH_IMAGE_TIFF)
     ${TIFF_LIBRARY}
   )
   add_definitions(-DWITH_TIFF)
-endif()
-
-
-if(WITH_OPENIMAGEIO)
-  list(APPEND LIB
-    bf_imbuf_openimageio
-  )
-  add_definitions(-DWITH_OPENIMAGEIO)
 endif()
 
 if(WITH_IMAGE_OPENJPEG)

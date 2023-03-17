@@ -44,7 +44,7 @@ static bool modifier_ui_poll(const bContext *C, PanelType *UNUSED(pt))
 {
   Object *ob = ED_object_active_context(C);
 
-  return (ob != NULL) && (ob->type != OB_GPENCIL);
+  return (ob != NULL) && (ob->type != OB_GPENCIL_LEGACY);
 }
 
 /* -------------------------------------------------------------------- */
@@ -273,6 +273,17 @@ static void modifier_ops_extra_draw(bContext *C, uiLayout *layout, void *md_v)
   RNA_int_set(&op_ptr, "index", BLI_listbase_count(&ob->modifiers) - 1);
   if (!md->next) {
     uiLayoutSetEnabled(row, false);
+  }
+
+  if (md->type == eModifierType_Nodes) {
+    uiItemFullO(layout,
+                "OBJECT_OT_geometry_nodes_move_to_nodes",
+                NULL,
+                ICON_NONE,
+                NULL,
+                WM_OP_INVOKE_DEFAULT,
+                0,
+                &op_ptr);
   }
 }
 

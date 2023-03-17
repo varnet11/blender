@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include "BKE_gpencil.h"
+#include "BKE_gpencil_legacy.h"
 #include "BKE_image.h"
 #include "DRW_gpu_wrapper.hh"
 #include "DRW_render.h"
@@ -28,8 +28,12 @@ class AntiAliasing {
  private:
   ShaderModule &shaders_;
 
-  Texture smaa_search_tx_ = {"smaa_search", GPU_R8, int2(SEARCHTEX_WIDTH, SEARCHTEX_HEIGHT)};
-  Texture smaa_area_tx_ = {"smaa_area", GPU_RG8, int2(AREATEX_WIDTH, AREATEX_HEIGHT)};
+  Texture smaa_search_tx_ = {"smaa_search",
+                             GPU_R8,
+                             GPU_TEXTURE_USAGE_SHADER_READ,
+                             int2(SEARCHTEX_WIDTH, SEARCHTEX_HEIGHT)};
+  Texture smaa_area_tx_ = {
+      "smaa_area", GPU_RG8, GPU_TEXTURE_USAGE_SHADER_READ, int2(AREATEX_WIDTH, AREATEX_HEIGHT)};
 
   TextureFromPool edge_detect_tx_ = {"edge_detect_tx"};
   Framebuffer edge_detect_fb_ = {"edge_detect_fb"};

@@ -67,8 +67,10 @@ void Instance::init(const int2 &output_res,
   film.init(output_res, output_rect);
   velocity.init();
   depth_of_field.init();
+  shadows.init();
   motion_blur.init();
   main_view.init();
+  irradiance_cache.init();
 }
 
 void Instance::set_time(float time)
@@ -102,6 +104,7 @@ void Instance::begin_sync()
   materials.begin_sync();
   velocity.begin_sync(); /* NOTE: Also syncs camera. */
   lights.begin_sync();
+  shadows.begin_sync();
   cryptomatte.begin_sync();
 
   gpencil_engine_enabled = false;
@@ -115,6 +118,7 @@ void Instance::begin_sync()
   main_view.sync();
   world.sync();
   film.sync();
+  irradiance_cache.sync();
 }
 
 void Instance::scene_sync()
@@ -134,7 +138,7 @@ void Instance::scene_sync()
 
 void Instance::object_sync(Object *ob)
 {
-  const bool is_renderable_type = ELEM(ob->type, OB_CURVES, OB_GPENCIL, OB_MESH, OB_LAMP);
+  const bool is_renderable_type = ELEM(ob->type, OB_CURVES, OB_GPENCIL_LEGACY, OB_MESH, OB_LAMP);
   const int ob_visibility = DRW_object_visibility_in_active_context(ob);
   const bool partsys_is_visible = (ob_visibility & OB_VISIBLE_PARTICLES) != 0 &&
                                   (ob->type == OB_MESH);
@@ -172,7 +176,7 @@ void Instance::object_sync(Object *ob)
       case OB_CURVES:
         sync.sync_curves(ob, ob_handle, res_handle);
         break;
-      case OB_GPENCIL:
+      case OB_GPENCIL_LEGACY:
         sync.sync_gpencil(ob, ob_handle, res_handle);
         break;
       default:
@@ -197,6 +201,7 @@ void Instance::object_sync_render(void *instance_,
 void Instance::end_sync()
 {
   velocity.end_sync();
+  shadows.end_sync(); /** \note: Needs to be before lights. */
   lights.end_sync();
   sampling.end_sync();
   film.end_sync();
@@ -337,7 +342,7 @@ void Instance::draw_viewport(DefaultFramebufferList *dfbl)
 
   if (materials.queued_shaders_count > 0) {
     std::stringstream ss;
-    ss << "Compiling Shaders " << materials.queued_shaders_count;
+    ss << "Compiling Shaders (" << materials.queued_shaders_count << " remaining)";
     info = ss.str();
   }
 }

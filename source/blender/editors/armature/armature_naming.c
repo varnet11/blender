@@ -15,8 +15,8 @@
 #include "DNA_armature_types.h"
 #include "DNA_camera_types.h"
 #include "DNA_constraint_types.h"
+#include "DNA_gpencil_legacy_types.h"
 #include "DNA_gpencil_modifier_types.h"
-#include "DNA_gpencil_types.h"
 #include "DNA_object_types.h"
 
 #include "BLI_blenlib.h"
@@ -32,7 +32,7 @@
 #include "BKE_constraint.h"
 #include "BKE_context.h"
 #include "BKE_deform.h"
-#include "BKE_gpencil_modifier.h"
+#include "BKE_gpencil_modifier_legacy.h"
 #include "BKE_layer.h"
 #include "BKE_main.h"
 #include "BKE_modifier.h"
@@ -294,7 +294,7 @@ void ED_armature_bone_rename(Main *bmain,
       }
 
       /* fix grease pencil modifiers and vertex groups */
-      if (ob->type == OB_GPENCIL) {
+      if (ob->type == OB_GPENCIL_LEGACY) {
 
         bGPdata *gpd = (bGPdata *)ob->data;
         LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
@@ -337,7 +337,7 @@ void ED_armature_bone_rename(Main *bmain,
 
     /* Fix all animdata that may refer to this bone -
      * we can't just do the ones attached to objects,
-     * since other ID-blocks may have drivers referring to this bone T29822. */
+     * since other ID-blocks may have drivers referring to this bone #29822. */
 
     /* XXX: the ID here is for armatures,
      * but most bone drivers are actually on the object instead. */

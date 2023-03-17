@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include "BKE_gpencil.h"
+#include "BKE_gpencil_legacy.h"
 #include "BKE_image.h"
 #include "DRW_gpu_wrapper.hh"
 #include "DRW_render.h"

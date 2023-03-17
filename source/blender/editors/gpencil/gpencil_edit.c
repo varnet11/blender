@@ -23,8 +23,8 @@
 
 #include "BLT_translation.h"
 
+#include "DNA_gpencil_legacy_types.h"
 #include "DNA_gpencil_modifier_types.h"
-#include "DNA_gpencil_types.h"
 #include "DNA_material_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
@@ -37,9 +37,9 @@
 #include "BKE_context.h"
 #include "BKE_deform.h"
 #include "BKE_global.h"
-#include "BKE_gpencil.h"
-#include "BKE_gpencil_curve.h"
-#include "BKE_gpencil_geom.h"
+#include "BKE_gpencil_curve_legacy.h"
+#include "BKE_gpencil_geom_legacy.h"
+#include "BKE_gpencil_legacy.h"
 #include "BKE_layer.h"
 #include "BKE_lib_id.h"
 #include "BKE_library.h"
@@ -91,7 +91,7 @@ static bool gpencil_stroke_edit_poll(bContext *C)
 {
   /* edit only supported with grease pencil objects */
   Object *ob = CTX_data_active_object(C);
-  if ((ob == NULL) || (ob->type != OB_GPENCIL)) {
+  if ((ob == NULL) || (ob->type != OB_GPENCIL_LEGACY)) {
     return false;
   }
 
@@ -104,7 +104,7 @@ static bool gpencil_strokes_edit3d_poll(bContext *C)
 {
   /* edit only supported with grease pencil objects */
   Object *ob = CTX_data_active_object(C);
-  if ((ob == NULL) || (ob->type != OB_GPENCIL)) {
+  if ((ob == NULL) || (ob->type != OB_GPENCIL_LEGACY)) {
     return false;
   }
 
@@ -119,12 +119,12 @@ static bool gpencil_editmode_toggle_poll(bContext *C)
 {
   /* edit only supported with grease pencil objects */
   Object *ob = CTX_data_active_object(C);
-  if ((ob == NULL) || (ob->type != OB_GPENCIL)) {
+  if ((ob == NULL) || (ob->type != OB_GPENCIL_LEGACY)) {
     return false;
   }
 
   /* if using gpencil object, use this gpd */
-  if (ob->type == OB_GPENCIL) {
+  if (ob->type == OB_GPENCIL_LEGACY) {
     return ob->data != NULL;
   }
 
@@ -134,7 +134,7 @@ static bool gpencil_editmode_toggle_poll(bContext *C)
 static bool gpencil_stroke_not_in_curve_edit_mode(bContext *C)
 {
   Object *ob = CTX_data_active_object(C);
-  if ((ob == NULL) || (ob->type != OB_GPENCIL)) {
+  if ((ob == NULL) || (ob->type != OB_GPENCIL_LEGACY)) {
     return false;
   }
   bGPdata *gpd = (bGPdata *)ob->data;
@@ -159,7 +159,7 @@ static int gpencil_editmode_toggle_exec(bContext *C, wmOperator *op)
   short mode;
   /* if using a gpencil object, use this datablock */
   Object *ob = CTX_data_active_object(C);
-  if ((ob) && (ob->type == OB_GPENCIL)) {
+  if ((ob) && (ob->type == OB_GPENCIL_LEGACY)) {
     gpd = ob->data;
     is_object = true;
   }
@@ -261,7 +261,7 @@ static bool gpencil_selectmode_toggle_poll(bContext *C)
 {
   /* edit only supported with grease pencil objects */
   Object *ob = CTX_data_active_object(C);
-  if ((ob == NULL) || (ob->type != OB_GPENCIL) || (ob->mode != OB_MODE_EDIT_GPENCIL)) {
+  if ((ob == NULL) || (ob->type != OB_GPENCIL_LEGACY) || (ob->mode != OB_MODE_EDIT_GPENCIL)) {
     return false;
   }
 
@@ -341,7 +341,7 @@ static bool gpencil_paintmode_toggle_poll(bContext *C)
 {
   /* if using gpencil object, use this gpd */
   Object *ob = CTX_data_active_object(C);
-  if ((ob) && (ob->type == OB_GPENCIL)) {
+  if ((ob) && (ob->type == OB_GPENCIL_LEGACY)) {
     return ob->data != NULL;
   }
   return ED_gpencil_data_get_active(C) != NULL;
@@ -360,7 +360,7 @@ static int gpencil_paintmode_toggle_exec(bContext *C, wmOperator *op)
   short mode;
   /* if using a gpencil object, use this datablock */
   Object *ob = CTX_data_active_object(C);
-  if ((ob) && (ob->type == OB_GPENCIL)) {
+  if ((ob) && (ob->type == OB_GPENCIL_LEGACY)) {
     gpd = ob->data;
     is_object = true;
   }
@@ -457,7 +457,7 @@ static bool gpencil_sculptmode_toggle_poll(bContext *C)
 {
   /* if using gpencil object, use this gpd */
   Object *ob = CTX_data_active_object(C);
-  if ((ob) && (ob->type == OB_GPENCIL)) {
+  if ((ob) && (ob->type == OB_GPENCIL_LEGACY)) {
     return ob->data != NULL;
   }
   return ED_gpencil_data_get_active(C) != NULL;
@@ -476,7 +476,7 @@ static int gpencil_sculptmode_toggle_exec(bContext *C, wmOperator *op)
   short mode;
   /* if using a gpencil object, use this datablock */
   Object *ob = CTX_data_active_object(C);
-  if ((ob) && (ob->type == OB_GPENCIL)) {
+  if ((ob) && (ob->type == OB_GPENCIL_LEGACY)) {
     gpd = ob->data;
     is_object = true;
   }
@@ -566,7 +566,7 @@ static bool gpencil_weightmode_toggle_poll(bContext *C)
 {
   /* if using gpencil object, use this gpd */
   Object *ob = CTX_data_active_object(C);
-  if ((ob) && (ob->type == OB_GPENCIL)) {
+  if ((ob) && (ob->type == OB_GPENCIL_LEGACY)) {
     return ob->data != NULL;
   }
   return ED_gpencil_data_get_active(C) != NULL;
@@ -585,7 +585,7 @@ static int gpencil_weightmode_toggle_exec(bContext *C, wmOperator *op)
   short mode;
   /* if using a gpencil object, use this datablock */
   Object *ob = CTX_data_active_object(C);
-  if ((ob) && (ob->type == OB_GPENCIL)) {
+  if ((ob) && (ob->type == OB_GPENCIL_LEGACY)) {
     gpd = ob->data;
     is_object = true;
   }
@@ -678,7 +678,7 @@ static bool gpencil_vertexmode_toggle_poll(bContext *C)
 {
   /* if using gpencil object, use this gpd */
   Object *ob = CTX_data_active_object(C);
-  if ((ob) && (ob->type == OB_GPENCIL)) {
+  if ((ob) && (ob->type == OB_GPENCIL_LEGACY)) {
     return ob->data != NULL;
   }
   return ED_gpencil_data_get_active(C) != NULL;
@@ -696,7 +696,7 @@ static int gpencil_vertexmode_toggle_exec(bContext *C, wmOperator *op)
   short mode;
   /* if using a gpencil object, use this datablock */
   Object *ob = CTX_data_active_object(C);
-  if ((ob) && (ob->type == OB_GPENCIL)) {
+  if ((ob) && (ob->type == OB_GPENCIL_LEGACY)) {
     gpd = ob->data;
     is_object = true;
   }
@@ -913,11 +913,6 @@ static int gpencil_duplicate_exec(bContext *C, wmOperator *op)
 
   if (gpd == NULL) {
     BKE_report(op->reports, RPT_ERROR, "No Grease Pencil data");
-    return OPERATOR_CANCELLED;
-  }
-
-  if (GPENCIL_MULTIEDIT_SESSIONS_ON(gpd)) {
-    BKE_report(op->reports, RPT_ERROR, "Operator not supported in multiframe edition");
     return OPERATOR_CANCELLED;
   }
 
@@ -1483,14 +1478,10 @@ static int gpencil_strokes_copy_exec(bContext *C, wmOperator *op)
   Object *ob = CTX_data_active_object(C);
   bGPdata *gpd = ED_gpencil_data_get_active(C);
   const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
+  const bool is_multiedit = (bool)GPENCIL_MULTIEDIT_SESSIONS_ON(gpd);
 
   if (gpd == NULL) {
     BKE_report(op->reports, RPT_ERROR, "No Grease Pencil data");
-    return OPERATOR_CANCELLED;
-  }
-
-  if (GPENCIL_MULTIEDIT_SESSIONS_ON(gpd)) {
-    BKE_report(op->reports, RPT_ERROR, "Operator not supported in multiframe edition");
     return OPERATOR_CANCELLED;
   }
 
@@ -1506,47 +1497,51 @@ static int gpencil_strokes_copy_exec(bContext *C, wmOperator *op)
      * once all done
      */
     CTX_DATA_BEGIN (C, bGPDlayer *, gpl, editable_gpencil_layers) {
-      bGPDframe *gpf = gpl->actframe;
-      bGPDstroke *gps;
+      bGPDframe *init_gpf = (is_multiedit) ? gpl->frames.first : gpl->actframe;
 
-      if (gpf == NULL) {
-        continue;
-      }
+      for (bGPDframe *gpf = init_gpf; gpf; gpf = gpf->next) {
+        if ((gpf == gpl->actframe) || ((gpf->flag & GP_FRAME_SELECT) && (is_multiedit))) {
+          if (gpf == NULL) {
+            continue;
+          }
 
-      /* make copies of selected strokes, and deselect these once we're done */
-      for (gps = gpf->strokes.first; gps; gps = gps->next) {
-        /* skip strokes that are invalid for current view */
-        if (ED_gpencil_stroke_can_use(C, gps) == false) {
-          continue;
-        }
-
-        if (gps->flag & GP_STROKE_SELECT) {
-          if (gps->totpoints == 1) {
-            /* Special Case: If there's just a single point in this stroke... */
-            bGPDstroke *gpsd;
-
-            /* make direct copies of the stroke and its points */
-            gpsd = BKE_gpencil_stroke_duplicate(gps, false, true);
-
-            /* saves original layer name */
-            BLI_strncpy(
-                gpsd->runtime.tmp_layerinfo, gpl->info, sizeof(gpsd->runtime.tmp_layerinfo));
-            gpsd->points = MEM_dupallocN(gps->points);
-            if (gps->dvert != NULL) {
-              gpsd->dvert = MEM_dupallocN(gps->dvert);
-              BKE_gpencil_stroke_weights_duplicate(gps, gpsd);
+          /* make copies of selected strokes, and deselect these once we're done */
+          for (bGPDstroke *gps = gpf->strokes.first; gps; gps = gps->next) {
+            /* skip strokes that are invalid for current view */
+            if (ED_gpencil_stroke_can_use(C, gps) == false) {
+              continue;
             }
 
-            /* Calc geometry data. */
-            BKE_gpencil_stroke_geometry_update(gpd, gpsd);
+            if (gps->flag & GP_STROKE_SELECT) {
+              if (gps->totpoints == 1) {
+                /* Special Case: If there's just a single point in this stroke... */
+                bGPDstroke *gpsd;
 
-            /* add to temp buffer */
-            gpsd->next = gpsd->prev = NULL;
-            BLI_addtail(&gpencil_strokes_copypastebuf, gpsd);
-          }
-          else {
-            /* delegate to a helper, as there's too much to fit in here (for copying subsets)... */
-            gpencil_duplicate_points(gpd, gps, &gpencil_strokes_copypastebuf, gpl->info);
+                /* make direct copies of the stroke and its points */
+                gpsd = BKE_gpencil_stroke_duplicate(gps, false, true);
+
+                /* saves original layer name */
+                BLI_strncpy(
+                    gpsd->runtime.tmp_layerinfo, gpl->info, sizeof(gpsd->runtime.tmp_layerinfo));
+                gpsd->points = MEM_dupallocN(gps->points);
+                if (gps->dvert != NULL) {
+                  gpsd->dvert = MEM_dupallocN(gps->dvert);
+                  BKE_gpencil_stroke_weights_duplicate(gps, gpsd);
+                }
+
+                /* Calc geometry data. */
+                BKE_gpencil_stroke_geometry_update(gpd, gpsd);
+
+                /* add to temp buffer */
+                gpsd->next = gpsd->prev = NULL;
+                BLI_addtail(&gpencil_strokes_copypastebuf, gpsd);
+              }
+              else {
+                /* delegate to a helper, as there's too much to fit in here (for copying
+                 * subsets)... */
+                gpencil_duplicate_points(gpd, gps, &gpencil_strokes_copypastebuf, gpl->info);
+              }
+            }
           }
         }
       }
@@ -1631,19 +1626,17 @@ static int gpencil_strokes_paste_exec(bContext *C, wmOperator *op)
   Object *ob = CTX_data_active_object(C);
   bGPdata *gpd = (bGPdata *)ob->data;
   const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
+  const bool is_multiedit = (bool)GPENCIL_MULTIEDIT_SESSIONS_ON(gpd);
   bGPDlayer *gpl = BKE_gpencil_layer_active_get(gpd); /* only use active for copy merge */
   Scene *scene = CTX_data_scene(C);
-  bGPDframe *gpf;
+
+  bGPDframe *init_gpf = (is_multiedit) ? gpl->frames.first : gpl->actframe;
 
   eGP_PasteMode type = RNA_enum_get(op->ptr, "type");
   const bool on_back = RNA_boolean_get(op->ptr, "paste_back");
   GHash *new_colors;
 
   /* Check for various error conditions. */
-  if (GPENCIL_MULTIEDIT_SESSIONS_ON(gpd)) {
-    BKE_report(op->reports, RPT_ERROR, "Operator not supported in multiframe edition");
-    return OPERATOR_CANCELLED;
-  }
 
   if (BLI_listbase_is_empty(&gpencil_strokes_copypastebuf)) {
     BKE_report(op->reports,
@@ -1702,6 +1695,7 @@ static int gpencil_strokes_paste_exec(bContext *C, wmOperator *op)
     /* Copy over the strokes from the buffer (and adjust the colors) */
     bGPDstroke *gps_init = (!on_back) ? gpencil_strokes_copypastebuf.first :
                                         gpencil_strokes_copypastebuf.last;
+
     for (bGPDstroke *gps = gps_init; gps; gps = (!on_back) ? gps->next : gps->prev) {
       if (ED_gpencil_stroke_can_use(C, gps)) {
         /* Need to verify if layer exists */
@@ -1719,6 +1713,42 @@ static int gpencil_strokes_paste_exec(bContext *C, wmOperator *op)
          *       we reuse active frame or add a new frame if one
          *       doesn't exist already depending on REC button status.
          */
+
+        for (bGPDframe *gpf = init_gpf; gpf; gpf = gpf->next) {
+          /* Active frame is copied later, so don't need duplicate the stroke here. */
+          if (gpl->actframe == gpf) {
+            continue;
+          }
+          if (gpf->flag & GP_FRAME_SELECT) {
+            if (gpf) {
+              /* Create new stroke */
+              bGPDstroke *new_stroke = BKE_gpencil_stroke_duplicate(gps, true, true);
+              new_stroke->runtime.tmp_layerinfo[0] = '\0';
+              new_stroke->next = new_stroke->prev = NULL;
+
+              /* Calc geometry data. */
+              BKE_gpencil_stroke_geometry_update(gpd, new_stroke);
+
+              if (on_back) {
+                BLI_addhead(&gpf->strokes, new_stroke);
+              }
+              else {
+                BLI_addtail(&gpf->strokes, new_stroke);
+              }
+
+              /* Remap material */
+              Material *ma = BLI_ghash_lookup(new_colors, POINTER_FROM_INT(new_stroke->mat_nr));
+              new_stroke->mat_nr = BKE_gpencil_object_material_index_get(ob, ma);
+              CLAMP_MIN(new_stroke->mat_nr, 0);
+            }
+          }
+          /* If not multi-edit, exit loop. */
+          if (!is_multiedit) {
+            break;
+          }
+        }
+
+        bGPDframe *gpf;
         if (IS_AUTOKEY_ON(scene) || (gpl->actframe == NULL)) {
           gpf = BKE_gpencil_layer_frame_get(gpl, scene->r.cfra, GP_GETFRAME_ADD_NEW);
         }
@@ -1903,39 +1933,12 @@ static int gpencil_move_to_layer_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
-static void layer_new_name_get(bGPdata *gpd, char *rname)
-{
-  int index = 0;
-  LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
-    if (strstr(gpl->info, "GP_Layer")) {
-      index++;
-    }
-  }
-
-  if (index == 0) {
-    BLI_strncpy(rname, "GP_Layer", 128);
-    return;
-  }
-  char *name = BLI_sprintfN("%.*s.%03d", 128, "GP_Layer", index);
-  BLI_strncpy(rname, name, 128);
-  MEM_freeN(name);
-}
-
 static int gpencil_move_to_layer_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
 {
-  Object *ob = CTX_data_active_object(C);
-  PropertyRNA *prop;
-  if (RNA_int_get(op->ptr, "layer") == -1) {
-    prop = RNA_struct_find_property(op->ptr, "new_layer_name");
-    if (!RNA_property_is_set(op->ptr, prop)) {
-      char name[MAX_NAME];
-      bGPdata *gpd = ob->data;
-      layer_new_name_get(gpd, name);
-      RNA_property_string_set(op->ptr, prop, name);
-      return WM_operator_props_dialog_popup(C, op, 200);
-    }
+  const int tmp = ED_gpencil_new_layer_dialog(C, op);
+  if (tmp != 0) {
+    return tmp;
   }
-
   return gpencil_move_to_layer_exec(C, op);
 }
 
@@ -2819,7 +2822,7 @@ static bool gpencil_snap_poll(bContext *C)
   ScrArea *area = CTX_wm_area(C);
   Object *ob = CTX_data_active_object(C);
 
-  return (ob != NULL) && (ob->type == OB_GPENCIL) &&
+  return (ob != NULL) && (ob->type == OB_GPENCIL_LEGACY) &&
          ((area != NULL) && (area->spacetype == SPACE_VIEW3D));
 }
 
@@ -4060,12 +4063,11 @@ void GPENCIL_OT_reproject(wmOperatorType *ot)
   ot->prop = RNA_def_enum(
       ot->srna, "type", reproject_type, GP_REPROJECT_VIEW, "Projection Type", "");
 
-  prop = RNA_def_boolean(
-      ot->srna,
-      "keep_original",
-      0,
-      "Keep Original",
-      "Keep original strokes and create a copy before reprojecting instead of reproject them");
+  prop = RNA_def_boolean(ot->srna,
+                         "keep_original",
+                         0,
+                         "Keep Original",
+                         "Keep original strokes and create a copy before reprojecting");
   RNA_def_property_translation_context(prop, BLT_I18NCONTEXT_ID_MOVIECLIP);
 
   RNA_def_float(ot->srna, "offset", 0.0f, 0.0f, 10.0f, "Surface Offset", "", 0.0f, 10.0f);
@@ -4074,7 +4076,7 @@ void GPENCIL_OT_reproject(wmOperatorType *ot)
 static int gpencil_recalc_geometry_exec(bContext *C, wmOperator *UNUSED(op))
 {
   Object *ob = CTX_data_active_object(C);
-  if ((ob == NULL) || (ob->type != OB_GPENCIL)) {
+  if ((ob == NULL) || (ob->type != OB_GPENCIL_LEGACY)) {
     return OPERATOR_CANCELLED;
   }
 
@@ -4772,7 +4774,7 @@ void GPENCIL_OT_stroke_simplify(wmOperatorType *ot)
   /* identifiers */
   ot->name = "Simplify Stroke";
   ot->idname = "GPENCIL_OT_stroke_simplify";
-  ot->description = "Simplify selected stroked reducing number of points";
+  ot->description = "Simplify selected strokes, reducing number of points";
 
   /* api callbacks */
   ot->exec = gpencil_stroke_simplify_exec;
@@ -4833,7 +4835,7 @@ void GPENCIL_OT_stroke_simplify_fixed(wmOperatorType *ot)
   /* identifiers */
   ot->name = "Simplify Fixed Stroke";
   ot->idname = "GPENCIL_OT_stroke_simplify_fixed";
-  ot->description = "Simplify selected stroked reducing number of points using fixed algorithm";
+  ot->description = "Simplify selected strokes, reducing number of points using fixed algorithm";
 
   /* api callbacks */
   ot->exec = gpencil_stroke_simplify_fixed_exec;
@@ -5537,7 +5539,7 @@ static void gpencil_cutter_dissolve(bGPdata *gpd,
     }
 
     BKE_gpencil_stroke_delete_tagged_points(
-        gpd, hit_layer->actframe, hit_stroke, gpsn, GP_SPOINT_TAG, false, flat_caps, 1);
+        gpd, hit_layer->actframe, hit_stroke, gpsn, GP_SPOINT_TAG, false, false, 1);
   }
 }
 
@@ -5777,7 +5779,7 @@ bool ED_object_gpencil_exit(struct Main *bmain, Object *ob)
 static bool gpencil_merge_by_distance_poll(bContext *C)
 {
   Object *ob = CTX_data_active_object(C);
-  if ((ob == NULL) || (ob->type != OB_GPENCIL)) {
+  if ((ob == NULL) || (ob->type != OB_GPENCIL_LEGACY)) {
     return false;
   }
   bGPdata *gpd = (bGPdata *)ob->data;
@@ -5864,7 +5866,7 @@ typedef enum eGP_NormalizeMode {
 static bool gpencil_stroke_normalize_poll(bContext *C)
 {
   Object *ob = CTX_data_active_object(C);
-  if ((ob == NULL) || (ob->type != OB_GPENCIL)) {
+  if ((ob == NULL) || (ob->type != OB_GPENCIL_LEGACY)) {
     return false;
   }
   bGPdata *gpd = (bGPdata *)ob->data;

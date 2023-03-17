@@ -225,22 +225,22 @@ static void do_versions_nodetree_socket_use_flags_2_62(bNodeTree *ntree)
 
   for (node = ntree->nodes.first; node; node = node->next) {
     for (sock = node->inputs.first; sock; sock = sock->next) {
-      sock->flag &= ~SOCK_IN_USE;
+      sock->flag &= ~SOCK_IS_LINKED;
     }
     for (sock = node->outputs.first; sock; sock = sock->next) {
-      sock->flag &= ~SOCK_IN_USE;
+      sock->flag &= ~SOCK_IS_LINKED;
     }
   }
   for (sock = ntree->inputs.first; sock; sock = sock->next) {
-    sock->flag &= ~SOCK_IN_USE;
+    sock->flag &= ~SOCK_IS_LINKED;
   }
   for (sock = ntree->outputs.first; sock; sock = sock->next) {
-    sock->flag &= ~SOCK_IN_USE;
+    sock->flag &= ~SOCK_IS_LINKED;
   }
 
   for (link = ntree->links.first; link; link = link->next) {
-    link->fromsock->flag |= SOCK_IN_USE;
-    link->tosock->flag |= SOCK_IN_USE;
+    link->fromsock->flag |= SOCK_IS_LINKED;
+    link->tosock->flag |= SOCK_IS_LINKED;
   }
 }
 
@@ -456,22 +456,22 @@ static void do_versions_affine_tracker_track(MovieTrackingTrack *track)
 
     if (is_zero_v2(marker->pattern_corners[0]) && is_zero_v2(marker->pattern_corners[1]) &&
         is_zero_v2(marker->pattern_corners[2]) && is_zero_v2(marker->pattern_corners[3])) {
-      marker->pattern_corners[0][0] = track->pat_min[0];
-      marker->pattern_corners[0][1] = track->pat_min[1];
+      marker->pattern_corners[0][0] = track->pat_min_legacy[0];
+      marker->pattern_corners[0][1] = track->pat_min_legacy[1];
 
-      marker->pattern_corners[1][0] = track->pat_max[0];
-      marker->pattern_corners[1][1] = track->pat_min[1];
+      marker->pattern_corners[1][0] = track->pat_max_legacy[0];
+      marker->pattern_corners[1][1] = track->pat_min_legacy[1];
 
-      marker->pattern_corners[2][0] = track->pat_max[0];
-      marker->pattern_corners[2][1] = track->pat_max[1];
+      marker->pattern_corners[2][0] = track->pat_max_legacy[0];
+      marker->pattern_corners[2][1] = track->pat_max_legacy[1];
 
-      marker->pattern_corners[3][0] = track->pat_min[0];
-      marker->pattern_corners[3][1] = track->pat_max[1];
+      marker->pattern_corners[3][0] = track->pat_min_legacy[0];
+      marker->pattern_corners[3][1] = track->pat_max_legacy[1];
     }
 
     if (is_zero_v2(marker->search_min) && is_zero_v2(marker->search_max)) {
-      copy_v2_v2(marker->search_min, track->search_min);
-      copy_v2_v2(marker->search_max, track->search_max);
+      copy_v2_v2(marker->search_min, track->search_min_legacy);
+      copy_v2_v2(marker->search_max, track->search_max_legacy);
     }
   }
 }
@@ -856,7 +856,7 @@ void blo_do_versions_260(FileData *fd, Library *UNUSED(lib), Main *bmain)
           clip->tracking.camera.pixel_aspect = 1.0f;
         }
 
-        track = clip->tracking.tracks.first;
+        track = clip->tracking.tracks_legacy.first;
         while (track) {
           if (track->minimum_correlation == 0.0f) {
             track->minimum_correlation = 0.75f;
@@ -1442,7 +1442,7 @@ void blo_do_versions_260(FileData *fd, Library *UNUSED(lib), Main *bmain)
     for (clip = bmain->movieclips.first; clip; clip = clip->id.next) {
       MovieTrackingTrack *track;
 
-      track = clip->tracking.tracks.first;
+      track = clip->tracking.tracks_legacy.first;
       while (track) {
         do_versions_affine_tracker_track(track);
 
@@ -1587,7 +1587,7 @@ void blo_do_versions_260(FileData *fd, Library *UNUSED(lib), Main *bmain)
 
   /* correction for files saved in blender version when BKE_pose_copy_data
    * didn't copy animation visualization, which lead to deadlocks on motion
-   * path calculation for proxied armatures, see T32742.
+   * path calculation for proxied armatures, see #32742.
    */
   if (bmain->versionfile < 264) {
     Object *ob;
@@ -1625,8 +1625,8 @@ void blo_do_versions_260(FileData *fd, Library *UNUSED(lib), Main *bmain)
       for (tracking_object = tracking->objects.first; tracking_object;
            tracking_object = tracking_object->next) {
         if (tracking_object->keyframe1 == 0 && tracking_object->keyframe2 == 0) {
-          tracking_object->keyframe1 = tracking->settings.keyframe1;
-          tracking_object->keyframe2 = tracking->settings.keyframe2;
+          tracking_object->keyframe1 = tracking->settings.keyframe1_legacy;
+          tracking_object->keyframe2 = tracking->settings.keyframe2_legacy;
         }
       }
     }
@@ -1707,26 +1707,6 @@ void blo_do_versions_260(FileData *fd, Library *UNUSED(lib), Main *bmain)
     }
   }
 
-  if (!MAIN_VERSION_ATLEAST(bmain, 264, 6)) {
-    /* Fix for bug T32982, internal_links list could get corrupted from r51630 onward.
-     * Simply remove bad internal_links lists to avoid NULL pointers.
-     */
-    FOREACH_NODETREE_BEGIN (bmain, ntree, id) {
-      bNode *node;
-      bNodeLink *link, *nextlink;
-
-      for (node = ntree->nodes.first; node; node = node->next) {
-        for (link = node->internal_links.first; link; link = nextlink) {
-          nextlink = link->next;
-          if (!link->fromnode || !link->fromsock || !link->tonode || !link->tosock) {
-            BLI_remlink(&node->internal_links, link);
-          }
-        }
-      }
-    }
-    FOREACH_NODETREE_END;
-  }
-
   if (!MAIN_VERSION_ATLEAST(bmain, 264, 7)) {
     /* convert tiles size from resolution and number of tiles */
     {
@@ -1752,18 +1732,13 @@ void blo_do_versions_260(FileData *fd, Library *UNUSED(lib), Main *bmain)
   }
 
   if (!MAIN_VERSION_ATLEAST(bmain, 264, 7)) {
-    MovieClip *clip;
-
-    for (clip = bmain->movieclips.first; clip; clip = clip->id.next) {
-      MovieTrackingTrack *track;
-      MovieTrackingObject *object;
-
-      for (track = clip->tracking.tracks.first; track; track = track->next) {
+    LISTBASE_FOREACH (MovieClip *, clip, &bmain->movieclips) {
+      LISTBASE_FOREACH (MovieTrackingTrack *, track, &clip->tracking.tracks_legacy) {
         do_versions_affine_tracker_track(track);
       }
 
-      for (object = clip->tracking.objects.first; object; object = object->next) {
-        for (track = object->tracks.first; track; track = track->next) {
+      LISTBASE_FOREACH (MovieTrackingObject *, tracking_object, &clip->tracking.objects) {
+        LISTBASE_FOREACH (MovieTrackingTrack *, track, &tracking_object->tracks) {
           do_versions_affine_tracker_track(track);
         }
       }
@@ -2366,15 +2341,13 @@ void blo_do_versions_260(FileData *fd, Library *UNUSED(lib), Main *bmain)
     }
 
     if (!DNA_struct_elem_find(fd->filesdna, "MovieTrackingTrack", "float", "weight")) {
-      MovieClip *clip;
-      for (clip = bmain->movieclips.first; clip; clip = clip->id.next) {
-        MovieTracking *tracking = &clip->tracking;
-        MovieTrackingObject *tracking_object;
-        for (tracking_object = tracking->objects.first; tracking_object;
-             tracking_object = tracking_object->next) {
-          ListBase *tracksbase = BKE_tracking_object_get_tracks(tracking, tracking_object);
-          MovieTrackingTrack *track;
-          for (track = tracksbase->first; track; track = track->next) {
+      LISTBASE_FOREACH (MovieClip *, clip, &bmain->movieclips) {
+        const MovieTracking *tracking = &clip->tracking;
+        LISTBASE_FOREACH (MovieTrackingObject *, tracking_object, &tracking->objects) {
+          const ListBase *tracksbase = (tracking_object->flag & TRACKING_OBJECT_CAMERA) ?
+                                           &tracking->tracks_legacy :
+                                           &tracking_object->tracks;
+          LISTBASE_FOREACH (MovieTrackingTrack *, track, tracksbase) {
             track->weight = 1.0f;
           }
         }
@@ -2479,7 +2452,7 @@ void blo_do_versions_260(FileData *fd, Library *UNUSED(lib), Main *bmain)
       MovieClip *clip;
       for (clip = bmain->movieclips.first; clip; clip = clip->id.next) {
         MovieTrackingPlaneTrack *plane_track;
-        for (plane_track = clip->tracking.plane_tracks.first; plane_track;
+        for (plane_track = clip->tracking.plane_tracks_legacy.first; plane_track;
              plane_track = plane_track->next) {
           plane_track->image_opacity = 1.0f;
         }

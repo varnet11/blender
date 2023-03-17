@@ -49,7 +49,7 @@ typedef struct DDSData {
 /* WARNING: Keep explicit value assignments here,
  * this file is included in areas where not all format defines are set
  * (e.g. intern/dds only get WITH_DDS, even if TIFF, HDR etc are also defined).
- * See T46524. */
+ * See #46524. */
 
 /** #ImBuf.ftype flag, main image types. */
 enum eImbFileType {
@@ -59,9 +59,7 @@ enum eImbFileType {
   IMB_FTYPE_BMP = 4,
   IMB_FTYPE_OPENEXR = 5,
   IMB_FTYPE_IMAGIC = 6,
-#ifdef WITH_OPENIMAGEIO
   IMB_FTYPE_PSD = 7,
-#endif
 #ifdef WITH_OPENJPEG
   IMB_FTYPE_JP2 = 8,
 #endif
@@ -144,8 +142,7 @@ typedef enum eImBufFlags {
   IB_multilayer = 1 << 7,
   IB_metadata = 1 << 8,
   IB_animdeinterlace = 1 << 9,
-  IB_tiles = 1 << 10,
-  IB_tilecache = 1 << 11,
+
   /** indicates whether image on disk have premul alpha */
   IB_alphamode_premul = 1 << 12,
   /** if this flag is set, alpha mode would be guessed from file */
@@ -202,11 +199,6 @@ typedef struct ImBuf {
   /** Resolution in pixels per meter. Multiply by `0.0254` for DPI. */
   double ppm[2];
 
-  /* tiled pixel storage */
-  int tilex, tiley;
-  int xtiles, ytiles;
-  unsigned int **tiles;
-
   /* zbuffer */
   /** z buffer data, original zbuffer */
   int *zbuf;
@@ -239,8 +231,6 @@ typedef struct ImBuf {
   ImbFormatOptions foptions;
   /** filename associated with this image */
   char name[IMB_FILENAME_SIZE];
-  /** full filename used for reading from cache */
-  char cachename[IMB_FILENAME_SIZE];
 
   /* memory cache limiter */
   /** handle for cache limiter */
@@ -327,9 +317,6 @@ enum {
 extern const char *imb_ext_image[];
 extern const char *imb_ext_movie[];
 extern const char *imb_ext_audio[];
-
-/** Image formats that can only be loaded via filepath. */
-extern const char *imb_ext_image_filepath_only[];
 
 /* -------------------------------------------------------------------- */
 /** \name Imbuf Color Management Flag

@@ -223,7 +223,7 @@ static float compute_scale_factor(const float ve_median, const float median)
  * Apply helpers.
  * \note In case we only have one element,
  * copy directly the value instead of applying the diff or scale factor.
- * Avoids some glitches when going e.g. from 3 to 0.0001 (see T37327).
+ * Avoids some glitches when going e.g. from 3 to 0.0001 (see #37327).
  */
 static void apply_raw_diff(float *val, const int tot, const float ve_median, const float median)
 {
@@ -511,7 +511,7 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
     int yi = 200;
     const float tilt_limit = DEG2RADF(21600.0f);
     const int butw = 200;
-    const int buth = 20 * UI_DPI_FAC;
+    const int buth = 20 * UI_SCALE_FAC;
     const int but_margin = 2;
     const char *c;
 
@@ -1117,7 +1117,7 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
             if (bezt->f2 & SELECT) {
               if (apply_vcos) {
                 /* Here we always have to use the diff... :/
-                 * Cannot avoid some glitches when going e.g. from 3 to 0.0001 (see T37327),
+                 * Cannot avoid some glitches when going e.g. from 3 to 0.0001 (see #37327),
                  * unless we use doubles.
                  */
                 add_v3_v3(bezt->vec[0], median->location);
@@ -1210,7 +1210,7 @@ static void v3d_object_dimension_buts(bContext *C, uiLayout *layout, View3D *v3d
     BLI_assert(C == NULL);
     int yi = 200;
     const int butw = 200;
-    const int buth = 20 * UI_DPI_FAC;
+    const int buth = 20 * UI_SCALE_FAC;
 
     BKE_object_dimensions_get(ob, tfp->ob_dims);
     copy_v3_v3(tfp->ob_dims_orig, tfp->ob_dims);

@@ -22,7 +22,7 @@
 #include "BKE_armature.h"
 #include "BKE_constraint.h"
 #include "BKE_context.h"
-#include "BKE_gpencil_modifier.h"
+#include "BKE_gpencil_modifier_legacy.h"
 #include "BKE_layer.h"
 #include "BKE_modifier.h"
 #include "BKE_object.h"
@@ -168,7 +168,7 @@ bool ED_armature_pose_select_pick_bone(const Scene *scene,
 
     /* Since we do unified select, we don't shift+select a bone if the
      * armature object was not active yet.
-     * NOTE(@campbellbarton): special exception for armature mode so we can do multi-select
+     * NOTE(@ideasman42): special exception for armature mode so we can do multi-select
      * we could check for multi-select explicitly but think its fine to
      * always give predictable behavior in weight paint mode. */
     if ((ob_act == NULL) || ((ob_act != ob) && (ob_act->mode & OB_MODE_ALL_WEIGHT_PAINT) == 0)) {
@@ -230,7 +230,7 @@ bool ED_armature_pose_select_pick_bone(const Scene *scene,
        */
       else if (arm->flag & ARM_HAS_VIZ_DEPS) {
         /* NOTE: ob not ob_act here is intentional - it's the source of the
-         *       bones being selected  [T37247]
+         *       bones being selected [#37247].
          */
         DEG_id_tag_update(&ob->id, ID_RECALC_GEOMETRY);
       }
@@ -278,7 +278,7 @@ void ED_armature_pose_select_in_wpaint_mode(const Scene *scene,
   Object *ob_active = BKE_view_layer_active_object_get(view_layer);
   BLI_assert(ob_active && (ob_active->mode & OB_MODE_ALL_WEIGHT_PAINT));
 
-  if (ob_active->type == OB_GPENCIL) {
+  if (ob_active->type == OB_GPENCIL_LEGACY) {
     GpencilVirtualModifierData virtualModifierData;
     GpencilModifierData *md = BKE_gpencil_modifiers_get_virtual_modifierlist(ob_active,
                                                                              &virtualModifierData);

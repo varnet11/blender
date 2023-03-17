@@ -36,7 +36,7 @@
 #include "BKE_key.h"
 #include "BKE_lib_id.h"
 #include "BKE_mball.h"
-#include "BKE_mesh.h"
+#include "BKE_mesh.hh"
 #include "BKE_modifier.h"
 #include "BKE_object.h"
 #include "BKE_vfont.h"
@@ -613,6 +613,8 @@ void BKE_curve_calc_modifiers_pre(Depsgraph *depsgraph,
         continue;
       }
 
+      blender::bke::ScopedModifierTimer modifier_timer{*md};
+
       if (!deformedVerts) {
         deformedVerts = BKE_curve_nurbs_vert_coords_alloc(source_nurb, &numVerts);
       }
@@ -733,8 +735,10 @@ static GeometrySet curve_calc_modifiers_post(Depsgraph *depsgraph,
       continue;
     }
 
+    blender::bke::ScopedModifierTimer modifier_timer{*md};
+
     if (!geometry_set.has_mesh()) {
-      geometry_set.replace_mesh(BKE_mesh_new_nomain(0, 0, 0, 0, 0));
+      geometry_set.replace_mesh(BKE_mesh_new_nomain(0, 0, 0, 0));
     }
     Mesh *mesh = geometry_set.get_mesh_for_write();
 
@@ -881,7 +885,7 @@ static GeometrySet evaluate_surface_object(Depsgraph *depsgraph,
   GeometrySet geometry_set = curve_calc_modifiers_post(
       depsgraph, scene, ob, r_dispbase, for_render);
   if (!geometry_set.has_mesh()) {
-    geometry_set.replace_mesh(BKE_mesh_new_nomain(0, 0, 0, 0, 0));
+    geometry_set.replace_mesh(BKE_mesh_new_nomain(0, 0, 0, 0));
   }
   return geometry_set;
 }
@@ -1090,7 +1094,7 @@ static void calc_bevfac_mapping(const Curve *cu,
   }
 
   if (end < *r_start || (end == *r_start && *r_lastblend < 1.0f - *r_firstblend)) {
-    SWAP(int, *r_start, end);
+    std::swap(*r_start, end);
     tmpf = *r_lastblend;
     *r_lastblend = 1.0f - *r_firstblend;
     *r_firstblend = 1.0f - tmpf;
@@ -1200,7 +1204,7 @@ static GeometrySet evaluate_curve_type_object(Depsgraph *depsgraph,
         }
 
         LISTBASE_FOREACH (DispList *, dlb, &dlbev) {
-          /* for each part of the bevel use a separate displblock */
+          /* For each part of the bevel use a separate display-block. */
           DispList *dl = MEM_cnew<DispList>(__func__);
           dl->verts = data = (float *)MEM_mallocN(sizeof(float[3]) * dlb->nr * steps, __func__);
           BLI_addtail(r_dispbase, dl);
@@ -1349,7 +1353,7 @@ void BKE_displist_make_curveTypes(Depsgraph *depsgraph,
        *   but it doesn't seem to work in this case.
        *
        * Since the plan is to replace this legacy curve object with the curves data-block
-       * (see T95355), this somewhat hacky inefficient solution is relatively temporary.
+       * (see #95355), this somewhat hacky inefficient solution is relatively temporary.
        */
       Curve &cow_curve = *reinterpret_cast<Curve *>(
           BKE_id_copy_ex(nullptr, &original_curve.id, nullptr, LIB_ID_COPY_LOCALIZE));

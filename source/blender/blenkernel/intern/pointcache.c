@@ -3133,10 +3133,10 @@ static void ptcache_dt_to_str(char *str, double dtime)
   if (dtime > 60.0) {
     if (dtime > 3600.0) {
       BLI_sprintf(
-          str, "%ih %im %is", (int)(dtime / 3600), ((int)(dtime / 60)) % 60, ((int)dtime) % 60);
+          str, "%ih %im %is", (int)(dtime / 3600), (int)(dtime / 60) % 60, ((int)dtime) % 60);
     }
     else {
-      BLI_sprintf(str, "%im %is", ((int)(dtime / 60)) % 60, ((int)dtime) % 60);
+      BLI_sprintf(str, "%im %is", (int)(dtime / 60) % 60, ((int)dtime) % 60);
     }
   }
   else {
@@ -3706,8 +3706,8 @@ void BKE_ptcache_update_info(PTCacheID *pid)
   }
   else {
     PTCacheMem *pm = cache->mem_cache.first;
-    char formatted_tot[16];
-    char formatted_mem[15];
+    char formatted_tot[BLI_STR_FORMAT_INT32_GROUPED_SIZE];
+    char formatted_mem[BLI_STR_FORMAT_INT64_BYTE_UNIT_SIZE];
     long long int bytes = 0.0f;
     int i;
 

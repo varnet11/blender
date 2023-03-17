@@ -15,7 +15,7 @@
 #include "DNA_anim_types.h"
 #include "DNA_armature_types.h"
 #include "DNA_collection_types.h"
-#include "DNA_gpencil_types.h"
+#include "DNA_gpencil_legacy_types.h"
 #include "DNA_light_types.h"
 #include "DNA_material_types.h"
 #include "DNA_modifier_types.h"
@@ -1141,7 +1141,7 @@ static int object_select_all_exec(bContext *C, wmOperator *op)
     return OPERATOR_FINISHED;
   }
   if (any_visible == false) {
-    /* TODO(@campbellbarton): Looks like we could remove this,
+    /* TODO(@ideasman42): Looks like we could remove this,
      * if not comment should say why its needed. */
     return OPERATOR_PASS_THROUGH;
   }

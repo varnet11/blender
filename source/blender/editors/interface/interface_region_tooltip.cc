@@ -7,7 +7,7 @@
  * ToolTip Region and Construction
  */
 
-/* TODO(@campbellbarton):
+/* TODO(@ideasman42):
  * We may want to have a higher level API that initializes a timer,
  * checks for mouse motion and clears the tool-tip afterwards.
  * We never want multiple tool-tips at once
@@ -52,7 +52,7 @@
 
 #include "ED_screen.h"
 
-#include "interface_intern.h"
+#include "interface_intern.hh"
 #include "interface_regions_intern.hh"
 
 #define UI_TIP_PAD_FAC 1.3f
@@ -135,7 +135,8 @@ static uiTooltipField *text_field_add(uiTooltipData *data,
   uiTooltipField *field = text_field_add_only(data);
   field->format = {};
   field->format.style = style;
-  field->format.color_id = color, field->format.is_pad = is_pad;
+  field->format.color_id = color;
+  field->format.is_pad = is_pad;
   return field;
 }
 
@@ -252,7 +253,7 @@ static void ui_tooltip_region_draw_cb(const bContext * /*C*/, ARegion *region)
 
       UI_fontstyle_set(&fstyle_mono);
       /* XXX: needed because we don't have mono in 'U.uifonts'. */
-      BLF_size(fstyle_mono.uifont_id, fstyle_mono.points * U.dpi_fac);
+      BLF_size(fstyle_mono.uifont_id, fstyle_mono.points * UI_SCALE_FAC);
       rgb_float_to_uchar(drawcol, tip_colors[int(field->format.color_id)]);
       UI_fontstyle_draw(&fstyle_mono, &bbox, field->text, UI_TIP_STR_MAX, drawcol, &fs_params);
     }
@@ -995,7 +996,7 @@ static uiTooltipData *ui_tooltip_data_from_gizmo(bContext *C, wmGizmo *gz)
 {
   uiTooltipData *data = MEM_cnew<uiTooltipData>(__func__);
 
-  /* TODO(@campbellbarton): a way for gizmos to have their own descriptions (low priority). */
+  /* TODO(@ideasman42): a way for gizmos to have their own descriptions (low priority). */
 
   /* Operator Actions */
   {
@@ -1057,7 +1058,7 @@ static uiTooltipData *ui_tooltip_data_from_gizmo(bContext *C, wmGizmo *gz)
   if (gz->type->target_property_defs_len) {
     wmGizmoProperty *gz_prop_array = WM_gizmo_target_property_array(gz);
     for (int i = 0; i < gz->type->target_property_defs_len; i++) {
-      /* TODO(@campbellbarton): function callback descriptions. */
+      /* TODO(@ideasman42): function callback descriptions. */
       wmGizmoProperty *gz_prop = &gz_prop_array[i];
       if (gz_prop->prop != nullptr) {
         const char *info = RNA_property_ui_description(gz_prop->prop);
@@ -1131,7 +1132,7 @@ static ARegion *ui_tooltip_create_with_data(bContext *C,
     int font_id;
 
     if (field->format.style == uiTooltipFormat::Style::Mono) {
-      BLF_size(blf_mono_font, data->fstyle.points * U.dpi_fac);
+      BLF_size(blf_mono_font, data->fstyle.points * UI_SCALE_FAC);
       font_id = blf_mono_font;
     }
     else {

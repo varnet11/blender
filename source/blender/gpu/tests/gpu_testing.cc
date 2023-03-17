@@ -14,17 +14,22 @@ namespace blender::gpu {
 
 void GPUTest::SetUp()
 {
-  GHOST_GLSettings glSettings = {0};
+  GPU_backend_type_selection_set(gpu_backend_type);
+  GHOST_GLSettings glSettings = {};
+  glSettings.context_type = draw_context_type;
+  glSettings.flags = GHOST_glDebugContext;
   CLG_init();
   ghost_system = GHOST_CreateSystem();
   ghost_context = GHOST_CreateOpenGLContext(ghost_system, glSettings);
   GHOST_ActivateOpenGLContext(ghost_context);
   context = GPU_context_create(nullptr, ghost_context);
   GPU_init();
+  GPU_context_begin_frame(context);
 }
 
 void GPUTest::TearDown()
 {
+  GPU_context_end_frame(context);
   GPU_exit();
   GPU_context_discard(context);
   GHOST_DisposeOpenGLContext(ghost_system, ghost_context);

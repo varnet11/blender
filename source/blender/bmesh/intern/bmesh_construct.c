@@ -591,8 +591,7 @@ void BM_mesh_copy_init_customdata_all_layers(BMesh *bm_dst,
     const int size = *(&allocsize->totvert + i);
 
     for (int l = 0; l < src->totlayer; l++) {
-      CustomData_add_layer_named(
-          dst, src->layers[l].type, CD_SET_DEFAULT, NULL, 0, src->layers[l].name);
+      CustomData_add_layer_named(dst, src->layers[l].type, CD_SET_DEFAULT, 0, src->layers[l].name);
     }
     CustomData_bmesh_init_pool(dst, size, htypes[i]);
   }
@@ -714,29 +713,4 @@ BMesh *BM_mesh_copy(BMesh *bm_old)
   bm_new->selectmode = bm_old->selectmode;
 
   return bm_new;
-}
-
-char BM_edge_flag_from_mflag(const short mflag)
-{
-  return (((mflag & ME_SEAM) ? BM_ELEM_SEAM : 0) | ((mflag & ME_EDGEDRAW) ? BM_ELEM_DRAW : 0) |
-          ((mflag & ME_SHARP) == 0 ? BM_ELEM_SMOOTH : 0));
-}
-char BM_face_flag_from_mflag(const char mflag)
-{
-  return ((mflag & ME_SMOOTH) ? BM_ELEM_SMOOTH : 0);
-}
-
-short BM_edge_flag_to_mflag(BMEdge *e)
-{
-  const char hflag = e->head.hflag;
-
-  return (((hflag & BM_ELEM_SEAM) ? ME_SEAM : 0) | ((hflag & BM_ELEM_DRAW) ? ME_EDGEDRAW : 0) |
-          ((hflag & BM_ELEM_SMOOTH) == 0 ? ME_SHARP : 0) |
-          (BM_edge_is_wire(e) ? ME_LOOSEEDGE : 0));
-}
-char BM_face_flag_to_mflag(BMFace *f)
-{
-  const char hflag = f->head.hflag;
-
-  return ((hflag & BM_ELEM_SMOOTH) ? ME_SMOOTH : 0);
 }

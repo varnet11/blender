@@ -37,6 +37,11 @@ int BKE_object_defgroup_active_index_get(const struct Object *ob);
  */
 void BKE_object_defgroup_active_index_set(struct Object *ob, int new_index);
 
+/**
+ * Return the ID's vertex group names.
+ * Supports Mesh (ME), Lattice (LT), and GreasePencil (GD) IDs.
+ * \return ListBase of bDeformGroup pointers.
+ */
 const struct ListBase *BKE_id_defgroup_list_get(const struct ID *id);
 struct ListBase *BKE_id_defgroup_list_get_mutable(struct ID *id);
 int BKE_id_defgroup_name_index(const struct ID *id, const char *name);
@@ -86,7 +91,7 @@ struct MDeformWeight *BKE_defvert_find_index(const struct MDeformVert *dv, int d
 /**
  * Ensures that `dv` has a deform weight entry for the specified defweight group.
  *
- * \note this function is mirrored in editmesh_tools.c, for use for edit-vertices.
+ * \note this function is mirrored in editmesh_tools.cc, for use for edit-vertices.
  */
 struct MDeformWeight *BKE_defvert_ensure_index(struct MDeformVert *dv, int defgroup);
 /**

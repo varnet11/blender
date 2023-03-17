@@ -1207,7 +1207,7 @@ static ScrEdge *screen_area_edge_from_cursor(const bContext *C,
   if (actedge == NULL) {
     return NULL;
   }
-  int borderwidth = (4 * UI_DPI_FAC);
+  int borderwidth = (4 * UI_SCALE_FAC);
   ScrArea *sa1, *sa2;
   if (screen_geom_edge_is_horizontal(actedge)) {
     sa1 = BKE_screen_find_area_xy(
@@ -1638,7 +1638,7 @@ static void area_move_set_limits(wmWindow *win,
       }
     }
     else {
-      int areamin = AREAMINX * U.dpi_fac;
+      int areamin = AREAMINX * UI_SCALE_FAC;
 
       if (area->v1->vec.x > window_rect.xmin) {
         areamin += U.pixelsize;
@@ -1847,7 +1847,7 @@ static void area_move_apply_do(const bContext *C,
       if (area->v1->editflag || area->v2->editflag || area->v3->editflag || area->v4->editflag) {
         if (ED_area_is_global(area)) {
           /* Snap to minimum or maximum for global areas. */
-          int height = round_fl_to_int(screen_geom_area_height(area) / UI_DPI_FAC);
+          int height = round_fl_to_int(screen_geom_area_height(area) / UI_SCALE_FAC);
           if (abs(height - area->global->size_min) < abs(height - area->global->size_max)) {
             area->global->cur_fixed_height = area->global->size_min;
           }
@@ -2061,7 +2061,7 @@ static bool area_split_allowed(const ScrArea *area, const eScreenAxis dir_axis)
     return false;
   }
 
-  if ((dir_axis == SCREEN_AXIS_V && area->winx <= 2 * AREAMINX * U.dpi_fac) ||
+  if ((dir_axis == SCREEN_AXIS_V && area->winx <= 2 * AREAMINX * UI_SCALE_FAC) ||
       (dir_axis == SCREEN_AXIS_H && area->winy <= 2 * ED_area_headersize())) {
     /* Must be at least double minimum sizes to split into two. */
     return false;
@@ -2586,21 +2586,21 @@ typedef struct RegionMoveData {
 
 } RegionMoveData;
 
-static int area_max_regionsize(ScrArea *area, ARegion *scalear, AZEdge edge)
+static int area_max_regionsize(ScrArea *area, ARegion *scale_region, AZEdge edge)
 {
   int dist;
 
   /* regions in regions. */
-  if (scalear->alignment & RGN_SPLIT_PREV) {
-    const int align = RGN_ALIGN_ENUM_FROM_MASK(scalear->alignment);
+  if (scale_region->alignment & RGN_SPLIT_PREV) {
+    const int align = RGN_ALIGN_ENUM_FROM_MASK(scale_region->alignment);
 
     if (ELEM(align, RGN_ALIGN_TOP, RGN_ALIGN_BOTTOM)) {
-      ARegion *region = scalear->prev;
-      dist = region->winy + scalear->winy - U.pixelsize;
+      ARegion *region = scale_region->prev;
+      dist = region->winy + scale_region->winy - U.pixelsize;
     }
     else /* if (ELEM(align, RGN_ALIGN_LEFT, RGN_ALIGN_RIGHT)) */ {
-      ARegion *region = scalear->prev;
-      dist = region->winx + scalear->winx - U.pixelsize;
+      ARegion *region = scale_region->prev;
+      dist = region->winx + scale_region->winx - U.pixelsize;
     }
   }
   else {
@@ -2614,23 +2614,23 @@ static int area_max_regionsize(ScrArea *area, ARegion *scalear, AZEdge edge)
     /* Subtract the width of regions on opposite side
      * prevents dragging regions into other opposite regions. */
     LISTBASE_FOREACH (ARegion *, region, &area->regionbase) {
-      if (region == scalear) {
+      if (region == scale_region) {
         continue;
       }
 
-      if (scalear->alignment == RGN_ALIGN_LEFT && region->alignment == RGN_ALIGN_RIGHT) {
+      if (scale_region->alignment == RGN_ALIGN_LEFT && region->alignment == RGN_ALIGN_RIGHT) {
         dist -= region->winx;
       }
-      else if (scalear->alignment == RGN_ALIGN_RIGHT && region->alignment == RGN_ALIGN_LEFT) {
+      else if (scale_region->alignment == RGN_ALIGN_RIGHT && region->alignment == RGN_ALIGN_LEFT) {
         dist -= region->winx;
       }
-      else if (scalear->alignment == RGN_ALIGN_TOP &&
+      else if (scale_region->alignment == RGN_ALIGN_TOP &&
                (region->alignment == RGN_ALIGN_BOTTOM ||
                 ELEM(
                     region->regiontype, RGN_TYPE_HEADER, RGN_TYPE_TOOL_HEADER, RGN_TYPE_FOOTER))) {
         dist -= region->winy;
       }
-      else if (scalear->alignment == RGN_ALIGN_BOTTOM &&
+      else if (scale_region->alignment == RGN_ALIGN_BOTTOM &&
                (region->alignment == RGN_ALIGN_TOP ||
                 ELEM(
                     region->regiontype, RGN_TYPE_HEADER, RGN_TYPE_TOOL_HEADER, RGN_TYPE_FOOTER))) {
@@ -2639,7 +2639,7 @@ static int area_max_regionsize(ScrArea *area, ARegion *scalear, AZEdge edge)
     }
   }
 
-  dist /= UI_DPI_FAC;
+  dist /= UI_SCALE_FAC;
   return dist;
 }
 
@@ -2731,7 +2731,7 @@ static void region_scale_validate_size(RegionMoveData *rmd)
       size = &rmd->region->sizey;
     }
 
-    maxsize = rmd->maxsize - (UI_UNIT_Y / UI_DPI_FAC);
+    maxsize = rmd->maxsize - (UI_UNIT_Y / UI_SCALE_FAC);
 
     if (*size > maxsize && maxsize > 0) {
       *size = maxsize;
@@ -2742,7 +2742,7 @@ static void region_scale_validate_size(RegionMoveData *rmd)
 static void region_scale_toggle_hidden(bContext *C, RegionMoveData *rmd)
 {
   /* hidden areas may have bad 'View2D.cur' value,
-   * correct before displaying. see T45156 */
+   * correct before displaying. see #45156 */
   if (rmd->region->flag & RGN_FLAG_HIDDEN) {
     UI_view2d_curRect_validate(&rmd->region->v2d);
   }
@@ -2781,7 +2781,7 @@ static int region_scale_modal(bContext *C, wmOperator *op, const wmEvent *event)
         }
 
         /* region sizes now get multiplied */
-        delta /= UI_DPI_FAC;
+        delta /= UI_SCALE_FAC;
 
         const int size_no_snap = rmd->origval + delta;
         rmd->region->sizex = size_no_snap;
@@ -2814,7 +2814,7 @@ static int region_scale_modal(bContext *C, wmOperator *op, const wmEvent *event)
         }
 
         /* region sizes now get multiplied */
-        delta /= UI_DPI_FAC;
+        delta /= UI_SCALE_FAC;
 
         const int size_no_snap = rmd->origval + delta;
         rmd->region->sizey = size_no_snap;
@@ -2951,6 +2951,11 @@ static int frame_offset_exec(bContext *C, wmOperator *op)
 
   int delta = RNA_int_get(op->ptr, "delta");
 
+  /* In order to jump from e.g. 1.5 to 1 the delta needs to be incremented by 1 since the sub-frame
+   * is always zeroed. Otherwise it would jump to 0. */
+  if (delta < 0 && scene->r.subframe > 0) {
+    delta += 1;
+  }
   scene->r.cfra += delta;
   FRAMENUMBER_MIN_CLAMP(scene->r.cfra);
   scene->r.subframe = 0.0f;
@@ -3062,7 +3067,7 @@ static int keyframe_jump_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  float cfra = (float)(scene->r.cfra);
+  const float cfra = BKE_scene_frame_get(scene);
 
   /* Initialize binary-tree-list for getting keyframes. */
   struct AnimKeylist *keylist = ED_keylist_create();
@@ -3079,7 +3084,7 @@ static int keyframe_jump_exec(bContext *C, wmOperator *op)
   if (ob) {
     ob_to_keylist(&ads, ob, keylist, 0);
 
-    if (ob->type == OB_GPENCIL) {
+    if (ob->type == OB_GPENCIL_LEGACY) {
       const bool active = !(scene->flag & SCE_KEYS_NO_SELONLY);
       gpencil_to_keylist(&ads, ob->data, keylist, active);
     }
@@ -3096,23 +3101,26 @@ static int keyframe_jump_exec(bContext *C, wmOperator *op)
 
   /* find matching keyframe in the right direction */
   const ActKeyColumn *ak;
+
   if (next) {
     ak = ED_keylist_find_next(keylist, cfra);
-  }
-  else {
-    ak = ED_keylist_find_prev(keylist, cfra);
+    while ((ak != NULL) && (done == false)) {
+      if (cfra < ak->cfra) {
+        BKE_scene_frame_set(scene, ak->cfra);
+        done = true;
+      }
+      else {
+        ak = ak->next;
+      }
+    }
   }
 
-  while ((ak != NULL) && (done == false)) {
-    if (scene->r.cfra != (int)ak->cfra) {
-      /* this changes the frame, so set the frame and we're done */
-      scene->r.cfra = (int)ak->cfra;
-      done = true;
-    }
-    else {
-      /* take another step... */
-      if (next) {
-        ak = ak->next;
+  else {
+    ak = ED_keylist_find_prev(keylist, cfra);
+    while ((ak != NULL) && (done == false)) {
+      if (cfra > ak->cfra) {
+        BKE_scene_frame_set(scene, ak->cfra);
+        done = true;
       }
       else {
         ak = ak->prev;
@@ -3938,7 +3946,7 @@ static int region_quadview_exec(bContext *C, wmOperator *op)
       rv3d->viewlock_quad = RV3D_VIEWLOCK_INIT;
       rv3d->viewlock = 0;
 
-      /* FIXME: This fixes missing update to workbench TAA. (see T76216)
+      /* FIXME: This fixes missing update to workbench TAA. (see #76216)
        * However, it would be nice if the tagging should be done in a more conventional way. */
       rv3d->rflag |= RV3D_GPULIGHT_UPDATE;
 
@@ -3980,7 +3988,7 @@ static int region_quadview_exec(bContext *C, wmOperator *op)
 
       /* run ED_view3d_lock() so the correct 'rv3d->viewquat' is set,
        * otherwise when restoring rv3d->localvd the 'viewquat' won't
-       * match the 'view', set on entering localview See: T26315,
+       * match the 'view', set on entering localview See: #26315,
        *
        * We could avoid manipulating rv3d->localvd here if exiting
        * localview with a 4-split would assign these view locks */
@@ -5036,8 +5044,8 @@ static int userpref_show_exec(bContext *C, wmOperator *op)
   wmWindow *win_cur = CTX_wm_window(C);
   /* Use eventstate, not event from _invoke, so this can be called through exec(). */
   const wmEvent *event = win_cur->eventstate;
-  int sizex = (500 + UI_NAVIGATION_REGION_WIDTH) * UI_DPI_FAC;
-  int sizey = 520 * UI_DPI_FAC;
+  int sizex = (500 + UI_NAVIGATION_REGION_WIDTH) * UI_SCALE_FAC;
+  int sizey = 520 * UI_SCALE_FAC;
 
   PropertyRNA *prop = RNA_struct_find_property(op->ptr, "section");
   if (prop && RNA_property_is_set(op->ptr, prop)) {
@@ -5116,8 +5124,8 @@ static int drivers_editor_show_exec(bContext *C, wmOperator *op)
   /* Use eventstate, not event from _invoke, so this can be called through exec(). */
   const wmEvent *event = win_cur->eventstate;
 
-  int sizex = 900 * UI_DPI_FAC;
-  int sizey = 580 * UI_DPI_FAC;
+  int sizex = 900 * UI_SCALE_FAC;
+  int sizey = 580 * UI_SCALE_FAC;
 
   /* Get active property to show driver for
    * - Need to grab it first, or else this info disappears
@@ -5193,8 +5201,8 @@ static int info_log_show_exec(bContext *C, wmOperator *op)
   wmWindow *win_cur = CTX_wm_window(C);
   /* Use eventstate, not event from _invoke, so this can be called through exec(). */
   const wmEvent *event = win_cur->eventstate;
-  int sizex = 900 * UI_DPI_FAC;
-  int sizey = 580 * UI_DPI_FAC;
+  int sizex = 900 * UI_SCALE_FAC;
+  int sizey = 580 * UI_SCALE_FAC;
   int shift_y = 480;
 
   /* changes context! */
@@ -5741,7 +5749,8 @@ static void keymap_modal_set(wmKeyConfig *keyconf)
 static bool blend_file_drop_poll(bContext *UNUSED(C), wmDrag *drag, const wmEvent *UNUSED(event))
 {
   if (drag->type == WM_DRAG_PATH) {
-    if (ELEM(drag->icon, ICON_FILE_BLEND, ICON_FILE_BACKUP, ICON_BLENDER)) {
+    const eFileSel_File_Types file_type = WM_drag_get_path_file_type(drag);
+    if (ELEM(file_type, FILE_TYPE_BLENDER, FILE_TYPE_BLENDER_BACKUP)) {
       return true;
     }
   }
@@ -5751,7 +5760,7 @@ static bool blend_file_drop_poll(bContext *UNUSED(C), wmDrag *drag, const wmEven
 static void blend_file_drop_copy(bContext *UNUSED(C), wmDrag *drag, wmDropBox *drop)
 {
   /* copy drag path to properties */
-  RNA_string_set(drop->ptr, "filepath", drag->path);
+  RNA_string_set(drop->ptr, "filepath", WM_drag_get_path(drag));
 }
 
 void ED_keymap_screen(wmKeyConfig *keyconf)

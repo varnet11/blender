@@ -44,7 +44,7 @@ typedef struct CfraElem {
 /* ************** F-Curve Modifiers *************** */
 
 /**
- * F-Curve Modifier Type-Info (fmi):
+ * F-Curve Modifier Type-Info (`fmi`):
  * This struct provides function pointers for runtime, so that functions can be
  * written more generally (with fewer/no special exceptions for various modifiers).
  *
@@ -63,7 +63,7 @@ typedef struct FModifierTypeInfo {
   /** #eFMI_Action_Types. */
   short acttype;
   /** #eFMI_Requirement_Flags. */
-  short requires;
+  short requires_flag;
   /** name of modifier in interface. */
   char name[64];
   /** name of struct for SDNA. */
@@ -366,21 +366,25 @@ int BKE_fcurve_pathcache_find_array(struct FCurvePathCache *fcache,
                                     int fcurve_result_len);
 
 /**
- * Calculate the extents of F-Curve's keyframes.
+ * Calculate the x range of the given F-Curve's data.
+ * \return true if a range has been found.
  */
-bool BKE_fcurve_calc_range(
-    const struct FCurve *fcu, float *min, float *max, bool do_sel_only, bool do_min_length);
+bool BKE_fcurve_calc_range(const struct FCurve *fcu,
+                           float *r_min,
+                           float *r_max,
+                           bool selected_keys_only);
 
 /**
- * Calculate the extents of F-Curve's data.
+ * Calculate the x and y extents of F-Curve's data.
+ * \param frame_range: Only calculate the bounds of the FCurve in the given range.
+ * Does the full range if NULL.
+ * \return true if the bounds have been found.
  */
 bool BKE_fcurve_calc_bounds(const struct FCurve *fcu,
-                            float *xmin,
-                            float *xmax,
-                            float *ymin,
-                            float *ymax,
-                            bool do_sel_only,
-                            bool include_handles);
+                            bool selected_keys_only,
+                            bool include_handles,
+                            const float frame_range[2],
+                            struct rctf *r_bounds);
 
 /**
  * Return an array of keyed frames, rounded to `interval`.
@@ -482,6 +486,18 @@ bool BKE_fcurve_delete_keys_selected(struct FCurve *fcu);
  * Delete all keyframes from an F-curve.
  */
 void BKE_fcurve_delete_keys_all(struct FCurve *fcu);
+
+/**
+ * Called during transform/snapping to make sure selected keyframes replace
+ * any other keyframes which may reside on that frame (that is not selected).
+ *
+ * \param sel_flag: The flag (bezt.f1/2/3) value to use to determine selection. Usually `SELECT`,
+ *                  but may want to use a different one at times (if caller does not operate on
+ *                  selection).
+ */
+void BKE_fcurve_merge_duplicate_keys(struct FCurve *fcu,
+                                     const int sel_flag,
+                                     const bool use_handle);
 
 /* -------- Curve Sanity -------- */
 

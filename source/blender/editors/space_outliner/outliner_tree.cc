@@ -17,8 +17,8 @@
 #include "DNA_collection_types.h"
 #include "DNA_constraint_types.h"
 #include "DNA_curves_types.h"
+#include "DNA_gpencil_legacy_types.h"
 #include "DNA_gpencil_modifier_types.h"
-#include "DNA_gpencil_types.h"
 #include "DNA_key_types.h"
 #include "DNA_light_types.h"
 #include "DNA_lightprobe_types.h"
@@ -278,9 +278,6 @@ static void outliner_add_object_contents(SpaceOutliner *space_outliner,
     outliner_add_element(space_outliner, &te->subtree, ob, te, TSE_ANIM_DATA, 0);
   }
 
-  /* FIXME: add a special type for this. */
-  outliner_add_element(space_outliner, &te->subtree, ob->poselib, te, TSE_SOME_ID, 0);
-
   outliner_add_element(space_outliner, &te->subtree, ob->data, te, TSE_SOME_ID, 0);
 
   if (ob->pose) {
@@ -514,7 +511,7 @@ static void outliner_add_object_contents(SpaceOutliner *space_outliner,
   }
 
   /* vertex groups */
-  if (ELEM(ob->type, OB_MESH, OB_GPENCIL, OB_LATTICE)) {
+  if (ELEM(ob->type, OB_MESH, OB_GPENCIL_LEGACY, OB_LATTICE)) {
     const ListBase *defbase = BKE_object_defgroup_list(ob);
     if (!BLI_listbase_is_empty(defbase)) {
       TreeElement *tenla = outliner_add_element(
@@ -730,7 +727,7 @@ static void outliner_add_id_contents(SpaceOutliner *space_outliner,
       }
       break;
     }
-    case ID_GD: {
+    case ID_GD_LEGACY: {
       bGPdata *gpd = (bGPdata *)id;
 
       if (outliner_animdata_test(gpd->adt)) {
@@ -1441,6 +1438,11 @@ static bool outliner_element_visible_get(const Scene *scene,
             return false;
           }
           break;
+        case OB_GPENCIL_LEGACY:
+          if (exclude_filter & SO_FILTER_NO_OB_GPENCIL_LEGACY) {
+            return false;
+          }
+          break;
         default:
           if (exclude_filter & SO_FILTER_NO_OB_OTHERS) {
             return false;
@@ -1573,7 +1575,7 @@ static int outliner_filter_subtree(SpaceOutliner *space_outliner,
     te_next = te->next;
     if (outliner_element_visible_get(scene, view_layer, te, exclude_filter) == false) {
       /* Don't free the tree, but extract the children from the parent and add to this tree. */
-      /* This also needs filtering the subtree prior (see T69246). */
+      /* This also needs filtering the subtree prior (see #69246). */
       outliner_filter_subtree(
           space_outliner, scene, view_layer, &te->subtree, search_string, exclude_filter);
       te_next = outliner_extract_children_from_subtree(te, lb);

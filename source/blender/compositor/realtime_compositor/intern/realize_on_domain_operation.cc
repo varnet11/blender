@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 
-#include "BLI_float3x3.hh"
-#include "BLI_math_vec_types.hh"
+#include "BLI_math_matrix.hh"
 #include "BLI_utildefines.h"
 
 #include "GPU_shader.h"
@@ -38,16 +37,16 @@ void RealizeOnDomainOperation::execute()
   GPU_shader_bind(shader);
 
   /* Transform the input space into the domain space. */
-  const float3x3 local_transformation = domain_.transformation.inverted() *
+  const float3x3 local_transformation = math::invert(domain_.transformation) *
                                         input.domain().transformation;
 
   /* Set the origin of the transformation to be the center of the domain. */
-  const float3x3 transformation = float3x3::from_origin_transformation(
+  const float3x3 transformation = math::from_origin_transform<float3x3>(
       local_transformation, float2(domain_.size) / 2.0f);
 
   /* Invert the transformation because the shader transforms the domain coordinates instead of the
    * input image itself and thus expect the inverse. */
-  const float3x3 inverse_transformation = transformation.inverted();
+  const float3x3 inverse_transformation = math::invert(transformation);
 
   GPU_shader_uniform_mat3_as_mat4(shader, "inverse_transformation", inverse_transformation.ptr());
 
@@ -77,13 +76,25 @@ void RealizeOnDomainOperation::execute()
 
 GPUShader *RealizeOnDomainOperation::get_realization_shader()
 {
-  switch (get_result().type()) {
-    case ResultType::Color:
-      return shader_manager().get("compositor_realize_on_domain_color");
-    case ResultType::Vector:
-      return shader_manager().get("compositor_realize_on_domain_vector");
-    case ResultType::Float:
-      return shader_manager().get("compositor_realize_on_domain_float");
+  if (get_input().get_realization_options().interpolation == Interpolation::Bicubic) {
+    switch (get_result().type()) {
+      case ResultType::Color:
+        return shader_manager().get("compositor_realize_on_domain_bicubic_color");
+      case ResultType::Vector:
+        return shader_manager().get("compositor_realize_on_domain_bicubic_vector");
+      case ResultType::Float:
+        return shader_manager().get("compositor_realize_on_domain_bicubic_float");
+    }
+  }
+  else {
+    switch (get_result().type()) {
+      case ResultType::Color:
+        return shader_manager().get("compositor_realize_on_domain_color");
+      case ResultType::Vector:
+        return shader_manager().get("compositor_realize_on_domain_vector");
+      case ResultType::Float:
+        return shader_manager().get("compositor_realize_on_domain_float");
+    }
   }
 
   BLI_assert_unreachable();

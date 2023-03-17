@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "BKE_attribute_math.hh"
-#include "BKE_mesh.h"
+#include "BKE_mesh.hh"
 
 #include "BLI_map.hh"
 #include "BLI_set.hh"
@@ -17,7 +17,7 @@ static void node_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Bool>(N_("Start Vertices")).default_value(true).hide_value().supports_field();
   b.add_input<decl::Int>(N_("Next Vertex Index")).default_value(-1).hide_value().supports_field();
-  b.add_output<decl::Bool>(N_("Selection")).field_source();
+  b.add_output<decl::Bool>(N_("Selection")).field_source_reference_all();
 }
 
 static void edge_paths_to_selection(const Mesh &src_mesh,
@@ -90,6 +90,12 @@ class PathToEdgeSelectionFieldInput final : public bke::MeshFieldInput {
 
     return mesh.attributes().adapt_domain<bool>(
         VArray<bool>::ForContainer(std::move(selection)), ATTR_DOMAIN_EDGE, domain);
+  }
+
+  void for_each_field_input_recursive(FunctionRef<void(const FieldInput &)> fn) const override
+  {
+    start_vertices_.node().for_each_field_input_recursive(fn);
+    next_vertex_.node().for_each_field_input_recursive(fn);
   }
 
   uint64_t hash() const override

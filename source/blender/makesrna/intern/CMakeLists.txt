@@ -11,7 +11,7 @@ if(HAVE_MALLOC_STATS_H)
   add_definitions(-DHAVE_MALLOC_STATS_H)
 endif()
 
-# files rna_access.c rna_define.c makesrna.c intentionally excluded.
+# files rna_access.cc rna_define.c makesrna.c intentionally excluded.
 set(DEFSRC
   rna_ID.c
   rna_action.c
@@ -140,6 +140,9 @@ if(CMAKE_COMPILER_IS_GNUCC OR (CMAKE_C_COMPILER_ID MATCHES "Clang"))
 endif()
 if(CMAKE_C_COMPILER_ID MATCHES "Clang")
   string(APPEND GENSRC_CFLAGS " -Wno-missing-variable-declarations")
+elseif(MSVC)
+  # Restore warn C4100 (unreferenced formal parameter) back to w4
+  remove_cc_flag(/w34100)
 endif()
 
 if(GENSRC_CFLAGS)
@@ -178,6 +181,7 @@ set(SRC
   ../../../../intern/guardedalloc/intern/mallocn.c
   ../../../../intern/guardedalloc/intern/mallocn_guarded_impl.c
   ../../../../intern/guardedalloc/intern/mallocn_lockfree_impl.c
+  ../../../../intern/guardedalloc/intern/memory_usage.cc
 
   # Needed for defaults.
   ../../../../release/datafiles/userdef/userdef_default.c
@@ -241,10 +245,6 @@ if(WITH_IMAGE_OPENEXR)
   add_definitions(-DWITH_OPENEXR)
 endif()
 
-if(WITH_OPENIMAGEIO)
-  add_definitions(-DWITH_OPENIMAGEIO)
-endif()
-
 if(WITH_IMAGE_TIFF)
   add_definitions(-DWITH_TIFF)
 endif()
@@ -270,15 +270,16 @@ if(WITH_IMAGE_WEBP)
 endif()
 
 if(WITH_AUDASPACE)
-  add_definitions(-DWITH_AUDASPACE)
-
   list(APPEND INC_SYS
     ${AUDASPACE_C_INCLUDE_DIRS}
   )
-  list(APPEND LIB
-    ${AUDASPACE_C_LIBRARIES}
-    ${AUDASPACE_PY_LIBRARIES}
-  )
+  if(WITH_SYSTEM_AUDASPACE)
+    list(APPEND LIB
+      ${AUDASPACE_C_LIBRARIES}
+      ${AUDASPACE_PY_LIBRARIES}
+    )
+  endif()
+  add_definitions(-DWITH_AUDASPACE)
 endif()
 
 if(WITH_CODEC_FFMPEG)
@@ -404,7 +405,9 @@ target_link_libraries(makesrna bf_dna)
 target_link_libraries(makesrna bf_dna_blenlib)
 
 if(WIN32 AND NOT UNIX)
-  target_link_libraries(makesrna ${PTHREADS_LIBRARIES})
+  if(DEFINED PTHREADS_LIBRARIES)
+    target_link_libraries(makesrna ${PTHREADS_LIBRARIES})
+  endif()
 endif()
 
 # Output `rna_*_gen.c`.
@@ -412,13 +415,13 @@ endif()
 # `valgrind --leak-check=full --track-origins=yes`
 add_custom_command(
   OUTPUT ${GENSRC}
-  COMMAND "$<TARGET_FILE:makesrna>" ${CMAKE_CURRENT_BINARY_DIR}/  ${CMAKE_CURRENT_BINARY_DIR}/../
+  COMMAND "$<TARGET_FILE:makesrna>" ${CMAKE_CURRENT_BINARY_DIR}/ ${CMAKE_CURRENT_BINARY_DIR}/../
   DEPENDS makesrna
 )
 
 # Build bf_rna
 set(SRC
-  rna_access.c
+  rna_access.cc
   rna_access_compare_override.c
   rna_path.cc
   ${GENSRC}

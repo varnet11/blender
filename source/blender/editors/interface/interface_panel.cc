@@ -48,7 +48,7 @@
 #include "GPU_matrix.h"
 #include "GPU_state.h"
 
-#include "interface_intern.h"
+#include "interface_intern.hh"
 
 /* -------------------------------------------------------------------- */
 /** \name Defines & Structs
@@ -731,13 +731,7 @@ Panel *UI_panel_begin(
     UI_block_theme_style_set(block, UI_BLOCK_THEME_STYLE_POPUP);
   }
 
-  *r_open = false;
-
-  if (UI_panel_is_closed(panel)) {
-    return panel;
-  }
-
-  *r_open = true;
+  *r_open = !UI_panel_is_closed(panel);
 
   return panel;
 }
@@ -754,18 +748,16 @@ void UI_panel_header_buttons_end(Panel *panel)
   uiBlock *block = panel->runtime.block;
 
   /* A button group should always be created in #UI_panel_header_buttons_begin. */
-  BLI_assert(!BLI_listbase_is_empty(&block->button_groups));
+  BLI_assert(!block->button_groups.is_empty());
 
-  uiButtonGroup *button_group = static_cast<uiButtonGroup *>(block->button_groups.last);
-
-  button_group->flag &= ~UI_BUTTON_GROUP_LOCK;
+  uiButtonGroup &button_group = block->button_groups.last();
+  button_group.flag &= ~UI_BUTTON_GROUP_LOCK;
 
   /* Repurpose the first header button group if it is empty, in case the first button added to
    * the panel doesn't add a new group (if the button is created directly rather than through an
    * interface layout call). */
-  if (BLI_listbase_is_single(&block->button_groups) &&
-      BLI_listbase_is_empty(&button_group->buttons)) {
-    button_group->flag &= ~UI_BUTTON_GROUP_PANEL_HEADER;
+  if (block->button_groups.size() > 0) {
+    button_group.flag &= ~UI_BUTTON_GROUP_PANEL_HEADER;
   }
   else {
     /* Always add a new button group. Although this may result in many empty groups, without it,
@@ -940,12 +932,11 @@ static void panel_remove_invisible_layouts_recursive(Panel *panel, const Panel *
     /* If sub-panels have no search results but the parent panel does, then the parent panel open
      * and the sub-panels will close. In that case there must be a way to hide the buttons in the
      * panel but keep the header buttons. */
-    LISTBASE_FOREACH (uiButtonGroup *, button_group, &block->button_groups) {
-      if (button_group->flag & UI_BUTTON_GROUP_PANEL_HEADER) {
+    for (const uiButtonGroup &button_group : block->button_groups) {
+      if (button_group.flag & UI_BUTTON_GROUP_PANEL_HEADER) {
         continue;
       }
-      LISTBASE_FOREACH (LinkData *, link, &button_group->buttons) {
-        uiBut *but = static_cast<uiBut *>(link->data);
+      for (uiBut *but : button_group.buttons) {
         but->flag |= UI_HIDDEN;
       }
     }
@@ -1108,7 +1099,7 @@ static void panel_draw_aligned_widgets(const uiStyle *style,
     UI_icon_draw_ex(widget_rect.xmin + size_y * 0.2f,
                     widget_rect.ymin + size_y * 0.2f,
                     UI_panel_is_closed(panel) ? ICON_RIGHTARROW : ICON_DOWNARROW_HLT,
-                    aspect * U.inv_dpi_fac,
+                    aspect * UI_INV_SCALE_FAC,
                     0.7f,
                     0.0f,
                     title_color,
@@ -1137,7 +1128,7 @@ static void panel_draw_aligned_widgets(const uiStyle *style,
     UI_icon_draw_ex(widget_rect.xmax - scaled_unit * 2.2f,
                     widget_rect.ymin + 5.0f / aspect,
                     ICON_PINNED,
-                    aspect * U.inv_dpi_fac,
+                    aspect * UI_INV_SCALE_FAC,
                     1.0f,
                     0.0f,
                     title_color,
@@ -1297,7 +1288,7 @@ void UI_panel_category_draw_all(ARegion *region, const char *category_id_active)
   const float zoom = 1.0f / aspect;
   const int px = U.pixelsize;
   const int category_tabs_width = round_fl_to_int(UI_PANEL_CATEGORY_MARGIN_WIDTH * zoom);
-  const float dpi_fac = UI_DPI_FAC;
+  const float dpi_fac = UI_SCALE_FAC;
   /* Padding of tabs around text. */
   const int tab_v_pad_text = round_fl_to_int(TABS_PADDING_TEXT_FACTOR * dpi_fac * zoom) + 2 * px;
   /* Padding between tabs. */
@@ -1307,11 +1298,9 @@ void UI_panel_category_draw_all(ARegion *region, const char *category_id_active)
   const int roundboxtype = is_left ? (UI_CNR_TOP_LEFT | UI_CNR_BOTTOM_LEFT) :
                                      (UI_CNR_TOP_RIGHT | UI_CNR_BOTTOM_RIGHT);
   bool is_alpha;
-  bool do_scaletabs = false;
 #ifdef USE_FLAT_INACTIVE
   bool is_active_prev = false;
 #endif
-  float scaletabs = 1.0f;
   /* Same for all tabs. */
   /* Intentionally don't scale by 'px'. */
   const int rct_xmin = is_left ? v2d->mask.xmin + 3 : (v2d->mask.xmax - category_tabs_width);
@@ -1345,7 +1334,7 @@ void UI_panel_category_draw_all(ARegion *region, const char *category_id_active)
   BLF_enable(fontid, BLF_ROTATION);
   BLF_rotation(fontid, M_PI_2);
   ui_fontscale(&fstyle_points, aspect);
-  BLF_size(fontid, fstyle_points * U.dpi_fac);
+  BLF_size(fontid, fstyle_points * UI_SCALE_FAC);
 
   /* Check the region type supports categories to avoid an assert
    * for showing 3D view panels in the properties space. */
@@ -1353,7 +1342,7 @@ void UI_panel_category_draw_all(ARegion *region, const char *category_id_active)
     BLI_assert(UI_panel_category_is_visible(region));
   }
 
-  /* Calculate tab rectangle and check if we need to scale down. */
+  /* Calculate tab rectangle for each panel. */
   LISTBASE_FOREACH (PanelCategoryDyn *, pc_dyn, &region->panels_category) {
     rcti *rct = &pc_dyn->rect;
     const char *category_id = pc_dyn->idname;
@@ -1369,16 +1358,13 @@ void UI_panel_category_draw_all(ARegion *region, const char *category_id_active)
     y_ofs += category_width + tab_v_pad + (tab_v_pad_text * 2);
   }
 
-  if (y_ofs > BLI_rcti_size_y(&v2d->mask)) {
-    scaletabs = float(BLI_rcti_size_y(&v2d->mask)) / float(y_ofs);
-
-    LISTBASE_FOREACH (PanelCategoryDyn *, pc_dyn, &region->panels_category) {
-      rcti *rct = &pc_dyn->rect;
-      rct->ymin = ((rct->ymin - v2d->mask.ymax) * scaletabs) + v2d->mask.ymax;
-      rct->ymax = ((rct->ymax - v2d->mask.ymax) * scaletabs) + v2d->mask.ymax;
-    }
-
-    do_scaletabs = true;
+  const int max_scroll = max_ii(y_ofs - BLI_rcti_size_y(&v2d->mask), 0);
+  const int scroll = clamp_i(region->category_scroll, 0, max_scroll);
+  region->category_scroll = scroll;
+  LISTBASE_FOREACH (PanelCategoryDyn *, pc_dyn, &region->panels_category) {
+    rcti *rct = &pc_dyn->rect;
+    rct->ymin += scroll;
+    rct->ymax += scroll;
   }
 
   /* Begin drawing. */
@@ -1414,14 +1400,17 @@ void UI_panel_category_draw_all(ARegion *region, const char *category_id_active)
 
   LISTBASE_FOREACH (PanelCategoryDyn *, pc_dyn, &region->panels_category) {
     const rcti *rct = &pc_dyn->rect;
+    if (rct->ymin > v2d->mask.ymax) {
+      /* Scrolled outside the top of the view, check the next tab. */
+      continue;
+    }
+    if (rct->ymax < v2d->mask.ymin) {
+      /* Scrolled past visible bounds, no need to draw other tabs. */
+      break;
+    }
     const char *category_id = pc_dyn->idname;
     const char *category_id_draw = IFACE_(category_id);
-    const int category_width = BLI_rcti_size_y(rct) - (tab_v_pad_text * 2);
     size_t category_draw_len = BLF_DRAW_STR_DUMMY_MAX;
-#if 0
-    int category_width = BLF_width(fontid, category_id_draw, BLF_DRAW_STR_DUMMY_MAX);
-#endif
-
     const bool is_active = STREQ(category_id, category_id_active);
 
     GPU_blend(GPU_BLEND_ALPHA);
@@ -1478,18 +1467,13 @@ void UI_panel_category_draw_all(ARegion *region, const char *category_id_active)
 
     /* Tab titles. */
 
-    if (do_scaletabs) {
-      category_draw_len = BLF_width_to_strlen(
-          fontid, category_id_draw, category_draw_len, category_width, nullptr);
-    }
-
     BLF_position(fontid, rct->xmax - text_v_ofs, rct->ymin + tab_v_pad_text, 0.0f);
     BLF_color3ubv(fontid, is_active ? theme_col_text_hi : theme_col_text);
     BLF_draw(fontid, category_id_draw, category_draw_len);
 
     GPU_blend(GPU_BLEND_NONE);
 
-    /* Not essential, but allows events to be handled right up to the region edge (T38171). */
+    /* Not essential, but allows events to be handled right up to the region edge (#38171). */
     if (is_left) {
       pc_dyn->rect.xmin = v2d->mask.xmin;
     }
@@ -2264,7 +2248,9 @@ static int ui_handle_panel_category_cycling(const wmEvent *event,
     const char *category = UI_panel_category_active_get(region, false);
     if (LIKELY(category)) {
       PanelCategoryDyn *pc_dyn = UI_panel_category_find(region, category);
-      if (LIKELY(pc_dyn)) {
+      /* Cyclic behavior between categories
+       * using Ctrl+Tab (+Shift for backwards) or Ctrl+Wheel Up/Down. */
+      if (LIKELY(pc_dyn) && (event->modifier & KM_CTRL)) {
         if (is_mousewheel) {
           /* We can probably get rid of this and only allow Ctrl-Tabbing. */
           pc_dyn = (event->type == WHEELDOWNMOUSE) ? pc_dyn->next : pc_dyn->prev;
@@ -2285,9 +2271,9 @@ static int ui_handle_panel_category_cycling(const wmEvent *event,
           UI_panel_category_active_set(region, pc_dyn->idname);
           ED_region_tag_redraw(region);
         }
+        return WM_UI_HANDLER_BREAK;
       }
     }
-    return WM_UI_HANDLER_BREAK;
   }
 
   return WM_UI_HANDLER_CONTINUE;
@@ -2323,7 +2309,7 @@ int ui_handler_panel_region(bContext *C,
         UI_panel_category_active_set(region, pc_dyn->idname);
         ED_region_tag_redraw(region);
 
-        /* Reset scroll to the top (T38348). */
+        /* Reset scroll to the top (#38348). */
         UI_view2d_offset(&region->v2d, -1.0f, 1.0f);
 
         retval = WM_UI_HANDLER_BREAK;

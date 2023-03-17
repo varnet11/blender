@@ -246,7 +246,7 @@ static const char32_t *blf_get_sample_text(FT_Face face)
     return def;
   }
 
-  /* Detect "Last resort" fonts. They have everything, except the last 5 bits.  */
+  /* Detect "Last resort" fonts. They have everything, except the last 5 bits. */
   if (os2_table->ulUnicodeRange1 == 0xffffffffU && os2_table->ulUnicodeRange2 == 0xffffffffU &&
       os2_table->ulUnicodeRange3 == 0xffffffffU && os2_table->ulUnicodeRange4 >= 0x7FFFFFFU) {
     return U"\xE000\xFFFF";
@@ -256,6 +256,22 @@ static const char32_t *blf_get_sample_text(FT_Face face)
                        count_bits_i((uint)os2_table->ulUnicodeRange2) +
                        count_bits_i((uint)os2_table->ulUnicodeRange3) +
                        count_bits_i((uint)os2_table->ulUnicodeRange4);
+
+  /* Use OS/2 Table code page range bits to differentiate between (combined) CJK fonts.
+   * See https://learn.microsoft.com/en-us/typography/opentype/spec/os2#cpr */
+  FT_ULong codepages = os2_table->ulCodePageRange1;
+  if (codepages & (1 << 19) || codepages & (1 << 21)) {
+    return U"\ud55c\uad6d\uc5b4"; /* 한국어 Korean. */
+  }
+  if (codepages & (1 << 20)) {
+    return U"\u7E41\u9AD4\u5B57"; /* 繁體字 Traditional Chinese. */
+  }
+  if (codepages & (1 << 17) && !(codepages & (1 << 18))) {
+    return U"\u65E5\u672C\u8A9E"; /* 日本語 Japanese. */
+  }
+  if (codepages & (1 << 18) && !(codepages & (1 << 17))) {
+    return U"\u7B80\u4F53\u5B57"; /* 简体字 Simplified Chinese. */
+  }
 
   for (uint i = 0; i < ARRAY_SIZE(unicode_samples); ++i) {
     const UnicodeSample *s = &unicode_samples[i];

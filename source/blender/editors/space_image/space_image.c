@@ -6,7 +6,7 @@
  */
 
 #include "DNA_defaults.h"
-#include "DNA_gpencil_types.h"
+#include "DNA_gpencil_legacy_types.h"
 #include "DNA_image_types.h"
 #include "DNA_mask_types.h"
 #include "DNA_object_types.h"
@@ -255,8 +255,8 @@ static bool image_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
     return false;
   }
   if (drag->type == WM_DRAG_PATH) {
-    /* rule might not work? */
-    if (ELEM(drag->icon, 0, ICON_FILE_IMAGE, ICON_FILE_MOVIE, ICON_FILE_BLANK)) {
+    const eFileSel_File_Types file_type = WM_drag_get_path_file_type(drag);
+    if (ELEM(file_type, 0, FILE_TYPE_IMAGE, FILE_TYPE_MOVIE)) {
       return true;
     }
   }
@@ -266,7 +266,7 @@ static bool image_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
 static void image_drop_copy(bContext *UNUSED(C), wmDrag *drag, wmDropBox *drop)
 {
   /* copy drag path to properties */
-  RNA_string_set(drop->ptr, "filepath", drag->path);
+  RNA_string_set(drop->ptr, "filepath", WM_drag_get_path(drag));
 }
 
 /* area+region dropbox definition */
@@ -336,6 +336,7 @@ static void image_listener(const wmSpaceTypeListenerParams *params)
         case ND_COMPO_RESULT:
           if (ED_space_image_show_render(sima)) {
             image_scopes_tag_refresh(area);
+            BKE_image_partial_update_mark_full_update(sima->image);
           }
           ED_area_tag_redraw(area);
           break;
@@ -405,7 +406,10 @@ static void image_listener(const wmSpaceTypeListenerParams *params)
           ViewLayer *view_layer = WM_window_get_active_view_layer(win);
           BKE_view_layer_synced_ensure(scene, view_layer);
           Object *ob = BKE_view_layer_active_object_get(view_layer);
-          if (ob && (ob == wmn->reference) && (ob->mode & OB_MODE_EDIT)) {
+          /* \note With a geometry nodes modifier, the UVs on `ob` can change in response to
+           * any change on `wmn->reference`. If we could track the upstream dependencies,
+           * unnecessary redraws could be reduced. Until then, just redraw. See #98594. */
+          if (ob && (ob->mode & OB_MODE_EDIT)) {
             if (sima->lock && (sima->flag & SI_DRAWSHADOW)) {
               ED_area_tag_refresh(area);
               ED_area_tag_redraw(area);
@@ -990,7 +994,8 @@ static void image_id_remap(ScrArea *UNUSED(area),
 {
   SpaceImage *simg = (SpaceImage *)slink;
 
-  if (!BKE_id_remapper_has_mapping_for(mappings, FILTER_ID_IM | FILTER_ID_GD | FILTER_ID_MSK)) {
+  if (!BKE_id_remapper_has_mapping_for(mappings,
+                                       FILTER_ID_IM | FILTER_ID_GD_LEGACY | FILTER_ID_MSK)) {
     return;
   }
 

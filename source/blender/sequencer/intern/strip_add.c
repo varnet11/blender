@@ -176,6 +176,7 @@ Sequence *SEQ_add_effect_strip(Scene *scene, ListBase *seqbase, struct SeqLoadDa
 
   if (!load_data->effect.seq1) {
     seq->len = 1; /* Effect is generator, set non zero length. */
+    seq->flag |= SEQ_SINGLE_FRAME_CONTENT;
     SEQ_time_right_handle_frame_set(scene, seq, load_data->effect.end_frame);
   }
 
@@ -234,6 +235,10 @@ Sequence *SEQ_add_image_strip(Main *bmain, Scene *scene, ListBase *seqbase, SeqL
   seq->len = load_data->image.len;
   Strip *strip = seq->strip;
   strip->stripdata = MEM_callocN(load_data->image.len * sizeof(StripElem), "stripelem");
+
+  if (seq->len == 1) {
+    seq->flag |= SEQ_SINGLE_FRAME_CONTENT;
+  }
 
   /* Multiview settings. */
   if (load_data->use_multiview) {
@@ -314,7 +319,7 @@ Sequence *SEQ_add_sound_strip(Main *bmain, Scene *scene, ListBase *seqbase, SeqL
    * line up with the video frames. Therefore we round this number to the
    * nearest frame as the audio track usually overshoots or undershoots the
    * end frame of the video by a little bit.
-   * See T47135 for under shoot example. */
+   * See #47135 for under shoot example. */
   seq->len = MAX2(1, round((info.length - sound->offset_time) * FPS));
 
   Strip *strip = seq->strip;
@@ -366,6 +371,8 @@ Sequence *SEQ_add_meta_strip(Scene *scene, ListBase *seqbase, SeqLoadData *load_
   /* Set frames start and length. */
   seqm->start = load_data->start_frame;
   seqm->len = 1;
+
+  seq_add_generic_update(scene, seqm);
 
   return seqm;
 }

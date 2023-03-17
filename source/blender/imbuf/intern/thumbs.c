@@ -10,6 +10,8 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "BKE_blendfile.h"
+
 #include "BLI_fileops.h"
 #include "BLI_ghash.h"
 #include "BLI_hash_md5.h"
@@ -21,8 +23,6 @@
 #include BLI_SYSTEM_PID_H
 
 #include "DNA_space_types.h" /* For FILE_MAX_LIBEXTRA */
-
-#include "BLO_readfile.h"
 
 #include "IMB_imbuf.h"
 #include "IMB_imbuf_types.h"
@@ -397,7 +397,7 @@ static ImBuf *thumb_create_ex(const char *file_path,
 
       if (img->x > tsize || img->y > tsize) {
         float scale = MIN2((float)tsize / (float)img->x, (float)tsize / (float)img->y);
-        /* Scaling down must never assign zero width/height, see: T89868. */
+        /* Scaling down must never assign zero width/height, see: #89868. */
         short ex = MAX2(1, (short)(img->x * scale));
         short ey = MAX2(1, (short)(img->y * scale));
         /* Save some time by only scaling byte buf */
@@ -527,7 +527,7 @@ ImBuf *IMB_thumb_manage(const char *filepath, ThumbSize size, ThumbSource source
 
   path = file_path = filepath;
   if (source == THB_SOURCE_BLEND) {
-    if (BLO_library_path_explode(path, path_buff, &blen_group, &blen_id)) {
+    if (BKE_blendfile_library_path_explode(path, path_buff, &blen_group, &blen_id)) {
       if (blen_group) {
         if (!blen_id) {
           /* No preview for blen groups */

@@ -15,15 +15,15 @@
 #include "BLT_translation.h"
 
 #include "DNA_defaults.h"
+#include "DNA_gpencil_legacy_types.h"
 #include "DNA_gpencil_modifier_types.h"
-#include "DNA_gpencil_types.h"
 #include "DNA_material_types.h"
 #include "DNA_object_types.h"
 #include "DNA_screen_types.h"
 
 #include "BKE_colortools.h"
 #include "BKE_context.h"
-#include "BKE_gpencil_modifier.h"
+#include "BKE_gpencil_modifier_legacy.h"
 #include "BKE_lib_query.h"
 #include "BKE_main.h"
 #include "BKE_material.h"
@@ -204,25 +204,25 @@ static void panelRegister(ARegionType *region_type)
 }
 
 GpencilModifierTypeInfo modifierType_Gpencil_Color = {
-    /* name */ N_("Hue/Saturation"),
-    /* structName */ "ColorGpencilModifierData",
-    /* structSize */ sizeof(ColorGpencilModifierData),
-    /* type */ eGpencilModifierTypeType_Gpencil,
-    /* flags */ eGpencilModifierTypeFlag_SupportsEditmode,
+    /*name*/ N_("Hue/Saturation"),
+    /*structName*/ "ColorGpencilModifierData",
+    /*structSize*/ sizeof(ColorGpencilModifierData),
+    /*type*/ eGpencilModifierTypeType_Gpencil,
+    /*flags*/ eGpencilModifierTypeFlag_SupportsEditmode,
 
-    /* copyData */ copyData,
+    /*copyData*/ copyData,
 
-    /* deformStroke */ deformStroke,
-    /* generateStrokes */ NULL,
-    /* bakeModifier */ bakeModifier,
-    /* remapTime */ NULL,
+    /*deformStroke*/ deformStroke,
+    /*generateStrokes*/ NULL,
+    /*bakeModifier*/ bakeModifier,
+    /*remapTime*/ NULL,
 
-    /* initData */ initData,
-    /* freeData */ freeData,
-    /* isDisabled */ NULL,
-    /* updateDepsgraph */ NULL,
-    /* dependsOnTime */ NULL,
-    /* foreachIDLink */ foreachIDLink,
-    /* foreachTexLink */ NULL,
-    /* panelRegister */ panelRegister,
+    /*initData*/ initData,
+    /*freeData*/ freeData,
+    /*isDisabled*/ NULL,
+    /*updateDepsgraph*/ NULL,
+    /*dependsOnTime*/ NULL,
+    /*foreachIDLink*/ foreachIDLink,
+    /*foreachTexLink*/ NULL,
+    /*panelRegister*/ panelRegister,
 };

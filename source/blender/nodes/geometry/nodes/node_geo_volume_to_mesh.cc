@@ -10,7 +10,7 @@
 
 #include "BKE_lib_id.h"
 #include "BKE_material.h"
-#include "BKE_mesh.h"
+#include "BKE_mesh.hh"
 #include "BKE_mesh_runtime.h"
 #include "BKE_volume.h"
 #include "BKE_volume_to_mesh.hh"
@@ -121,9 +121,9 @@ static Mesh *create_mesh_from_volume_grids(Span<openvdb::GridBase::ConstPtr> gri
     loop_offset += (3 * data.tris.size() + 4 * data.quads.size());
   }
 
-  Mesh *mesh = BKE_mesh_new_nomain(vert_offset, 0, 0, loop_offset, poly_offset);
+  Mesh *mesh = BKE_mesh_new_nomain(vert_offset, 0, loop_offset, poly_offset);
   BKE_id_material_eval_ensure_default_slot(&mesh->id);
-  MutableSpan<MVert> verts = mesh->verts_for_write();
+  MutableSpan<float3> positions = mesh->vert_positions_for_write();
   MutableSpan<MPoly> polys = mesh->polys_for_write();
   MutableSpan<MLoop> loops = mesh->loops_for_write();
 
@@ -135,12 +135,13 @@ static Mesh *create_mesh_from_volume_grids(Span<openvdb::GridBase::ConstPtr> gri
                                      vert_offsets[i],
                                      poly_offsets[i],
                                      loop_offsets[i],
-                                     verts,
+                                     positions,
                                      polys,
                                      loops);
   }
 
   BKE_mesh_calc_edges(mesh, false, false);
+  BKE_mesh_smooth_flag_set(mesh, false);
 
   return mesh;
 }

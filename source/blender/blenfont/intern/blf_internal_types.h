@@ -40,7 +40,7 @@ typedef int32_t ft_pix;
 /* Macros copied from `include/freetype/internal/ftobjs.h`. */
 
 /**
- * FIXME(@campbellbarton): Follow rounding from Blender 3.1x and older.
+ * FIXME(@ideasman42): Follow rounding from Blender 3.1x and older.
  * This is what users will expect and changing this creates wider spaced text.
  * Use this macro to communicate that rounding should be used, using floor is to avoid
  * user visible changes, which can be reviewed and handled separately.
@@ -300,7 +300,7 @@ typedef struct FontBLF {
   /** Font size. */
   float size;
 
-  /** Axes data for Adobe MM, TrueType GX, or OpenType variation fonts.  */
+  /** Axes data for Adobe MM, TrueType GX, or OpenType variation fonts. */
   FT_MM_Var *variations;
 
   /** Character variation; 0=default, -1=min, +1=max. */

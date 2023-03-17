@@ -25,6 +25,9 @@ set(INC
   ${CMAKE_BINARY_DIR}/source/blender/makesrna
 )
 
+set(INC_SYS
+)
+
 set(SRC
   image_buttons.c
   image_draw.c
@@ -42,10 +45,6 @@ set(LIB
   bf_blenlib
   bf_editor_uvedit
 )
-
-if(WITH_OPENIMAGEIO)
-  add_definitions(-DWITH_OPENIMAGEIO)
-endif()
 
 if(WITH_IMAGE_OPENJPEG)
   add_definitions(-DWITH_OPENJPEG)

@@ -10,8 +10,8 @@
 #include "MEM_guardedalloc.h"
 
 #include "DNA_defaults.h"
+#include "DNA_gpencil_legacy_types.h"
 #include "DNA_gpencil_modifier_types.h"
-#include "DNA_gpencil_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
@@ -23,9 +23,9 @@
 #include "BLT_translation.h"
 
 #include "BKE_context.h"
-#include "BKE_gpencil.h"
-#include "BKE_gpencil_geom.h"
-#include "BKE_gpencil_modifier.h"
+#include "BKE_gpencil_geom_legacy.h"
+#include "BKE_gpencil_legacy.h"
+#include "BKE_gpencil_modifier_legacy.h"
 #include "BKE_lib_query.h"
 #include "BKE_main.h"
 #include "BKE_modifier.h"
@@ -313,25 +313,25 @@ static void panelRegister(ARegionType *region_type)
 }
 
 GpencilModifierTypeInfo modifierType_Gpencil_Multiply = {
-    /* name */ N_("MultipleStrokes"),
-    /* structName */ "MultiplyGpencilModifierData",
-    /* structSize */ sizeof(MultiplyGpencilModifierData),
-    /* type */ eGpencilModifierTypeType_Gpencil,
-    /* flags */ 0,
+    /*name*/ N_("MultipleStrokes"),
+    /*structName*/ "MultiplyGpencilModifierData",
+    /*structSize*/ sizeof(MultiplyGpencilModifierData),
+    /*type*/ eGpencilModifierTypeType_Gpencil,
+    /*flags*/ 0,
 
-    /* copyData */ copyData,
+    /*copyData*/ copyData,
 
-    /* deformStroke */ NULL,
-    /* generateStrokes */ generateStrokes,
-    /* bakeModifier */ bakeModifier,
-    /* remapTime */ NULL,
+    /*deformStroke*/ NULL,
+    /*generateStrokes*/ generateStrokes,
+    /*bakeModifier*/ bakeModifier,
+    /*remapTime*/ NULL,
 
-    /* initData */ initData,
-    /* freeData */ NULL,
-    /* isDisabled */ NULL,
-    /* updateDepsgraph */ NULL,
-    /* dependsOnTime */ NULL,
-    /* foreachIDLink */ foreachIDLink,
-    /* foreachTexLink */ NULL,
-    /* panelRegister */ panelRegister,
+    /*initData*/ initData,
+    /*freeData*/ NULL,
+    /*isDisabled*/ NULL,
+    /*updateDepsgraph*/ NULL,
+    /*dependsOnTime*/ NULL,
+    /*foreachIDLink*/ foreachIDLink,
+    /*foreachTexLink*/ NULL,
+    /*panelRegister*/ panelRegister,
 };

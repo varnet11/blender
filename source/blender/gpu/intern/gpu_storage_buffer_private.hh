@@ -7,12 +7,15 @@
 
 #pragma once
 
+#include "BLI_span.hh"
 #include "BLI_sys_types.h"
 
 struct GPUStorageBuf;
 
 namespace blender {
 namespace gpu {
+
+class VertBuf;
 
 #ifdef DEBUG
 #  define DEBUG_NAME_LEN 64
@@ -40,25 +43,23 @@ class StorageBuf {
   virtual void update(const void *data) = 0;
   virtual void bind(int slot) = 0;
   virtual void unbind() = 0;
-  virtual void clear(eGPUTextureFormat internal_format,
-                     eGPUDataFormat data_format,
-                     void *data) = 0;
+  virtual void clear(uint32_t clear_value) = 0;
   virtual void copy_sub(VertBuf *src, uint dst_offset, uint src_offset, uint copy_size) = 0;
   virtual void read(void *data) = 0;
 };
 
 /* Syntactic sugar. */
-static inline GPUStorageBuf *wrap(StorageBuf *vert)
+static inline GPUStorageBuf *wrap(StorageBuf *storage_buf)
 {
-  return reinterpret_cast<GPUStorageBuf *>(vert);
+  return reinterpret_cast<GPUStorageBuf *>(storage_buf);
 }
-static inline StorageBuf *unwrap(GPUStorageBuf *vert)
+static inline StorageBuf *unwrap(GPUStorageBuf *storage_buf)
 {
-  return reinterpret_cast<StorageBuf *>(vert);
+  return reinterpret_cast<StorageBuf *>(storage_buf);
 }
-static inline const StorageBuf *unwrap(const GPUStorageBuf *vert)
+static inline const StorageBuf *unwrap(const GPUStorageBuf *storage_buf)
 {
-  return reinterpret_cast<const StorageBuf *>(vert);
+  return reinterpret_cast<const StorageBuf *>(storage_buf);
 }
 
 #undef DEBUG_NAME_LEN

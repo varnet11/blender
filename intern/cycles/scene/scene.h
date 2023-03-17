@@ -72,7 +72,7 @@ class DeviceScene {
   device_vector<packed_float3> tri_verts;
   device_vector<uint> tri_shader;
   device_vector<packed_float3> tri_vnormal;
-  device_vector<uint4> tri_vindex;
+  device_vector<packed_uint3> tri_vindex;
   device_vector<uint> tri_patch;
   device_vector<float2> tri_patch_uv;
 
@@ -110,6 +110,13 @@ class DeviceScene {
   device_vector<KernelLight> lights;
   device_vector<float2> light_background_marginal_cdf;
   device_vector<float2> light_background_conditional_cdf;
+
+  /* light tree */
+  device_vector<KernelLightTreeNode> light_tree_nodes;
+  device_vector<KernelLightTreeEmitter> light_tree_emitters;
+  device_vector<uint> light_to_tree;
+  device_vector<uint> object_lookup_offset;
+  device_vector<uint> triangle_to_tree;
 
   /* particles */
   device_vector<KernelParticle> particles;
@@ -270,6 +277,7 @@ class Scene : public NodeOwner {
 
   void enable_update_stats();
 
+  bool load_kernels(Progress &progress);
   bool update(Progress &progress);
 
   bool has_shadow_catcher();
@@ -333,7 +341,6 @@ class Scene : public NodeOwner {
   uint loaded_kernel_features;
 
   void update_kernel_features();
-  bool load_kernels(Progress &progress, bool lock_scene = true);
 
   bool has_shadow_catcher_ = false;
   bool shadow_catcher_modified_ = true;
@@ -344,7 +351,7 @@ class Scene : public NodeOwner {
   /* Get maximum number of closures to be used in kernel. */
   int get_max_closure_count();
 
-  /* Get size of a volume stack needed to render this scene.  */
+  /* Get size of a volume stack needed to render this scene. */
   int get_volume_stack_size() const;
 
   template<typename T> void delete_node_impl(T *node)

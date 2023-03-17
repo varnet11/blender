@@ -14,8 +14,8 @@
 #include "BLT_translation.h"
 
 #include "DNA_defaults.h"
+#include "DNA_gpencil_legacy_types.h"
 #include "DNA_gpencil_modifier_types.h"
-#include "DNA_gpencil_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
@@ -23,9 +23,9 @@
 
 #include "BKE_armature.h"
 #include "BKE_context.h"
-#include "BKE_gpencil.h"
-#include "BKE_gpencil_geom.h"
-#include "BKE_gpencil_modifier.h"
+#include "BKE_gpencil_geom_legacy.h"
+#include "BKE_gpencil_legacy.h"
+#include "BKE_gpencil_modifier_legacy.h"
 #include "BKE_lib_query.h"
 #include "BKE_main.h"
 #include "BKE_modifier.h"
@@ -118,14 +118,12 @@ static void bakeModifier(Main *UNUSED(bmain),
                          GpencilModifierData *md,
                          Object *ob)
 {
-  Object *object_eval = DEG_get_evaluated_object(depsgraph, ob);
   ArmatureGpencilModifierData *mmd = (ArmatureGpencilModifierData *)md;
-  GpencilModifierData *md_eval = BKE_gpencil_modifiers_findby_name(object_eval, md->name);
 
   if (mmd->object == NULL) {
     return;
   }
-  generic_bake_deform_stroke(depsgraph, md_eval, object_eval, true, deformStroke);
+  generic_bake_deform_stroke(depsgraph, md, ob, true, deformStroke);
 }
 
 static bool isDisabled(GpencilModifierData *md, int UNUSED(userRenderParams))
@@ -191,24 +189,24 @@ static void panelRegister(ARegionType *region_type)
 }
 
 GpencilModifierTypeInfo modifierType_Gpencil_Armature = {
-    /* name */ N_("Armature"),
-    /* structName */ "ArmatureGpencilModifierData",
-    /* structSize */ sizeof(ArmatureGpencilModifierData),
-    /* type */ eGpencilModifierTypeType_Gpencil,
-    /* flags */ eGpencilModifierTypeFlag_SupportsEditmode,
+    /*name*/ N_("Armature"),
+    /*structName*/ "ArmatureGpencilModifierData",
+    /*structSize*/ sizeof(ArmatureGpencilModifierData),
+    /*type*/ eGpencilModifierTypeType_Gpencil,
+    /*flags*/ eGpencilModifierTypeFlag_SupportsEditmode,
 
-    /* copyData */ copyData,
+    /*copyData*/ copyData,
 
-    /* deformStroke */ deformStroke,
-    /* generateStrokes */ NULL,
-    /* bakeModifier */ bakeModifier,
-    /* remapTime */ NULL,
-    /* initData */ initData,
-    /* freeData */ NULL,
-    /* isDisabled */ isDisabled,
-    /* updateDepsgraph */ updateDepsgraph,
-    /* dependsOnTime */ NULL,
-    /* foreachIDLink */ foreachIDLink,
-    /* foreachTexLink */ NULL,
-    /* panelRegister */ panelRegister,
+    /*deformStroke*/ deformStroke,
+    /*generateStrokes*/ NULL,
+    /*bakeModifier*/ bakeModifier,
+    /*remapTime*/ NULL,
+    /*initData*/ initData,
+    /*freeData*/ NULL,
+    /*isDisabled*/ isDisabled,
+    /*updateDepsgraph*/ updateDepsgraph,
+    /*dependsOnTime*/ NULL,
+    /*foreachIDLink*/ foreachIDLink,
+    /*foreachTexLink*/ NULL,
+    /*panelRegister*/ panelRegister,
 };

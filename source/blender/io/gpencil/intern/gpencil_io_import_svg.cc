@@ -6,13 +6,13 @@
  */
 
 #include "BLI_math.h"
-#include "BLI_math_vec_types.hh"
+#include "BLI_math_vector_types.hh"
 #include "BLI_span.hh"
 
-#include "DNA_gpencil_types.h"
+#include "DNA_gpencil_legacy_types.h"
 
-#include "BKE_gpencil.h"
-#include "BKE_gpencil_geom.h"
+#include "BKE_gpencil_geom_legacy.h"
+#include "BKE_gpencil_legacy.h"
 
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_query.h"

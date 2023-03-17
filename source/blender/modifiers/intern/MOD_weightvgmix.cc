@@ -23,7 +23,7 @@
 #include "BKE_customdata.h"
 #include "BKE_deform.h"
 #include "BKE_lib_query.h"
-#include "BKE_mesh.h"
+#include "BKE_mesh.hh"
 #include "BKE_modifier.h"
 #include "BKE_screen.h"
 #include "BKE_texture.h" /* Texture masking. */
@@ -490,35 +490,35 @@ static void panelRegister(ARegionType *region_type)
 }
 
 ModifierTypeInfo modifierType_WeightVGMix = {
-    /* name */ N_("VertexWeightMix"),
-    /* structName */ "WeightVGMixModifierData",
-    /* structSize */ sizeof(WeightVGMixModifierData),
-    /* srna */ &RNA_VertexWeightMixModifier,
-    /* type */ eModifierTypeType_NonGeometrical,
-    /* flags */ eModifierTypeFlag_AcceptsMesh | eModifierTypeFlag_SupportsMapping |
+    /*name*/ N_("VertexWeightMix"),
+    /*structName*/ "WeightVGMixModifierData",
+    /*structSize*/ sizeof(WeightVGMixModifierData),
+    /*srna*/ &RNA_VertexWeightMixModifier,
+    /*type*/ eModifierTypeType_NonGeometrical,
+    /*flags*/ eModifierTypeFlag_AcceptsMesh | eModifierTypeFlag_SupportsMapping |
         eModifierTypeFlag_SupportsEditmode | eModifierTypeFlag_UsesPreview,
-    /* icon */ ICON_MOD_VERTEX_WEIGHT,
+    /*icon*/ ICON_MOD_VERTEX_WEIGHT,
 
-    /* copyData */ BKE_modifier_copydata_generic,
+    /*copyData*/ BKE_modifier_copydata_generic,
 
-    /* deformVerts */ nullptr,
-    /* deformMatrices */ nullptr,
-    /* deformVertsEM */ nullptr,
-    /* deformMatricesEM */ nullptr,
-    /* modifyMesh */ modifyMesh,
-    /* modifyGeometrySet */ nullptr,
+    /*deformVerts*/ nullptr,
+    /*deformMatrices*/ nullptr,
+    /*deformVertsEM*/ nullptr,
+    /*deformMatricesEM*/ nullptr,
+    /*modifyMesh*/ modifyMesh,
+    /*modifyGeometrySet*/ nullptr,
 
-    /* initData */ initData,
-    /* requiredDataMask */ requiredDataMask,
-    /* freeData */ nullptr,
-    /* isDisabled */ isDisabled,
-    /* updateDepsgraph */ updateDepsgraph,
-    /* dependsOnTime */ dependsOnTime,
-    /* dependsOnNormals */ nullptr,
-    /* foreachIDLink */ foreachIDLink,
-    /* foreachTexLink */ foreachTexLink,
-    /* freeRuntimeData */ nullptr,
-    /* panelRegister */ panelRegister,
-    /* blendWrite */ nullptr,
-    /* blendRead */ nullptr,
+    /*initData*/ initData,
+    /*requiredDataMask*/ requiredDataMask,
+    /*freeData*/ nullptr,
+    /*isDisabled*/ isDisabled,
+    /*updateDepsgraph*/ updateDepsgraph,
+    /*dependsOnTime*/ dependsOnTime,
+    /*dependsOnNormals*/ nullptr,
+    /*foreachIDLink*/ foreachIDLink,
+    /*foreachTexLink*/ foreachTexLink,
+    /*freeRuntimeData*/ nullptr,
+    /*panelRegister*/ panelRegister,
+    /*blendWrite*/ nullptr,
+    /*blendRead*/ nullptr,
 };

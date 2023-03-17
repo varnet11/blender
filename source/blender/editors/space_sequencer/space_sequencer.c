@@ -292,7 +292,7 @@ static void sequencer_refresh(const bContext *C, ScrArea *area)
     case SEQ_VIEW_SEQUENCE_PREVIEW:
       if (region_main && region_preview) {
         /* Get available height (without DPI correction). */
-        const float height = (area->winy - ED_area_headersize()) / UI_DPI_FAC;
+        const float height = (area->winy - ED_area_headersize()) / UI_SCALE_FAC;
 
         /* We reuse hidden region's size, allows to find same layout as before if we just switch
          * between one 'full window' view and the combined one. This gets lost if we switch to both
@@ -494,10 +494,15 @@ static void sequencer_gizmos(void)
   wmGizmoMapType *gzmap_type = WM_gizmomaptype_ensure(
       &(const struct wmGizmoMapType_Params){SPACE_SEQ, RGN_TYPE_PREVIEW});
 
+  WM_gizmotype_append(GIZMO_GT_retime_handle_add);
+  WM_gizmotype_append(GIZMO_GT_retime_handle);
+  WM_gizmotype_append(GIZMO_GT_retime_remove);
+
   WM_gizmogrouptype_append(SEQUENCER_GGT_gizmo2d);
   WM_gizmogrouptype_append(SEQUENCER_GGT_gizmo2d_translate);
   WM_gizmogrouptype_append(SEQUENCER_GGT_gizmo2d_resize);
   WM_gizmogrouptype_append(SEQUENCER_GGT_gizmo2d_rotate);
+  WM_gizmogrouptype_append(SEQUENCER_GGT_gizmo_retime);
 
   WM_gizmogrouptype_append_and_link(gzmap_type, SEQUENCER_GGT_navigate);
 }
@@ -565,7 +570,7 @@ static void sequencer_main_clamp_view(const bContext *C, ARegion *region)
 
   /* Initialize default view with 7 channels, that are visible even if empty. */
   rctf strip_boundbox;
-  BLI_rctf_init(&strip_boundbox, 0.0f, 0.0f, 1.0f, 7.0f);
+  BLI_rctf_init(&strip_boundbox, 0.0f, 0.0f, 1.0f, 6.0f);
   SEQ_timeline_expand_boundbox(scene, ed->seqbasep, &strip_boundbox);
 
   /* Clamp Y max. Scrubbing area height must be added, so strips aren't occluded. */
@@ -574,8 +579,8 @@ static void sequencer_main_clamp_view(const bContext *C, ARegion *region)
   const float pixel_view_size_y = BLI_rctf_size_y(&v2d->cur) / BLI_rcti_size_y(&v2d->mask);
   const float scrub_bar_height = BLI_rcti_size_y(&scrub_rect) * pixel_view_size_y;
 
-  /* Channel n has range of <n, n+1>. */
-  strip_boundbox.ymax += 1.0f + scrub_bar_height;
+  /* Channel n has range of <n, n+1>, +1 for empty channel. */
+  strip_boundbox.ymax += 2.0f + scrub_bar_height;
 
   /* Clamp Y min. Scroller and marker area height must be added, so strips aren't occluded. */
   float scroll_bar_height = v2d->hor.ymax * pixel_view_size_y;
@@ -645,6 +650,7 @@ static void sequencer_main_region_listener(const wmRegionListenerParams *params)
         case ND_SEQUENCER:
         case ND_RENDER_RESULT:
           ED_region_tag_redraw(region);
+          WM_gizmomap_tag_refresh(region->gizmo_map);
           break;
       }
       break;
@@ -658,6 +664,7 @@ static void sequencer_main_region_listener(const wmRegionListenerParams *params)
     case NC_SPACE:
       if (wmn->data == ND_SPACE_SEQUENCER) {
         ED_region_tag_redraw(region);
+        WM_gizmomap_tag_refresh(region->gizmo_map);
       }
       break;
     case NC_ID:
@@ -668,6 +675,7 @@ static void sequencer_main_region_listener(const wmRegionListenerParams *params)
     case NC_SCREEN:
       if (ELEM(wmn->data, ND_ANIMPLAY)) {
         ED_region_tag_redraw(region);
+        WM_gizmomap_tag_refresh(region->gizmo_map);
       }
       break;
   }
@@ -1069,7 +1077,6 @@ void ED_spacetype_sequencer(void)
   art->on_view2d_changed = sequencer_main_region_view2d_changed;
   art->listener = sequencer_main_region_listener;
   art->message_subscribe = sequencer_main_region_message_subscribe;
-  /* NOTE: inclusion of #ED_KEYMAP_GIZMO is currently for scripts and isn't used by default. */
   art->keymapflag = ED_KEYMAP_TOOL | ED_KEYMAP_GIZMO | ED_KEYMAP_VIEW2D | ED_KEYMAP_FRAMES |
                     ED_KEYMAP_ANIMATION;
   BLI_addhead(&st->regiontypes, art);

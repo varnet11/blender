@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "BKE_customdata.h"
-#include "BKE_mesh.h"
+#include "BKE_mesh.hh"
 
 #include "bmesh.h"
 #include "bmesh_tools.h"
@@ -18,9 +18,9 @@ namespace blender::nodes::node_geo_triangulate_cc {
 static void node_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>(N_("Mesh")).supported_type(GEO_COMPONENT_TYPE_MESH);
-  b.add_input<decl::Bool>(N_("Selection")).default_value(true).supports_field().hide_value();
+  b.add_input<decl::Bool>(N_("Selection")).default_value(true).field_on_all().hide_value();
   b.add_input<decl::Int>(N_("Minimum Vertices")).default_value(4).min(4).max(10000);
-  b.add_output<decl::Geometry>(N_("Mesh"));
+  b.add_output<decl::Geometry>(N_("Mesh")).propagate_all();
 }
 
 static void node_layout(uiLayout *layout, bContext * /*C*/, PointerRNA *ptr)
@@ -59,6 +59,10 @@ static Mesh *triangulate_mesh_selection(const Mesh &mesh,
   BM_mesh_triangulate(bm, quad_method, ngon_method, min_vertices, true, nullptr, nullptr, nullptr);
   Mesh *result = BKE_mesh_from_bmesh_for_eval_nomain(bm, &cd_mask_extra, &mesh);
   BM_mesh_free(bm);
+
+  /* Positions are not changed by the triangulation operation, so the bounds are the same. */
+  result->runtime->bounds_cache = mesh.runtime->bounds_cache;
+
   return result;
 }
 

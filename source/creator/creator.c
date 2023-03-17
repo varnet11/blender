@@ -39,7 +39,7 @@
 #include "BKE_context.h"
 #include "BKE_cpp_types.h"
 #include "BKE_global.h"
-#include "BKE_gpencil_modifier.h"
+#include "BKE_gpencil_modifier_legacy.h"
 #include "BKE_idtype.h"
 #include "BKE_main.h"
 #include "BKE_material.h"
@@ -93,6 +93,10 @@
 
 #ifdef WITH_SDL_DYNLOAD
 #  include "sdlew.h"
+#endif
+
+#ifdef WITH_USD
+#  include "usd.h"
 #endif
 
 #include "creator_intern.h" /* Own include. */
@@ -235,12 +239,12 @@ void *gmp_alloc(size_t size)
 {
   return scalable_malloc(size);
 }
-void *gmp_realloc(void *ptr, size_t old_size, size_t new_size)
+void *gmp_realloc(void *ptr, size_t UNUSED(old_size), size_t new_size)
 {
   return scalable_realloc(ptr, new_size);
 }
 
-void gmp_free(void *ptr, size_t size)
+void gmp_free(void *ptr, size_t UNUSED(size))
 {
   scalable_free(ptr);
 }
@@ -297,7 +301,7 @@ int main(int argc,
   /* Un-buffered `stdout` makes `stdout` and `stderr` better synchronized, and helps
    * when stepping through code in a debugger (prints are immediately
    * visible). However disabling buffering causes lock contention on windows
-   * see T76767 for details, since this is a debugging aid, we do not enable
+   * see #76767 for details, since this is a debugging aid, we do not enable
    * the un-buffered behavior for release builds. */
 #ifndef NDEBUG
   setvbuf(stdout, NULL, _IONBF, 0);
@@ -471,6 +475,10 @@ int main(int argc,
   /* Initialize sub-systems that use `BKE_appdir.h`. */
   IMB_init();
 
+#ifdef WITH_USD
+  USD_ensure_plugin_path_registered();
+#endif
+
 #ifndef WITH_PYTHON_MODULE
   /* First test for background-mode (#Global.background) */
   BLI_args_parse(ba, ARG_PASS_SETTINGS, NULL, NULL);
@@ -576,9 +584,13 @@ int main(int argc,
     }
     WM_main(C);
   }
-#endif /* WITH_PYTHON_MODULE */
+  /* Neither #WM_exit, #WM_main return, this quiets CLANG's `unreachable-code-return` warning. */
+  BLI_assert_unreachable();
+
+#endif /* !WITH_PYTHON_MODULE */
 
   return 0;
+
 } /* End of `int main(...)` function. */
 
 #ifdef WITH_PYTHON_MODULE

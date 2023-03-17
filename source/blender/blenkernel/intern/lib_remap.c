@@ -27,6 +27,7 @@
 #include "BKE_modifier.h"
 #include "BKE_multires.h"
 #include "BKE_node.h"
+#include "BKE_node_tree_update.h"
 #include "BKE_object.h"
 
 #include "DEG_depsgraph.h"
@@ -116,6 +117,11 @@ static void foreach_libblock_remap_callback_apply(ID *id_owner,
       DEG_id_tag_update_ex(id_remap_data->bmain,
                            id_owner,
                            ID_RECALC_COPY_ON_WRITE | ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
+    }
+    if (GS(id_owner->name) == ID_NT) {
+      /* Make sure that the node tree is updated after a property in it changed. Ideally, we would
+       * know which nodes property was changed so that only this node is tagged. */
+      BKE_ntree_update_tag_all((bNodeTree *)id_owner);
     }
   }
   /* Get the new_id pointer. When the mapping is violating never null we should use a NULL
@@ -319,20 +325,12 @@ static void libblock_remap_data_preprocess(ID *id_owner,
  */
 static void libblock_remap_data_postprocess_object_update(Main *bmain,
                                                           Object *old_ob,
-                                                          Object *new_ob,
+                                                          Object *UNUSED(new_ob),
                                                           const bool do_sync_collection)
 {
-  if (new_ob == NULL) {
-    /* In case we unlinked old_ob (new_ob is NULL), the object has already
-     * been removed from the scenes and their collections. We still have
-     * to remove the NULL children from collections not used in any scene. */
-    BKE_collections_object_remove_nulls(bmain);
-  }
-  else {
-    /* Remapping may have created duplicates of CollectionObject pointing to the same object within
-     * the same collection. */
-    BKE_collections_object_remove_duplicates(bmain);
-  }
+  /* Will only effectively process collections that have been tagged with
+   * #COLLECTION_TAG_COLLECTION_OBJECT_DIRTY. See #collection_foreach_id callback. */
+  BKE_collections_object_remove_invalids(bmain);
 
   if (do_sync_collection) {
     BKE_main_collection_sync_remap(bmain);
@@ -526,13 +524,16 @@ typedef struct LibblockRemapMultipleUserData {
 
 static void libblock_remap_foreach_idpair_cb(ID *old_id, ID *new_id, void *user_data)
 {
+  if (old_id == new_id) {
+    return;
+  }
+
   LibBlockRemapMultipleUserData *data = user_data;
   Main *bmain = data->bmain;
   const short remap_flags = data->remap_flags;
 
   BLI_assert(old_id != NULL);
   BLI_assert((new_id == NULL) || GS(old_id->name) == GS(new_id->name));
-  BLI_assert(old_id != new_id);
 
   if (free_notifier_reference_cb) {
     free_notifier_reference_cb(old_id);
@@ -599,7 +600,7 @@ static void libblock_remap_foreach_idpair_cb(ID *old_id, ID *new_id, void *user_
 
   /* Node trees may virtually use any kind of data-block... */
   /* XXX Yuck!!!! nodetree update can do pretty much any thing when talking about py nodes,
-   *     including creating new data-blocks (see T50385), so we need to unlock main here. :(
+   *     including creating new data-blocks (see #50385), so we need to unlock main here. :(
    *     Why can't we have re-entrent locks? */
   BKE_main_unlock(bmain);
   libblock_remap_data_postprocess_nodetree_update(bmain, new_id);

@@ -37,6 +37,7 @@
 #include "BLO_readfile.h"
 
 #include "BKE_armature.h"
+#include "BKE_blendfile.h"
 #include "BKE_blendfile_link_append.h"
 #include "BKE_context.h"
 #include "BKE_global.h"
@@ -141,6 +142,9 @@ static int wm_link_append_flag(wmOperator *op)
     if (RNA_boolean_get(op->ptr, "do_reuse_local_id")) {
       flag |= BLO_LIBLINK_APPEND_LOCAL_ID_REUSE;
     }
+    if (RNA_boolean_get(op->ptr, "clear_asset_data")) {
+      flag |= BLO_LIBLINK_APPEND_ASSET_DATA_CLEAR;
+    }
   }
   if (RNA_boolean_get(op->ptr, "instance_collections")) {
     flag |= BLO_LIBLINK_COLLECTION_INSTANCE;
@@ -213,7 +217,7 @@ static int wm_link_append_exec(bContext *C, wmOperator *op)
   BLI_path_join(path, sizeof(path), root, relname);
 
   /* test if we have a valid data */
-  if (!BLO_library_path_explode(path, libname, &group, &name)) {
+  if (!BKE_blendfile_library_path_explode(path, libname, &group, &name)) {
     BKE_reportf(op->reports, RPT_ERROR, "'%s': not a library", path);
     return OPERATOR_CANCELLED;
   }
@@ -286,7 +290,7 @@ static int wm_link_append_exec(bContext *C, wmOperator *op)
 
       BLI_path_join(path, sizeof(path), root, relname);
 
-      if (BLO_library_path_explode(path, libname, &group, &name)) {
+      if (BKE_blendfile_library_path_explode(path, libname, &group, &name)) {
         if (!wm_link_append_item_poll(NULL, path, group, name, do_append)) {
           continue;
         }
@@ -305,7 +309,7 @@ static int wm_link_append_exec(bContext *C, wmOperator *op)
 
       BLI_path_join(path, sizeof(path), root, relname);
 
-      if (BLO_library_path_explode(path, libname, &group, &name)) {
+      if (BKE_blendfile_library_path_explode(path, libname, &group, &name)) {
         BlendfileLinkAppendContextItem *item;
 
         if (!wm_link_append_item_poll(op->reports, path, group, name, do_append)) {
@@ -399,6 +403,12 @@ static void wm_link_append_properties_common(wmOperatorType *ot, bool is_link)
       false,
       "Re-Use Local Data",
       "Try to re-use previously matching appended data-blocks instead of appending a new copy");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE | PROP_HIDDEN);
+  prop = RNA_def_boolean(ot->srna,
+                         "clear_asset_data",
+                         false,
+                         "Clear Asset Data",
+                         "Don't add asset meta-data or tags from the original data-block");
   RNA_def_property_flag(prop, PROP_SKIP_SAVE | PROP_HIDDEN);
 
   prop = RNA_def_boolean(ot->srna, "autoselect", true, "Select", "Select new objects");
@@ -601,7 +611,7 @@ static int wm_lib_relocate_invoke(bContext *C, wmOperator *op, const wmEvent *UN
 
 void WM_lib_reload(Library *lib, bContext *C, ReportList *reports)
 {
-  if (!BLO_has_bfile_extension(lib->filepath_abs)) {
+  if (!BKE_blendfile_extension_check(lib->filepath_abs)) {
     BKE_reportf(reports, RPT_ERROR, "'%s' is not a valid library filepath", lib->filepath_abs);
     return;
   }
@@ -678,7 +688,7 @@ static int wm_lib_relocate_exec_do(bContext *C, wmOperator *op, bool do_reload)
     RNA_string_get(op->ptr, "directory", root);
     RNA_string_get(op->ptr, "filename", libname);
 
-    if (!BLO_has_bfile_extension(libname)) {
+    if (!BKE_blendfile_extension_check(libname)) {
       BKE_report(op->reports, RPT_ERROR, "Not a library");
       return OPERATOR_CANCELLED;
     }
@@ -741,7 +751,8 @@ static int wm_lib_relocate_exec_do(bContext *C, wmOperator *op, bool do_reload)
 
           BLI_path_join(path, sizeof(path), root, relname);
 
-          if (BLI_path_cmp(path, lib->filepath_abs) == 0 || !BLO_has_bfile_extension(relname)) {
+          if (BLI_path_cmp(path, lib->filepath_abs) == 0 ||
+              !BKE_blendfile_extension_check(relname)) {
             continue;
           }
 

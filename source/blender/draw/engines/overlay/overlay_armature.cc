@@ -18,6 +18,7 @@
 
 #include "DRW_render.h"
 
+#include "BLI_listbase_wrapper.hh"
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
 
@@ -45,6 +46,8 @@
 #define BONE_FLAG(eBone, pchan) ((eBone) ? (eBone->flag) : (pchan->bone->flag))
 
 #define PT_DEFAULT_RAD 0.05f /* radius of the point batch. */
+
+using namespace blender;
 
 struct ArmatureDrawContext {
   /* Current armature object */
@@ -1486,7 +1489,7 @@ static void draw_axes(ArmatureDrawContext *ctx,
 
   if (pchan && pchan->custom && !(arm->flag & ARM_NO_CUSTOM)) {
     /* Special case: Custom bones can have different scale than the bone.
-     * Recompute display matrix without the custom scaling applied. (T65640). */
+     * Recompute display matrix without the custom scaling applied. (#65640). */
     float axis_mat[4][4];
     float length = pchan->bone->length;
     copy_m4_m4(axis_mat, pchan->custom_tx ? pchan->custom_tx->pose_mat : pchan->pose_mat);
@@ -2096,7 +2099,7 @@ static void draw_bone_name(ArmatureDrawContext *ctx,
 /* -------------------------------------------------------------------- */
 /** \name Pose Bone Culling
  *
- * Used for selection since drawing many bones can be slow, see: T91253.
+ * Used for selection since drawing many bones can be slow, see: #91253.
  *
  * Bounding spheres are used with margins added to ensure bones are included.
  * An added margin is needed because #BKE_pchan_minmax only returns the bounds
@@ -2229,9 +2232,9 @@ static void draw_armature_edit(ArmatureDrawContext *ctx)
   const bool show_text = DRW_state_show_text();
 
   const Object *ob_orig = DEG_get_original_object(ob);
-  /* FIXME(@campbellbarton): We should be able to use the CoW object,
+  /* FIXME(@ideasman42): We should be able to use the CoW object,
    * however the active bone isn't updated. Long term solution is an 'EditArmature' struct.
-   * for now we can draw from the original armature. See: T66773. */
+   * for now we can draw from the original armature. See: #66773. */
   // bArmature *arm = ob->data;
   bArmature *arm = static_cast<bArmature *>(ob_orig->data);
 
@@ -2355,7 +2358,7 @@ static void draw_armature_pose(ArmatureDrawContext *ctx)
     const Object *obact_orig = DEG_get_original_object(draw_ctx->obact);
 
     const ListBase *defbase = BKE_object_defgroup_list(obact_orig);
-    LISTBASE_FOREACH (const bDeformGroup *, dg, defbase) {
+    for (const bDeformGroup *dg : ConstListBaseWrapper<bDeformGroup>(defbase)) {
       if (dg->flag & DG_LOCK_WEIGHT) {
         pchan = BKE_pose_channel_find_name(ob->pose, dg->name);
 
@@ -2437,7 +2440,7 @@ static void draw_armature_pose(ArmatureDrawContext *ctx)
             draw_bone_box(ctx, nullptr, pchan, arm, boneflag, constflag, select_id);
           }
         }
-        else {
+        else if (arm->drawtype == ARM_OCTA) {
           draw_bone_update_disp_matrix_default(nullptr, pchan);
           if (!is_pose_select || pchan_culling_test_octohedral(view, ob, pchan)) {
             draw_bone_octahedral(ctx, nullptr, pchan, arm, boneflag, constflag, select_id);

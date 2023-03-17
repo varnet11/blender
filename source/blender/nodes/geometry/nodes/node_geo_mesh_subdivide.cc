@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 
-#include "BKE_mesh.h"
+#include "BKE_mesh.hh"
 #include "BKE_subdiv.h"
-#include "BKE_subdiv_mesh.h"
+#include "BKE_subdiv_mesh.hh"
 
 #include "UI_interface.h"
 #include "UI_resources.h"
@@ -15,7 +15,7 @@ static void node_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>(N_("Mesh")).supported_type(GEO_COMPONENT_TYPE_MESH);
   b.add_input<decl::Int>(N_("Level")).default_value(1).min(0).max(6);
-  b.add_output<decl::Geometry>(N_("Mesh"));
+  b.add_output<decl::Geometry>(N_("Mesh")).propagate_all();
 }
 
 static void geometry_set_mesh_subdivide(GeometrySet &geometry_set, const int level)

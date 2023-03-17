@@ -20,6 +20,7 @@
 #include "eevee_depth_of_field.hh"
 #include "eevee_film.hh"
 #include "eevee_hizbuffer.hh"
+#include "eevee_irradiance_cache.hh"
 #include "eevee_light.hh"
 #include "eevee_material.hh"
 #include "eevee_motion_blur.hh"
@@ -27,6 +28,7 @@
 #include "eevee_renderbuffers.hh"
 #include "eevee_sampling.hh"
 #include "eevee_shader.hh"
+#include "eevee_shadow.hh"
 #include "eevee_sync.hh"
 #include "eevee_view.hh"
 #include "eevee_world.hh"
@@ -46,6 +48,7 @@ class Instance {
   SyncModule sync;
   MaterialModule materials;
   PipelineModule pipelines;
+  ShadowModule shadows;
   LightModule lights;
   VelocityModule velocity;
   MotionBlurModule motion_blur;
@@ -58,6 +61,7 @@ class Instance {
   RenderBuffers render_buffers;
   MainView main_view;
   World world;
+  IrradianceCache irradiance_cache;
 
   /** Input data. */
   Depsgraph *depsgraph;
@@ -89,6 +93,7 @@ class Instance {
         sync(*this),
         materials(*this),
         pipelines(*this),
+        shadows(*this),
         lights(*this),
         velocity(*this),
         motion_blur(*this),
@@ -100,7 +105,8 @@ class Instance {
         film(*this),
         render_buffers(*this),
         main_view(*this),
-        world(*this){};
+        world(*this),
+        irradiance_cache(*this){};
   ~Instance(){};
 
   void init(const int2 &output_res,

@@ -66,10 +66,10 @@
 /* Detect isolated holes and fill them. */
 #define USE_NET_ISLAND_CONNECT
 
-#define KMAXDIST (10 * U.dpi_fac) /* Max mouse distance from edge before not detecting it. */
+#define KMAXDIST (10 * UI_SCALE_FAC) /* Max mouse distance from edge before not detecting it. */
 
 /* WARNING: Knife float precision is fragile:
- * Be careful before making changes here see: (T43229, T42864, T42459, T41164).
+ * Be careful before making changes here see: (#43229, #42864, #42459, #41164).
  */
 #define KNIFE_FLT_EPS 0.00001f
 #define KNIFE_FLT_EPS_SQUARED (KNIFE_FLT_EPS * KNIFE_FLT_EPS)
@@ -198,7 +198,7 @@ typedef struct KnifeObjectInfo {
    * Optionally allocate triangle indices, these are needed for non-interactive knife
    * projection as multiple cuts are made without the BVH being updated.
    * Using these indices the it's possible to access `cagecos` even if the face has been cut
-   * and the loops in `em->looptris` no longer refer to the original triangles, see: T97153.
+   * and the loops in `em->looptris` no longer refer to the original triangles, see: #97153.
    */
   const int (*tri_indices)[3];
 
@@ -495,7 +495,7 @@ static void knifetool_draw_visible_distances(const KnifeTool_OpData *kcd)
   char numstr[256];
   float numstr_size[2];
   float posit[2];
-  const float bg_margin = 4.0f * U.dpi_fac;
+  const float bg_margin = 4.0f * UI_SCALE_FAC;
   const float font_size = 14.0f;
   const int distance_precision = 4;
 
@@ -517,7 +517,7 @@ static void knifetool_draw_visible_distances(const KnifeTool_OpData *kcd)
   }
 
   BLF_enable(blf_mono_font, BLF_ROTATION);
-  BLF_size(blf_mono_font, font_size * U.dpi_fac);
+  BLF_size(blf_mono_font, font_size * UI_SCALE_FAC);
   BLF_rotation(blf_mono_font, 0.0f);
   BLF_width_and_height(blf_mono_font, numstr, sizeof(numstr), &numstr_size[0], &numstr_size[1]);
 
@@ -563,9 +563,9 @@ static void knifetool_draw_angle(const KnifeTool_OpData *kcd,
 {
   const RegionView3D *rv3d = kcd->region->regiondata;
   const int arc_steps = 24;
-  const float arc_size = 64.0f * U.dpi_fac;
-  const float bg_margin = 4.0f * U.dpi_fac;
-  const float cap_size = 4.0f * U.dpi_fac;
+  const float arc_size = 64.0f * UI_SCALE_FAC;
+  const float bg_margin = 4.0f * UI_SCALE_FAC;
+  const float cap_size = 4.0f * UI_SCALE_FAC;
   const float font_size = 14.0f;
   const int angle_precision = 3;
 
@@ -647,7 +647,7 @@ static void knifetool_draw_angle(const KnifeTool_OpData *kcd,
   }
 
   BLF_enable(blf_mono_font, BLF_ROTATION);
-  BLF_size(blf_mono_font, font_size * U.dpi_fac);
+  BLF_size(blf_mono_font, font_size * UI_SCALE_FAC);
   BLF_rotation(blf_mono_font, 0.0f);
   BLF_width_and_height(blf_mono_font, numstr, sizeof(numstr), &numstr_size[0], &numstr_size[1]);
 
@@ -907,7 +907,7 @@ static void knifetool_draw(const bContext *UNUSED(C), ARegion *UNUSED(region), v
 
   if (kcd->prev.vert) {
     immUniformColor3ubv(kcd->colors.point);
-    GPU_point_size(11 * UI_DPI_FAC);
+    GPU_point_size(11 * UI_SCALE_FAC);
 
     immBegin(GPU_PRIM_POINTS, 1);
     immVertex3fv(pos, kcd->prev.cage);
@@ -916,7 +916,7 @@ static void knifetool_draw(const bContext *UNUSED(C), ARegion *UNUSED(region), v
 
   if (kcd->prev.bmface || kcd->prev.edge) {
     immUniformColor3ubv(kcd->colors.curpoint);
-    GPU_point_size(9 * UI_DPI_FAC);
+    GPU_point_size(9 * UI_SCALE_FAC);
 
     immBegin(GPU_PRIM_POINTS, 1);
     immVertex3fv(pos, kcd->prev.cage);
@@ -925,7 +925,7 @@ static void knifetool_draw(const bContext *UNUSED(C), ARegion *UNUSED(region), v
 
   if (kcd->curr.vert) {
     immUniformColor3ubv(kcd->colors.point);
-    GPU_point_size(11 * UI_DPI_FAC);
+    GPU_point_size(11 * UI_SCALE_FAC);
 
     immBegin(GPU_PRIM_POINTS, 1);
     immVertex3fv(pos, kcd->curr.cage);
@@ -943,7 +943,7 @@ static void knifetool_draw(const bContext *UNUSED(C), ARegion *UNUSED(region), v
 
   if (kcd->curr.bmface || kcd->curr.edge) {
     immUniformColor3ubv(kcd->colors.curpoint);
-    GPU_point_size(9 * UI_DPI_FAC);
+    GPU_point_size(9 * UI_SCALE_FAC);
 
     immBegin(GPU_PRIM_POINTS, 1);
     immVertex3fv(pos, kcd->curr.cage);
@@ -984,7 +984,7 @@ static void knifetool_draw(const bContext *UNUSED(C), ARegion *UNUSED(region), v
     KnifeVert *kfv;
 
     immUniformColor3ubv(kcd->colors.point);
-    GPU_point_size(5.0 * UI_DPI_FAC);
+    GPU_point_size(5.0 * UI_SCALE_FAC);
 
     GPUBatch *batch = immBeginBatchAtMost(GPU_PRIM_POINTS, BLI_mempool_len(kcd->kverts));
 
@@ -1040,7 +1040,7 @@ static void knifetool_draw(const bContext *UNUSED(C), ARegion *UNUSED(region), v
     /* Draw any snapped verts first. */
     rgba_uchar_to_float(fcol, kcd->colors.point_a);
     GPU_batch_uniform_4fv(batch, "color", fcol);
-    GPU_point_size(11 * UI_DPI_FAC);
+    GPU_point_size(11 * UI_SCALE_FAC);
     if (snapped_verts_count > 0) {
       GPU_batch_draw_range(batch, 0, snapped_verts_count);
     }
@@ -1048,7 +1048,7 @@ static void knifetool_draw(const bContext *UNUSED(C), ARegion *UNUSED(region), v
     /* Now draw the rest. */
     rgba_uchar_to_float(fcol, kcd->colors.curpoint_a);
     GPU_batch_uniform_4fv(batch, "color", fcol);
-    GPU_point_size(7 * UI_DPI_FAC);
+    GPU_point_size(7 * UI_SCALE_FAC);
     if (other_verts_count > 0) {
       GPU_batch_draw_range(batch, snapped_verts_count, other_verts_count);
     }
@@ -1897,17 +1897,9 @@ static void knife_start_cut(KnifeTool_OpData *kcd)
   kcd->mdata.is_stored = false;
 
   if (kcd->prev.vert == NULL && kcd->prev.edge == NULL) {
-    float origin[3], origin_ofs[3];
     float ofs_local[3];
-
     negate_v3_v3(ofs_local, kcd->vc.rv3d->ofs);
-
-    knife_input_ray_segment(kcd, kcd->curr.mval, 1.0f, origin, origin_ofs);
-
-    if (!isect_line_plane_v3(
-            kcd->prev.cage, origin, origin_ofs, ofs_local, kcd->vc.rv3d->viewinv[2])) {
-      zero_v3(kcd->prev.cage);
-    }
+    ED_view3d_win_to_3d(kcd->vc.v3d, kcd->region, ofs_local, kcd->curr.mval, kcd->prev.cage);
 
     copy_v3_v3(kcd->prev.co, kcd->prev.cage); /* TODO: do we need this? */
     copy_v3_v3(kcd->curr.cage, kcd->prev.cage);
@@ -2692,7 +2684,7 @@ static bool coinciding_edges(BMEdge *e1, BMEdge *e2)
 
 /* Callback used in point_is_visible to exclude hits on the faces that are the same
  * as or contain the hitting element (which is in user_data).
- * Also (see T44492) want to exclude hits on faces that butt up to the hitting element
+ * Also (see #44492) want to exclude hits on faces that butt up to the hitting element
  * (e.g., when you double an edge by an edge split).
  */
 static bool bm_ray_cast_cb_elem_not_in_face_check(BMFace *f, void *user_data)
@@ -2983,10 +2975,10 @@ static void knife_find_line_hits(KnifeTool_OpData *kcd)
     face_tol = KNIFE_FLT_EPS_PX_FACE;
   }
   else {
-    /* Use 1/100th of a pixel, see T43896 (too big), T47910 (too small).
+    /* Use 1/100th of a pixel, see #43896 (too big), #47910 (too small).
      *
      * Update, leave this as is until we investigate not using pixel coords
-     * for geometry calculations: T48023. */
+     * for geometry calculations: #48023. */
     vert_tol = line_tol = face_tol = 0.5f;
   }
 
@@ -3025,7 +3017,7 @@ static void knife_find_line_hits(KnifeTool_OpData *kcd)
 
       /* If this isn't from an existing BMVert, it may have been added to a BMEdge originally.
        * Knowing if the hit comes from an edge is important for edge-in-face checks later on.
-       * See: #knife_add_single_cut -> #knife_verts_edge_in_face, T42611. */
+       * See: #knife_add_single_cut -> #knife_verts_edge_in_face, #42611. */
       if (kfe_hit) {
         hit.kfe = kfe_hit;
       }
@@ -4090,7 +4082,7 @@ static void knifetool_init(ViewContext *vc,
                            const bool is_interactive)
 {
   /* Needed so multiple non-interactive cuts (also called knife-project)
-   * doesn't access indices of loops that were created by cutting, see: T97153. */
+   * doesn't access indices of loops that were created by cutting, see: #97153. */
   bool use_tri_indices = !is_interactive;
 
   kcd->vc = *vc;
@@ -4311,7 +4303,7 @@ static void knifetool_finish_single_pre(KnifeTool_OpData *kcd, Object *ob)
 
 /**
  * A post version is needed to delay recalculating tessellation after making cuts.
- * Without this, knife-project can't use the BVH tree to select geometry after a cut, see: T98349.
+ * Without this, knife-project can't use the BVH tree to select geometry after a cut, see: #98349.
  */
 static void knifetool_finish_single_post(KnifeTool_OpData *UNUSED(kcd), Object *ob)
 {
@@ -4329,8 +4321,8 @@ static void knifetool_finish_single_post(KnifeTool_OpData *UNUSED(kcd), Object *
 static void knifetool_finish_ex(KnifeTool_OpData *kcd)
 {
   /* Separate pre/post passes are needed because `em->looptris` recalculation from the 'post' pass
-   * causes causes triangle indices in #KnifeTool_OpData.bvh to get out of sync.
-   * So perform all the cuts before doing any mesh recalculation, see: T101721. */
+   * causes triangle indices in #KnifeTool_OpData.bvh to get out of sync.
+   * So perform all the cuts before doing any mesh recalculation, see: #101721. */
   for (uint ob_index = 0; ob_index < kcd->objects_len; ob_index++) {
     Object *ob = kcd->objects[ob_index];
     knifetool_finish_single_pre(kcd, ob);

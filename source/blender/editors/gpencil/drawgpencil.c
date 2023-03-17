@@ -24,7 +24,7 @@
 #include "BLT_translation.h"
 
 #include "DNA_brush_types.h"
-#include "DNA_gpencil_types.h"
+#include "DNA_gpencil_legacy_types.h"
 #include "DNA_material_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
@@ -36,7 +36,7 @@
 #include "BKE_brush.h"
 #include "BKE_context.h"
 #include "BKE_global.h"
-#include "BKE_gpencil.h"
+#include "BKE_gpencil_legacy.h"
 #include "BKE_image.h"
 #include "BKE_material.h"
 #include "BKE_paint.h"
@@ -188,7 +188,7 @@ static void gpencil_draw_stroke_3d(tGPDdraw *tgpw,
   int keep_size = (int)((tgpw->gpd) && (tgpw->gpd->flag & GP_DATA_STROKE_KEEPTHICKNESS));
   gpencil_stroke_data.keep_size = keep_size;
   gpencil_stroke_data.pixfactor = tgpw->gpd->pixfactor;
-  /* xray mode always to 3D space to avoid wrong zdepth calculation (T60051) */
+  /* xray mode always to 3D space to avoid wrong zdepth calculation (#60051) */
   gpencil_stroke_data.xraymode = GP_XRAY_3DSPACE;
   gpencil_stroke_data.caps_start = tgpw->gps->caps[0];
   gpencil_stroke_data.caps_end = tgpw->gps->caps[1];

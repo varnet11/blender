@@ -40,9 +40,6 @@
 
 #include "DEG_depsgraph_query.h"
 
-#include "bmesh.h"
-#include "bmesh_tools.h"
-
 #include "MEM_guardedalloc.h"
 
 #include "MOD_ui_common.h"
@@ -102,7 +99,7 @@ static void updateDepsgraph(ModifierData *md, const ModifierUpdateDepsgraphConte
     /* If not using envelopes,
      * create relations to individual bones for more rigging flexibility. */
     if ((amd->deformflag & ARM_DEF_ENVELOPE) == 0 && (amd->object->pose != NULL) &&
-        ELEM(ctx->object->type, OB_MESH, OB_LATTICE, OB_GPENCIL)) {
+        ELEM(ctx->object->type, OB_MESH, OB_LATTICE, OB_GPENCIL_LEGACY)) {
       /* If neither vertex groups nor envelopes are used, the modifier has no bone dependencies. */
       if ((amd->deformflag & ARM_DEF_VGROUP) != 0) {
         /* Enumerate groups that match existing bones. */
@@ -263,35 +260,35 @@ static void blendRead(BlendDataReader *UNUSED(reader), ModifierData *md)
 }
 
 ModifierTypeInfo modifierType_Armature = {
-    /* name */ N_("Armature"),
-    /* structName */ "ArmatureModifierData",
-    /* structSize */ sizeof(ArmatureModifierData),
-    /* srna */ &RNA_ArmatureModifier,
-    /* type */ eModifierTypeType_OnlyDeform,
-    /* flags */ eModifierTypeFlag_AcceptsCVs | eModifierTypeFlag_AcceptsVertexCosOnly |
+    /*name*/ N_("Armature"),
+    /*structName*/ "ArmatureModifierData",
+    /*structSize*/ sizeof(ArmatureModifierData),
+    /*srna*/ &RNA_ArmatureModifier,
+    /*type*/ eModifierTypeType_OnlyDeform,
+    /*flags*/ eModifierTypeFlag_AcceptsCVs | eModifierTypeFlag_AcceptsVertexCosOnly |
         eModifierTypeFlag_SupportsEditmode,
-    /* icon */ ICON_MOD_ARMATURE,
+    /*icon*/ ICON_MOD_ARMATURE,
 
-    /* copyData */ copyData,
+    /*copyData*/ copyData,
 
-    /* deformVerts */ deformVerts,
-    /* deformMatrices */ deformMatrices,
-    /* deformVertsEM */ deformVertsEM,
-    /* deformMatricesEM */ deformMatricesEM,
-    /* modifyMesh */ NULL,
-    /* modifyGeometrySet */ NULL,
+    /*deformVerts*/ deformVerts,
+    /*deformMatrices*/ deformMatrices,
+    /*deformVertsEM*/ deformVertsEM,
+    /*deformMatricesEM*/ deformMatricesEM,
+    /*modifyMesh*/ NULL,
+    /*modifyGeometrySet*/ NULL,
 
-    /* initData */ initData,
-    /* requiredDataMask */ requiredDataMask,
-    /* freeData */ NULL,
-    /* isDisabled */ isDisabled,
-    /* updateDepsgraph */ updateDepsgraph,
-    /* dependsOnTime */ NULL,
-    /* dependsOnNormals */ NULL,
-    /* foreachIDLink */ foreachIDLink,
-    /* foreachTexLink */ NULL,
-    /* freeRuntimeData */ NULL,
-    /* panelRegister */ panelRegister,
-    /* blendWrite */ NULL,
-    /* blendRead */ blendRead,
+    /*initData*/ initData,
+    /*requiredDataMask*/ requiredDataMask,
+    /*freeData*/ NULL,
+    /*isDisabled*/ isDisabled,
+    /*updateDepsgraph*/ updateDepsgraph,
+    /*dependsOnTime*/ NULL,
+    /*dependsOnNormals*/ NULL,
+    /*foreachIDLink*/ foreachIDLink,
+    /*foreachTexLink*/ NULL,
+    /*freeRuntimeData*/ NULL,
+    /*panelRegister*/ panelRegister,
+    /*blendWrite*/ NULL,
+    /*blendRead*/ blendRead,
 };

@@ -7,13 +7,13 @@
 
 #include "BLI_assert.h"
 #include "BLI_math_geom.h"
-#include "BLI_math_vec_types.hh"
 #include "BLI_math_vector.hh"
+#include "BLI_math_vector_types.hh"
 #include "BLI_vector.hh"
 
 #include "BKE_DerivedMesh.h"
 #include "BKE_customdata.h"
-#include "BKE_mesh.h"
+#include "BKE_mesh.hh"
 #include "BKE_mesh_mapping.h"
 
 #include "DNA_mesh_types.h"
@@ -54,9 +54,9 @@ class TextureMarginMap {
   uint32_t value_to_store_;
   char *mask_;
 
-  MPoly const *mpoly_;
+  MPoly const *polys_;
   MLoop const *mloop_;
-  MLoopUV const *mloopuv_;
+  float2 const *mloopuv_;
   int totpoly_;
   int totloop_;
   int totedge_;
@@ -65,15 +65,15 @@ class TextureMarginMap {
   TextureMarginMap(size_t w,
                    size_t h,
                    const float uv_offset[2],
-                   MPoly const *mpoly,
+                   MPoly const *polys,
                    MLoop const *mloop,
-                   MLoopUV const *mloopuv,
+                   float2 const *mloopuv,
                    int totpoly,
                    int totloop,
                    int totedge)
       : w_(w),
         h_(h),
-        mpoly_(mpoly),
+        polys_(polys),
         mloop_(mloop),
         mloopuv_(mloopuv),
         totpoly_(totpoly),
@@ -280,17 +280,17 @@ class TextureMarginMap {
   }
 
  private:
-  float2 uv_to_xy(MLoopUV const &mloopuv) const
+  float2 uv_to_xy(const float2 &mloopuv) const
   {
     float2 ret;
-    ret.x = (((mloopuv.uv[0] - uv_offset_[0]) * w_) - (0.5f + 0.001f));
-    ret.y = (((mloopuv.uv[1] - uv_offset_[1]) * h_) - (0.5f + 0.001f));
+    ret.x = (((mloopuv[0] - uv_offset_[0]) * w_) - (0.5f + 0.001f));
+    ret.y = (((mloopuv[1] - uv_offset_[1]) * h_) - (0.5f + 0.001f));
     return ret;
   }
 
   void build_tables()
   {
-    loop_to_poly_map_ = blender::bke::mesh_topology::build_loop_to_poly_map({mpoly_, totpoly_},
+    loop_to_poly_map_ = blender::bke::mesh_topology::build_loop_to_poly_map({polys_, totpoly_},
                                                                             totloop_);
 
     loop_adjacency_map_.resize(totloop_, -1);
@@ -326,8 +326,8 @@ class TextureMarginMap {
       return true;
     }
 
-    int loopstart = mpoly_[*r_start_poly].loopstart;
-    int totloop = mpoly_[*r_start_poly].totloop;
+    int loopstart = polys_[*r_start_poly].loopstart;
+    int totloop = polys_[*r_start_poly].totloop;
 
     float destx, desty;
     int foundpoly;
@@ -384,11 +384,11 @@ class TextureMarginMap {
 
     /* Find the closest edge on which the point x,y can be projected.
      */
-    for (size_t i = 0; i < mpoly_[src_poly].totloop; i++) {
-      int l1 = mpoly_[src_poly].loopstart + i;
+    for (size_t i = 0; i < polys_[src_poly].totloop; i++) {
+      int l1 = polys_[src_poly].loopstart + i;
       int l2 = l1 + 1;
-      if (l2 >= mpoly_[src_poly].loopstart + mpoly_[src_poly].totloop) {
-        l2 = mpoly_[src_poly].loopstart;
+      if (l2 >= polys_[src_poly].loopstart + polys_[src_poly].totloop) {
+        l2 = polys_[src_poly].loopstart;
       }
       /* edge points */
       float2 edgepoint1 = uv_to_xy(mloopuv_[l1]);
@@ -423,7 +423,7 @@ class TextureMarginMap {
           /* Stother_ab the info of the closest edge so far. */
           found_dist = reflectLen;
           found_t = t;
-          found_edge = i + mpoly_[src_poly].loopstart;
+          found_edge = i + polys_[src_poly].loopstart;
         }
       }
     }
@@ -448,8 +448,8 @@ class TextureMarginMap {
     }
 
     int other_edge2 = other_edge + 1;
-    if (other_edge2 >= mpoly_[dst_poly].loopstart + mpoly_[dst_poly].totloop) {
-      other_edge2 = mpoly_[dst_poly].loopstart;
+    if (other_edge2 >= polys_[dst_poly].loopstart + polys_[dst_poly].totloop) {
+      other_edge2 = polys_[dst_poly].loopstart;
     }
 
     float2 other_edgepoint1 = uv_to_xy(mloopuv_[other_edge]);
@@ -487,9 +487,9 @@ static void generate_margin(ImBuf *ibuf,
                             const float uv_offset[2])
 {
 
-  const MPoly *mpoly;
+  const MPoly *polys;
   const MLoop *mloop;
-  const MLoopUV *mloopuv;
+  const float2 *mloopuv;
   int totpoly, totloop, totedge;
 
   int tottri;
@@ -501,22 +501,22 @@ static void generate_margin(ImBuf *ibuf,
     totpoly = me->totpoly;
     totloop = me->totloop;
     totedge = me->totedge;
-    mpoly = me->polys().data();
+    polys = me->polys().data();
     mloop = me->loops().data();
 
     if ((uv_layer == nullptr) || (uv_layer[0] == '\0')) {
-      mloopuv = static_cast<const MLoopUV *>(CustomData_get_layer(&me->ldata, CD_MLOOPUV));
+      mloopuv = static_cast<const float2 *>(CustomData_get_layer(&me->ldata, CD_PROP_FLOAT2));
     }
     else {
-      int uv_id = CustomData_get_named_layer(&me->ldata, CD_MLOOPUV, uv_layer);
-      mloopuv = static_cast<const MLoopUV *>(
-          CustomData_get_layer_n(&me->ldata, CD_MLOOPUV, uv_id));
+      int uv_id = CustomData_get_named_layer(&me->ldata, CD_PROP_FLOAT2, uv_layer);
+      mloopuv = static_cast<const float2 *>(
+          CustomData_get_layer_n(&me->ldata, CD_PROP_FLOAT2, uv_id));
     }
 
     tottri = poly_to_tri_count(me->totpoly, me->totloop);
     looptri_mem = static_cast<MLoopTri *>(MEM_mallocN(sizeof(*looptri) * tottri, __func__));
-    BKE_mesh_recalc_looptri(
-        mloop, mpoly, me->verts().data(), me->totloop, me->totpoly, looptri_mem);
+    bke::mesh::looptris_calc(
+        me->vert_positions(), me->polys(), me->loops(), {looptri_mem, tottri});
     looptri = looptri_mem;
   }
   else {
@@ -525,16 +525,16 @@ static void generate_margin(ImBuf *ibuf,
     totpoly = dm->getNumPolys(dm);
     totedge = dm->getNumEdges(dm);
     totloop = dm->getNumLoops(dm);
-    mpoly = dm->getPolyArray(dm);
+    polys = dm->getPolyArray(dm);
     mloop = dm->getLoopArray(dm);
-    mloopuv = (MLoopUV const *)dm->getLoopDataArray(dm, CD_MLOOPUV);
+    mloopuv = static_cast<const float2 *>(dm->getLoopDataArray(dm, CD_PROP_FLOAT2));
 
     looptri = dm->getLoopTriArray(dm);
     tottri = dm->getNumLoopTri(dm);
   }
 
   TextureMarginMap map(
-      ibuf->x, ibuf->y, uv_offset, mpoly, mloop, mloopuv, totpoly, totloop, totedge);
+      ibuf->x, ibuf->y, uv_offset, polys, mloop, mloopuv, totpoly, totloop, totedge);
 
   bool draw_new_mask = false;
   /* Now the map contains 3 sorts of values: 0xFFFFFFFF for empty pixels, `0x80000000 + polyindex`
@@ -552,12 +552,12 @@ static void generate_margin(ImBuf *ibuf,
     float vec[3][2];
 
     for (int a = 0; a < 3; a++) {
-      const float *uv = mloopuv[lt->tri[a]].uv;
+      const float *uv = mloopuv[lt->tri[a]];
 
-      /* NOTE(@campbellbarton): workaround for pixel aligned UVs which are common and can screw up
+      /* NOTE(@ideasman42): workaround for pixel aligned UVs which are common and can screw up
        * our intersection tests where a pixel gets in between 2 faces or the middle of a quad,
        * camera aligned quads also have this problem but they are less common.
-       * Add a small offset to the UVs, fixes bug T18685. */
+       * Add a small offset to the UVs, fixes bug #18685. */
       vec[a][0] = (uv[0] - uv_offset[0]) * float(ibuf->x) - (0.5f + 0.001f);
       vec[a][1] = (uv[1] - uv_offset[1]) * float(ibuf->y) - (0.5f + 0.002f);
     }
@@ -570,7 +570,7 @@ static void generate_margin(ImBuf *ibuf,
 
   char *tmpmask = (char *)MEM_dupallocN(mask);
   /* Extend (with averaging) by 2 pixels. Those will be overwritten, but it
-   *  helps linear interpolations on the edges of polygons. */
+   * helps linear interpolations on the edges of polygons. */
   IMB_filter_extend(ibuf, tmpmask, 2);
   MEM_freeN(tmpmask);
 

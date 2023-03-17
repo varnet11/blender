@@ -267,7 +267,6 @@ static PyObject *pygpu_framebuffer__tp_new(PyTypeObject *UNUSED(self),
                                            PyObject *args,
                                            PyObject *kwds)
 {
-  BPYGPU_IS_INIT_OR_ERROR_OBJ;
   if (!GPU_context_active_get()) {
     PyErr_SetString(PyExc_RuntimeError, "No active GPU context found");
     return NULL;
@@ -298,7 +297,7 @@ static PyObject *pygpu_framebuffer__tp_new(PyTypeObject *UNUSED(self),
   if (!pygpu_framebuffer_new_parse_arg(depth_attachment, &config[0])) {
     return NULL;
   }
-  if (config[0].tex && !GPU_texture_depth(config[0].tex)) {
+  if (config[0].tex && !GPU_texture_has_depth_format(config[0].tex)) {
     PyErr_SetString(PyExc_ValueError, "Depth texture with incompatible format");
     return NULL;
   }

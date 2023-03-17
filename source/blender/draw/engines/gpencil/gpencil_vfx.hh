@@ -7,7 +7,7 @@
 #include "BKE_camera.h"
 #include "BLI_listbase_wrapper.hh"
 #include "DNA_camera_types.h"
-#include "DNA_gpencil_types.h"
+#include "DNA_gpencil_legacy_types.h"
 #include "DNA_shader_fx_types.h"
 
 #include "draw_manager.hh"

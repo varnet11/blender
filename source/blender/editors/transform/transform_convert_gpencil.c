@@ -5,7 +5,7 @@
  * \ingroup edtransform
  */
 
-#include "DNA_gpencil_types.h"
+#include "DNA_gpencil_legacy_types.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -16,9 +16,9 @@
 #include "BKE_colortools.h"
 #include "BKE_context.h"
 #include "BKE_curve.h"
-#include "BKE_gpencil.h"
-#include "BKE_gpencil_curve.h"
-#include "BKE_gpencil_geom.h"
+#include "BKE_gpencil_curve_legacy.h"
+#include "BKE_gpencil_geom_legacy.h"
+#include "BKE_gpencil_legacy.h"
 #include "BKE_layer.h"
 
 #include "ED_gpencil.h"
@@ -766,8 +766,8 @@ static void recalcData_gpencil_strokes(TransInfo *t)
 /** \} */
 
 TransConvertTypeInfo TransConvertType_GPencil = {
-    /* flags */ (T_EDIT | T_POINTS),
-    /* createTransData */ createTransGPencil,
-    /* recalcData */ recalcData_gpencil_strokes,
-    /* special_aftertrans_update */ NULL,
+    /*flags*/ (T_EDIT | T_POINTS),
+    /*createTransData*/ createTransGPencil,
+    /*recalcData*/ recalcData_gpencil_strokes,
+    /*special_aftertrans_update*/ NULL,
 };

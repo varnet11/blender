@@ -44,6 +44,7 @@ static PyStructSequence_Field app_builtopts_info_fields[] = {
     {"mod_remesh", NULL},
     {"collada", NULL},
     {"io_wavefront_obj", NULL},
+    {"io_ply", NULL},
     {"io_stl", NULL},
     {"io_gpencil", NULL},
     {"opencolorio", NULL},
@@ -260,6 +261,12 @@ static PyObject *make_builtopts_info(void)
   SetObjIncref(Py_False);
 #endif
 
+#ifdef WITH_IO_PLY
+  SetObjIncref(Py_True);
+#else
+  SetObjIncref(Py_False);
+#endif
+
 #ifdef WITH_IO_STL
   SetObjIncref(Py_True);
 #else
@@ -349,7 +356,7 @@ PyObject *BPY_app_build_options_struct(void)
   BlenderAppBuildOptionsType.tp_init = NULL;
   BlenderAppBuildOptionsType.tp_new = NULL;
   BlenderAppBuildOptionsType.tp_hash = (hashfunc)
-      _Py_HashPointer; /* without this we can't do set(sys.modules) T29635. */
+      _Py_HashPointer; /* without this we can't do set(sys.modules) #29635. */
 
   return ret;
 }

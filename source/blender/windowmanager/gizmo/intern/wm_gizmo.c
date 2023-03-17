@@ -430,10 +430,30 @@ void WM_gizmo_modal_set_from_setup(struct wmGizmoMap *gzmap,
   }
 }
 
+void WM_gizmo_modal_set_while_modal(struct wmGizmoMap *gzmap,
+                                    struct bContext *C,
+                                    struct wmGizmo *gz,
+                                    const wmEvent *event)
+{
+  if (gzmap->gzmap_context.modal) {
+    wm_gizmomap_modal_set(gzmap, C, gzmap->gzmap_context.modal, event, false);
+  }
+
+  if (gz) {
+    wm_gizmo_calculate_scale(gz, C);
+
+    /* Set `highlight_part` to -1 to skip operator invocation. */
+    const int highlight_part = gz->highlight_part;
+    gz->highlight_part = -1;
+    wm_gizmomap_modal_set(gzmap, C, gz, event, true);
+    gz->highlight_part = highlight_part;
+  }
+}
+
 void wm_gizmo_calculate_scale(wmGizmo *gz, const bContext *C)
 {
   const RegionView3D *rv3d = CTX_wm_region_view3d(C);
-  float scale = UI_DPI_FAC;
+  float scale = UI_SCALE_FAC;
 
   if ((gz->parent_gzgroup->type->flag & WM_GIZMOGROUPTYPE_SCALE) == 0) {
     scale *= U.gizmo_size;

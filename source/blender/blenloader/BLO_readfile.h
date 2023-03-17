@@ -16,13 +16,11 @@ extern "C" {
 
 struct BHead;
 struct BlendThumbnail;
-struct Collection;
 struct FileData;
 struct LinkNode;
 struct ListBase;
 struct Main;
 struct MemFile;
-struct Object;
 struct ReportList;
 struct Scene;
 struct UserDef;
@@ -124,6 +122,7 @@ typedef enum eBLOReadSkip {
   /** Do not attempt to re-use IDs from old bmain for unchanged ones in case of undo. */
   BLO_READ_SKIP_UNDO_OLD_MAIN = (1 << 2),
 } eBLOReadSkip;
+ENUM_OPERATORS(eBLOReadSkip, BLO_READ_SKIP_UNDO_OLD_MAIN)
 #define BLO_READ_SKIP_ALL (BLO_READ_SKIP_USERDEF | BLO_READ_SKIP_DATA)
 
 /**
@@ -182,12 +181,22 @@ void BLO_blendfiledata_free(BlendFileData *bfd);
 typedef struct BLODataBlockInfo {
   char name[64]; /* MAX_NAME */
   struct AssetMetaData *asset_data;
+  bool free_asset_data;
   /* Optimization: Tag data-blocks for which we know there is no preview.
    * Knowing this can be used to skip the (potentially expensive) preview loading process. If this
    * is set to true it means we looked for a preview and couldn't find one. False may mean that
    * either no preview was found, or that it wasn't looked for in the first place. */
   bool no_preview_found;
 } BLODataBlockInfo;
+
+/**
+ * Frees contained data, not \a datablock_info itself.
+ */
+void BLO_datablock_info_free(BLODataBlockInfo *datablock_info);
+/**
+ * Can be used to free the list returned by #BLO_blendhandle_get_datablock_info().
+ */
+void BLO_datablock_info_linklist_free(struct LinkNode * /*BLODataBlockInfo*/ datablock_infos);
 
 /**
  * Open a blendhandle from a file path.
@@ -231,8 +240,11 @@ struct LinkNode *BLO_blendhandle_get_datablock_names(BlendHandle *bh,
  * \param ofblocktype: The type of names to get.
  * \param use_assets_only: Limit the result to assets only.
  * \param r_tot_info_items: The length of the returned list.
+ *
  * \return A BLI_linklist of `BLODataBlockInfo *`.
- * The links and #BLODataBlockInfo.asset_data should be freed with MEM_freeN.
+ *
+ * \note The links should be freed using #BLO_datablock_info_free() or the entire list using
+ *       #BLO_datablock_info_linklist_free().
  */
 struct LinkNode * /*BLODataBlockInfo*/ BLO_blendhandle_get_datablock_info(BlendHandle *bh,
                                                                           int ofblocktype,
@@ -276,31 +288,30 @@ struct LinkNode *BLO_blendhandle_get_linkable_groups(BlendHandle *bh);
  */
 void BLO_blendhandle_close(BlendHandle *bh);
 
+/** Mark the given Main (and the 'root' local one in case of lib-split Mains) as invalid, and
+ * generate an error report containing given `message`. */
+void BLO_read_invalidate_message(BlendHandle *bh, struct Main *bmain, const char *message);
+
+/**
+ * BLI_assert-like macro to check a condition, and if `false`, fail the whole .blend reading
+ * process by marking the Main data-base as invalid, and returning provided `_ret_value`.
+ *
+ * NOTE: About usages:
+ *   - #BLI_assert should be used when the error is considered as a bug, but there is some code to
+ *     recover from it and produce a valid Main data-base.
+ *   - #BLO_read_assert_message should be used when the error is not considered as recoverable.
+ */
+#define BLO_read_assert_message(_check_expr, _ret_value, _bh, _bmain, _message) \
+  if (_check_expr) { \
+    BLO_read_invalidate_message((_bh), (_bmain), (_message)); \
+    return _ret_value; \
+  } \
+  (void)0
+
 /** \} */
 
 #define BLO_GROUP_MAX 32
 #define BLO_EMBEDDED_STARTUP_BLEND "<startup.blend>"
-
-/**
- * Check whether given path ends with a blend file compatible extension
- * (`.blend`, `.ble` or `.blend.gz`).
- *
- * \param str: The path to check.
- * \return true is this path ends with a blender file extension.
- */
-bool BLO_has_bfile_extension(const char *str);
-/**
- * Try to explode given path into its 'library components'
- * (i.e. a .blend file, id type/group, and data-block itself).
- *
- * \param path: the full path to explode.
- * \param r_dir: the string that'll contain path up to blend file itself ('library' path).
- * WARNING! Must be #FILE_MAX_LIBEXTRA long (it also stores group and name strings)!
- * \param r_group: the string that'll contain 'group' part of the path, if any. May be NULL.
- * \param r_name: the string that'll contain data's name part of the path, if any. May be NULL.
- * \return true if path contains a blend file.
- */
-bool BLO_library_path_explode(const char *path, char *r_dir, char **r_group, char **r_name);
 
 /* -------------------------------------------------------------------- */
 /** \name BLO Blend File Linking API

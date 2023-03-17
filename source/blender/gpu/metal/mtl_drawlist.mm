@@ -27,7 +27,7 @@ namespace blender::gpu {
  * uint32_t instanceCount;
  * uint32_t vertexStart;
  * uint32_t baseInstance;
-};*/
+ * }; */
 
 /* MTLDrawIndexedPrimitivesIndirectArguments --
  * https://developer.apple.com/documentation/metal/mtldrawindexedprimitivesindirectarguments?language=objc
@@ -38,7 +38,7 @@ namespace blender::gpu {
  * uint32_t indexStart;
  * uint32_t baseVertex;
  * uint32_t baseInstance;
-};*/
+ * }; */
 
 #define MDI_ENABLED (buffer_size_ != 0)
 #define MDI_DISABLED (buffer_size_ == 0)
@@ -185,8 +185,9 @@ void MTLDrawList::submit()
   can_use_MDI = can_use_MDI && (is_finishing_a_buffer || command_len_ > 2);
 
   /* Bind Batch to setup render pipeline state. */
+  BLI_assert(batch_ != nullptr);
   id<MTLRenderCommandEncoder> rec = batch_->bind(0, 0, 0, 0);
-  if (!rec) {
+  if (rec == nil) {
     BLI_assert_msg(false, "A RenderCommandEncoder should always be available!\n");
     return;
   }

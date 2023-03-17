@@ -14,8 +14,8 @@
 
 #include "DNA_collection_types.h"
 #include "DNA_defaults.h"
+#include "DNA_gpencil_legacy_types.h"
 #include "DNA_gpencil_modifier_types.h"
-#include "DNA_gpencil_types.h"
 #include "DNA_material_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
@@ -24,8 +24,8 @@
 #include "BKE_collection.h"
 #include "BKE_context.h"
 #include "BKE_global.h"
-#include "BKE_gpencil.h"
-#include "BKE_gpencil_modifier.h"
+#include "BKE_gpencil_legacy.h"
+#include "BKE_gpencil_modifier_legacy.h"
 #include "BKE_lib_query.h"
 #include "BKE_main.h"
 #include "BKE_screen.h"
@@ -43,9 +43,6 @@
 #include "MOD_gpencil_modifiertypes.h"
 #include "MOD_gpencil_ui_common.h"
 #include "lineart/MOD_lineart.h"
-
-#include "WM_api.h"
-#include "WM_types.h"
 
 static void initData(GpencilModifierData *md)
 {
@@ -92,7 +89,8 @@ static void generate_strokes_actual(
       lmd->silhouette_selection,
       lmd->source_vertex_group,
       lmd->vgname,
-      lmd->flags);
+      lmd->flags,
+      lmd->calculation_flags);
 }
 
 static bool isModifierDisabled(GpencilModifierData *md)
@@ -168,8 +166,6 @@ static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Objec
      * cache. */
     lmd->cache = gpd->runtime.lineart_cache;
   }
-
-  WM_main_add_notifier(NA_EDITED | NC_GPENCIL, NULL);
 }
 
 static void bakeModifier(Main *UNUSED(bmain),
@@ -809,25 +805,25 @@ static void panelRegister(ARegionType *region_type)
 }
 
 GpencilModifierTypeInfo modifierType_Gpencil_Lineart = {
-    /* name. */ "Line Art",
-    /* structName. */ "LineartGpencilModifierData",
-    /* structSize. */ sizeof(LineartGpencilModifierData),
-    /* type. */ eGpencilModifierTypeType_Gpencil,
-    /* flags. */ eGpencilModifierTypeFlag_SupportsEditmode,
+    /*name*/ "Line Art",
+    /*structName*/ "LineartGpencilModifierData",
+    /*structSize*/ sizeof(LineartGpencilModifierData),
+    /*type*/ eGpencilModifierTypeType_Gpencil,
+    /*flags*/ eGpencilModifierTypeFlag_SupportsEditmode,
 
-    /* copyData. */ copyData,
+    /*copyData*/ copyData,
 
-    /* deformStroke. */ NULL,
-    /* generateStrokes. */ generateStrokes,
-    /* bakeModifier. */ bakeModifier,
-    /* remapTime. */ NULL,
+    /*deformStroke*/ NULL,
+    /*generateStrokes*/ generateStrokes,
+    /*bakeModifier*/ bakeModifier,
+    /*remapTime*/ NULL,
 
-    /* initData. */ initData,
-    /* freeData. */ NULL,
-    /* isDisabled. */ isDisabled,
-    /* updateDepsgraph. */ updateDepsgraph,
-    /* dependsOnTime. */ NULL,
-    /* foreachIDLink. */ foreachIDLink,
-    /* foreachTexLink. */ NULL,
-    /* panelRegister. */ panelRegister,
+    /*initData*/ initData,
+    /*freeData*/ NULL,
+    /*isDisabled*/ isDisabled,
+    /*updateDepsgraph*/ updateDepsgraph,
+    /*dependsOnTime*/ NULL,
+    /*foreachIDLink*/ foreachIDLink,
+    /*foreachTexLink*/ NULL,
+    /*panelRegister*/ panelRegister,
 };

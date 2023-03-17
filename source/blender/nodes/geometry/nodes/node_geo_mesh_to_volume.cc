@@ -4,7 +4,7 @@
 #include "node_geometry_util.hh"
 
 #include "BKE_lib_id.h"
-#include "BKE_mesh.h"
+#include "BKE_mesh.hh"
 #include "BKE_mesh_runtime.h"
 #include "BKE_mesh_wrapper.h"
 #include "BKE_object.h"
@@ -125,7 +125,6 @@ static Volume *create_volume_from_mesh(const Mesh &mesh, GeoNodeExecParams &para
                                                                mesh_to_volume_space_transform);
 
   Volume *volume = reinterpret_cast<Volume *>(BKE_id_new_nomain(ID_VO, nullptr));
-  BKE_volume_init_grids(volume);
 
   /* Convert mesh to grid and add to volume. */
   geometry::volume_grid_add_from_mesh(volume,

@@ -2,13 +2,13 @@
 
 #include "BLI_array.hh"
 #include "BLI_delaunay_2d.h"
-#include "BLI_math_vec_types.hh"
+#include "BLI_math_vector_types.hh"
 
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 
 #include "BKE_curves.hh"
-#include "BKE_mesh.h"
+#include "BKE_mesh.hh"
 
 #include "BLI_task.hh"
 
@@ -43,15 +43,16 @@ static void node_init(bNodeTree * /*tree*/, bNode *node)
 static meshintersect::CDT_result<double> do_cdt(const bke::CurvesGeometry &curves,
                                                 const CDT_output_type output_type)
 {
+  const OffsetIndices points_by_curve = curves.evaluated_points_by_curve();
+  const Span<float3> positions = curves.evaluated_positions();
+
   meshintersect::CDT_input<double> input;
   input.need_ids = false;
-  input.vert.reinitialize(curves.evaluated_points_num());
+  input.vert.reinitialize(points_by_curve.total_size());
   input.face.reinitialize(curves.curves_num());
 
-  Span<float3> positions = curves.evaluated_positions();
-
   for (const int i_curve : curves.curves_range()) {
-    const IndexRange points = curves.evaluated_points_for_curve(i_curve);
+    const IndexRange points = points_by_curve[i_curve];
 
     for (const int i : points) {
       input.vert[i] = double2(positions[i].x, positions[i].y);
@@ -78,19 +79,18 @@ static Mesh *cdt_to_mesh(const meshintersect::CDT_result<double> &result)
     loop_len += face.size();
   }
 
-  Mesh *mesh = BKE_mesh_new_nomain(vert_len, edge_len, 0, loop_len, poly_len);
-  MutableSpan<MVert> verts = mesh->verts_for_write();
+  Mesh *mesh = BKE_mesh_new_nomain(vert_len, edge_len, loop_len, poly_len);
+  MutableSpan<float3> positions = mesh->vert_positions_for_write();
   MutableSpan<MEdge> edges = mesh->edges_for_write();
   MutableSpan<MPoly> polys = mesh->polys_for_write();
   MutableSpan<MLoop> loops = mesh->loops_for_write();
 
   for (const int i : IndexRange(result.vert.size())) {
-    copy_v3_v3(verts[i].co, float3(float(result.vert[i].x), float(result.vert[i].y), 0.0f));
+    positions[i] = float3(float(result.vert[i].x), float(result.vert[i].y), 0.0f);
   }
   for (const int i : IndexRange(result.edge.size())) {
     edges[i].v1 = result.edge[i].first;
     edges[i].v2 = result.edge[i].second;
-    edges[i].flag = ME_EDGEDRAW;
   }
   int i_loop = 0;
   for (const int i : IndexRange(result.face.size())) {
@@ -105,6 +105,7 @@ static Mesh *cdt_to_mesh(const meshintersect::CDT_result<double> &result)
   /* The delaunay triangulation doesn't seem to return all of the necessary edges, even in
    * triangulation mode. */
   BKE_mesh_calc_edges(mesh, true, false);
+  BKE_mesh_smooth_flag_set(mesh, false);
   return mesh;
 }
 
@@ -115,7 +116,7 @@ static void curve_fill_calculate(GeometrySet &geometry_set, const GeometryNodeCu
   }
 
   const Curves &curves_id = *geometry_set.get_curves_for_read();
-  const bke::CurvesGeometry &curves = bke::CurvesGeometry::wrap(curves_id.geometry);
+  const bke::CurvesGeometry &curves = curves_id.geometry.wrap();
   if (curves.curves_num() == 0) {
     geometry_set.replace_curves(nullptr);
     return;

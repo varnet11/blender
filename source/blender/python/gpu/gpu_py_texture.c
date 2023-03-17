@@ -111,8 +111,6 @@ static int pygpu_texture_valid_check(BPyGPUTexture *bpygpu_tex)
 
 static PyObject *pygpu_texture__tp_new(PyTypeObject *UNUSED(self), PyObject *args, PyObject *kwds)
 {
-  BPYGPU_IS_INIT_OR_ERROR_OBJ;
-
   PyObject *py_size;
   int size[3] = {1, 1, 1};
   int layers = 0;
@@ -206,41 +204,37 @@ static PyObject *pygpu_texture__tp_new(PyTypeObject *UNUSED(self), PyObject *arg
   }
   else {
     const char *name = "python_texture";
+    eGPUTextureUsage usage = GPU_TEXTURE_USAGE_GENERAL;
     if (is_cubemap) {
       if (layers) {
         tex = GPU_texture_create_cube_array(
-            name, size[0], layers, 1, pygpu_textureformat.value_found, data);
+            name, size[0], layers, 1, pygpu_textureformat.value_found, usage, data);
       }
       else {
-        tex = GPU_texture_create_cube(name, size[0], 1, pygpu_textureformat.value_found, data);
+        tex = GPU_texture_create_cube(
+            name, size[0], 1, pygpu_textureformat.value_found, usage, data);
       }
     }
     else if (layers) {
       if (len == 2) {
         tex = GPU_texture_create_2d_array(
-            name, size[0], size[1], layers, 1, pygpu_textureformat.value_found, data);
+            name, size[0], size[1], layers, 1, pygpu_textureformat.value_found, usage, data);
       }
       else {
         tex = GPU_texture_create_1d_array(
-            name, size[0], layers, 1, pygpu_textureformat.value_found, data);
+            name, size[0], layers, 1, pygpu_textureformat.value_found, usage, data);
       }
     }
     else if (len == 3) {
-      tex = GPU_texture_create_3d(name,
-                                  size[0],
-                                  size[1],
-                                  size[2],
-                                  1,
-                                  pygpu_textureformat.value_found,
-                                  GPU_DATA_FLOAT,
-                                  data);
+      tex = GPU_texture_create_3d(
+          name, size[0], size[1], size[2], 1, pygpu_textureformat.value_found, usage, data);
     }
     else if (len == 2) {
       tex = GPU_texture_create_2d(
-          name, size[0], size[1], 1, pygpu_textureformat.value_found, data);
+          name, size[0], size[1], 1, pygpu_textureformat.value_found, usage, data);
     }
     else {
-      tex = GPU_texture_create_1d(name, size[0], 1, pygpu_textureformat.value_found, data);
+      tex = GPU_texture_create_1d(name, size[0], 1, pygpu_textureformat.value_found, usage, data);
     }
   }
 
@@ -605,7 +599,7 @@ int bpygpu_ParseTexture(PyObject *o, void *p)
 PyObject *bpygpu_texture_init(void)
 {
   PyObject *submodule;
-  submodule = PyModule_Create(&pygpu_texture_module_def);
+  submodule = bpygpu_create_module(&pygpu_texture_module_def);
 
   return submodule;
 }

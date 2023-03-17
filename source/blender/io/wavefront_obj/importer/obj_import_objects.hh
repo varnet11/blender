@@ -10,7 +10,7 @@
 
 #include "BLI_map.hh"
 #include "BLI_math_base.hh"
-#include "BLI_math_vec_types.hh"
+#include "BLI_math_vector_types.hh"
 #include "BLI_set.hh"
 #include "BLI_vector.hh"
 
@@ -25,7 +25,7 @@ namespace blender::io::obj {
 struct GlobalVertices {
   Vector<float3> vertices;
   Vector<float2> uv_vertices;
-  Vector<float3> vertex_normals;
+  Vector<float3> vert_normals;
 
   /**
    * Vertex colors might not be present in the file at all, or only

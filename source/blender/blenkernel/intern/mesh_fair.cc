@@ -16,7 +16,7 @@
 
 #include "BKE_lib_id.h"
 #include "BKE_lib_query.h"
-#include "BKE_mesh.h"
+#include "BKE_mesh.hh"
 #include "BKE_mesh_fair.h"
 #include "BKE_mesh_mapping.h"
 
@@ -27,6 +27,7 @@
 #include "eigen_capi.h"
 
 using blender::Array;
+using blender::float3;
 using blender::Map;
 using blender::MutableSpan;
 using blender::Span;
@@ -191,18 +192,18 @@ class FairingContext {
 
 class MeshFairingContext : public FairingContext {
  public:
-  MeshFairingContext(Mesh *mesh, MVert *deform_mverts)
+  MeshFairingContext(Mesh *mesh, MutableSpan<float3> deform_positions)
   {
     totvert_ = mesh->totvert;
     totloop_ = mesh->totloop;
 
-    MutableSpan<MVert> verts = mesh->verts_for_write();
-    medge_ = mesh->edges();
-    mpoly_ = mesh->polys();
+    MutableSpan<float3> positions = mesh->vert_positions_for_write();
+    edges_ = mesh->edges();
+    polys = mesh->polys();
     mloop_ = mesh->loops();
     BKE_mesh_vert_loop_map_create(&vlmap_,
                                   &vlmap_mem_,
-                                  mpoly_.data(),
+                                  polys.data(),
                                   mloop_.data(),
                                   mesh->totvert,
                                   mesh->totpoly,
@@ -210,18 +211,18 @@ class MeshFairingContext : public FairingContext {
 
     /* Deformation coords. */
     co_.reserve(mesh->totvert);
-    if (deform_mverts) {
+    if (!deform_positions.is_empty()) {
       for (int i = 0; i < mesh->totvert; i++) {
-        co_[i] = deform_mverts[i].co;
+        co_[i] = deform_positions[i];
       }
     }
     else {
       for (int i = 0; i < mesh->totvert; i++) {
-        co_[i] = verts[i].co;
+        co_[i] = positions[i];
       }
     }
 
-    loop_to_poly_map_ = blender::bke::mesh_topology::build_loop_to_poly_map(mpoly_, mloop_.size());
+    loop_to_poly_map_ = blender::bke::mesh_topology::build_loop_to_poly_map(polys, mloop_.size());
   }
 
   ~MeshFairingContext() override
@@ -235,26 +236,26 @@ class MeshFairingContext : public FairingContext {
                                   float r_adj_prev[3]) override
   {
     const int vert = mloop_[loop].v;
-    const MPoly *p = &mpoly_[loop_to_poly_map_[loop]];
-    const int corner = poly_find_loop_from_vert(p, &mloop_[p->loopstart], vert);
-    copy_v3_v3(r_adj_next, co_[ME_POLY_LOOP_NEXT(mloop_, p, corner)->v]);
-    copy_v3_v3(r_adj_prev, co_[ME_POLY_LOOP_PREV(mloop_, p, corner)->v]);
+    const MPoly &poly = polys[loop_to_poly_map_[loop]];
+    const int corner = poly_find_loop_from_vert(&poly, &mloop_[poly.loopstart], vert);
+    copy_v3_v3(r_adj_next, co_[ME_POLY_LOOP_NEXT(mloop_, &poly, corner)->v]);
+    copy_v3_v3(r_adj_prev, co_[ME_POLY_LOOP_PREV(mloop_, &poly, corner)->v]);
   }
 
   int other_vertex_index_from_loop(const int loop, const uint v) override
   {
-    const MEdge *e = &medge_[mloop_[loop].e];
-    if (e->v1 == v) {
-      return e->v2;
+    const MEdge *edge = &edges_[mloop_[loop].e];
+    if (edge->v1 == v) {
+      return edge->v2;
     }
-    return e->v1;
+    return edge->v1;
   }
 
  protected:
   Mesh *mesh_;
   Span<MLoop> mloop_;
-  Span<MPoly> mpoly_;
-  Span<MEdge> medge_;
+  Span<MPoly> polys;
+  Span<MEdge> edges_;
   Array<int> loop_to_poly_map_;
 };
 
@@ -450,7 +451,7 @@ static void prefair_and_fair_verts(FairingContext *fairing_context,
                                    bool *affected_verts,
                                    const eMeshFairingDepth depth)
 {
-  /* Prefair. */
+  /* Pre-fair. */
   UniformVertexWeight *uniform_vertex_weights = new UniformVertexWeight(fairing_context);
   UniformLoopWeight *uniform_loop_weights = new UniformLoopWeight();
   fairing_context->fair_verts(affected_verts, depth, uniform_vertex_weights, uniform_loop_weights);
@@ -466,11 +467,15 @@ static void prefair_and_fair_verts(FairingContext *fairing_context,
 }
 
 void BKE_mesh_prefair_and_fair_verts(struct Mesh *mesh,
-                                     struct MVert *deform_mverts,
+                                     float (*deform_vert_positions)[3],
                                      bool *affect_verts,
                                      const eMeshFairingDepth depth)
 {
-  MeshFairingContext *fairing_context = new MeshFairingContext(mesh, deform_mverts);
+  MutableSpan<float3> deform_positions_span;
+  if (deform_vert_positions) {
+    deform_positions_span = {reinterpret_cast<float3 *>(deform_vert_positions), mesh->totvert};
+  }
+  MeshFairingContext *fairing_context = new MeshFairingContext(mesh, deform_positions_span);
   prefair_and_fair_verts(fairing_context, affect_verts, depth);
   delete fairing_context;
 }

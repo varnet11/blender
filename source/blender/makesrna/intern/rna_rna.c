@@ -426,7 +426,7 @@ static PointerRNA rna_Struct_properties_get(CollectionPropertyIterator *iter)
 {
   ListBaseIterator *internal = &iter->internal.listbase;
 
-  /* we return either PropertyRNA* or IDProperty*, the rna_access.c
+  /* we return either PropertyRNA* or IDProperty*, the rna_access.cc
    * functions can handle both as PropertyRNA* with some tricks */
   return rna_pointer_inherit_refine(&iter->parent, &RNA_Property, internal->link);
 }
@@ -455,7 +455,7 @@ static PointerRNA rna_Struct_functions_get(CollectionPropertyIterator *iter)
 {
   ListBaseIterator *internal = &iter->internal.listbase;
 
-  /* we return either PropertyRNA* or IDProperty*, the rna_access.c
+  /* we return either PropertyRNA* or IDProperty*, the rna_access.cc
    * functions can handle both as PropertyRNA* with some tricks */
   return rna_pointer_inherit_refine(&iter->parent, &RNA_Function, internal->link);
 }
@@ -1340,7 +1340,7 @@ static int rna_property_override_diff_propptr(Main *bmain,
                                               const int rna_itemindex_a,
                                               const int rna_itemindex_b,
                                               const int flags,
-                                              bool *r_override_changed)
+                                              eRNAOverrideMatchResult *r_report_flag)
 {
   BLI_assert(ELEM(property_type, PROP_POINTER, PROP_COLLECTION));
 
@@ -1418,8 +1418,8 @@ static int rna_property_override_diff_propptr(Main *bmain,
              * as used all of its operations. */
             op->tag &= ~IDOVERRIDE_LIBRARY_TAG_UNUSED;
             opop->tag &= ~IDOVERRIDE_LIBRARY_TAG_UNUSED;
-            if (r_override_changed) {
-              *r_override_changed = created;
+            if (r_report_flag && created) {
+              *r_report_flag |= RNA_OVERRIDE_MATCH_RESULT_CREATED;
             }
           }
           else {
@@ -1547,7 +1547,6 @@ static int rna_property_override_diff_propptr(Main *bmain,
         }
       }
 
-      eRNAOverrideMatchResult report_flags = 0;
       const bool match = RNA_struct_override_matches(bmain,
                                                      propptr_a,
                                                      propptr_b,
@@ -1555,10 +1554,7 @@ static int rna_property_override_diff_propptr(Main *bmain,
                                                      extended_rna_path_len,
                                                      override,
                                                      flags,
-                                                     &report_flags);
-      if (r_override_changed && (report_flags & RNA_OVERRIDE_MATCH_RESULT_CREATED) != 0) {
-        *r_override_changed = true;
-      }
+                                                     r_report_flag);
 
       if (!ELEM(extended_rna_path, extended_rna_path_buffer, rna_path)) {
         MEM_freeN(extended_rna_path);
@@ -1596,7 +1592,7 @@ int rna_property_override_diff_default(Main *bmain,
                                        const char *rna_path,
                                        const size_t rna_path_len,
                                        const int flags,
-                                       bool *r_override_changed)
+                                       eRNAOverrideMatchResult *r_report_flag)
 {
   PointerRNA *ptr_a = &prop_a->ptr;
   PointerRNA *ptr_b = &prop_b->ptr;
@@ -1648,8 +1644,8 @@ int rna_property_override_diff_default(Main *bmain,
           if (op != NULL && created) {
             BKE_lib_override_library_property_operation_get(
                 op, IDOVERRIDE_LIBRARY_OP_REPLACE, NULL, NULL, -1, -1, true, NULL, NULL);
-            if (r_override_changed) {
-              *r_override_changed = created;
+            if (*r_report_flag) {
+              *r_report_flag |= RNA_OVERRIDE_MATCH_RESULT_CREATED;
             }
           }
           else {
@@ -1677,8 +1673,8 @@ int rna_property_override_diff_default(Main *bmain,
           if (op != NULL && created) { /* If not yet overridden... */
             BKE_lib_override_library_property_operation_get(
                 op, IDOVERRIDE_LIBRARY_OP_REPLACE, NULL, NULL, -1, -1, true, NULL, NULL);
-            if (r_override_changed) {
-              *r_override_changed = created;
+            if (r_report_flag) {
+              *r_report_flag |= RNA_OVERRIDE_MATCH_RESULT_CREATED;
             }
           }
         }
@@ -1709,8 +1705,8 @@ int rna_property_override_diff_default(Main *bmain,
           if (op != NULL && created) {
             BKE_lib_override_library_property_operation_get(
                 op, IDOVERRIDE_LIBRARY_OP_REPLACE, NULL, NULL, -1, -1, true, NULL, NULL);
-            if (r_override_changed) {
-              *r_override_changed = created;
+            if (r_report_flag && created) {
+              *r_report_flag |= RNA_OVERRIDE_MATCH_RESULT_CREATED;
             }
           }
           else {
@@ -1738,8 +1734,8 @@ int rna_property_override_diff_default(Main *bmain,
           if (op != NULL && created) { /* If not yet overridden... */
             BKE_lib_override_library_property_operation_get(
                 op, IDOVERRIDE_LIBRARY_OP_REPLACE, NULL, NULL, -1, -1, true, NULL, NULL);
-            if (r_override_changed) {
-              *r_override_changed = created;
+            if (r_report_flag) {
+              *r_report_flag |= RNA_OVERRIDE_MATCH_RESULT_CREATED;
             }
           }
         }
@@ -1770,8 +1766,8 @@ int rna_property_override_diff_default(Main *bmain,
           if (op != NULL && created) {
             BKE_lib_override_library_property_operation_get(
                 op, IDOVERRIDE_LIBRARY_OP_REPLACE, NULL, NULL, -1, -1, true, NULL, NULL);
-            if (r_override_changed) {
-              *r_override_changed = created;
+            if (r_report_flag) {
+              *r_report_flag |= RNA_OVERRIDE_MATCH_RESULT_CREATED;
             }
           }
           else {
@@ -1799,8 +1795,8 @@ int rna_property_override_diff_default(Main *bmain,
           if (op != NULL && created) { /* If not yet overridden... */
             BKE_lib_override_library_property_operation_get(
                 op, IDOVERRIDE_LIBRARY_OP_REPLACE, NULL, NULL, -1, -1, true, NULL, NULL);
-            if (r_override_changed) {
-              *r_override_changed = created;
+            if (r_report_flag) {
+              *r_report_flag |= RNA_OVERRIDE_MATCH_RESULT_CREATED;
             }
           }
         }
@@ -1820,8 +1816,8 @@ int rna_property_override_diff_default(Main *bmain,
         if (op != NULL && created) { /* If not yet overridden... */
           BKE_lib_override_library_property_operation_get(
               op, IDOVERRIDE_LIBRARY_OP_REPLACE, NULL, NULL, -1, -1, true, NULL, NULL);
-          if (r_override_changed) {
-            *r_override_changed = created;
+          if (r_report_flag) {
+            *r_report_flag |= RNA_OVERRIDE_MATCH_RESULT_CREATED;
           }
         }
       }
@@ -1852,8 +1848,8 @@ int rna_property_override_diff_default(Main *bmain,
         if (op != NULL && created) { /* If not yet overridden... */
           BKE_lib_override_library_property_operation_get(
               op, IDOVERRIDE_LIBRARY_OP_REPLACE, NULL, NULL, -1, -1, true, NULL, NULL);
-          if (r_override_changed) {
-            *r_override_changed = created;
+          if (r_report_flag) {
+            *r_report_flag |= RNA_OVERRIDE_MATCH_RESULT_CREATED;
           }
         }
       }
@@ -1898,7 +1894,7 @@ int rna_property_override_diff_default(Main *bmain,
                                                   -1,
                                                   -1,
                                                   flags,
-                                                  r_override_changed);
+                                                  r_report_flag);
       }
       break;
     }
@@ -2063,7 +2059,7 @@ int rna_property_override_diff_default(Main *bmain,
                                                                   idx_a,
                                                                   idx_b,
                                                                   flags,
-                                                                  r_override_changed);
+                                                                  r_report_flag);
               equals = equals && (comp == 0);
             }
           }
@@ -2779,6 +2775,52 @@ bool rna_property_override_apply_default(Main *bmain,
 #  undef RNA_PROPERTY_GET_SINGLE
 #  undef RNA_PROPERTY_SET_SINGLE
 
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Primitive Values
+ * \{ */
+
+/* Primitive String. */
+
+static void rna_PrimitiveString_value_get(PointerRNA *ptr, char *result)
+{
+  const PrimitiveStringRNA *data = ptr->data;
+  strcpy(result, data->value ? data->value : "");
+}
+
+static int rna_PrimitiveString_value_length(PointerRNA *ptr)
+{
+  const PrimitiveStringRNA *data = ptr->data;
+  return data->value ? strlen(data->value) : 0;
+}
+
+/* Primitive Int. */
+
+static int rna_PrimitiveInt_value_get(PointerRNA *ptr)
+{
+  const PrimitiveIntRNA *data = ptr->data;
+  return data->value;
+}
+
+/* Primitive Float. */
+
+static float rna_PrimitiveFloat_value_get(PointerRNA *ptr)
+{
+  const PrimitiveFloatRNA *data = ptr->data;
+  return data->value;
+}
+
+/* Primitive Boolean. */
+
+static bool rna_PrimitiveBoolean_value_get(PointerRNA *ptr)
+{
+  const PrimitiveBooleanRNA *data = ptr->data;
+  return data->value;
+}
+
+/** \} */
+
 #else
 
 static void rna_def_struct(BlenderRNA *brna)
@@ -3371,6 +3413,40 @@ static void rna_def_pointer_property(StructRNA *srna, PropertyType type)
   RNA_def_property_ui_text(prop, "Pointer Type", "Fixed pointer type, empty if variable type");
 }
 
+static void rna_def_rna_primitive(BlenderRNA *brna)
+{
+  /* Primitive Values, use when passing #PointerRNA is used for primitive types.
+   * For the rare cases we want to pass a value as RNA which wraps a primitive data. */
+
+  StructRNA *srna;
+  PropertyRNA *prop;
+
+  srna = RNA_def_struct(brna, "PrimitiveString", NULL);
+  RNA_def_struct_ui_text(srna, "String Value", "RNA wrapped string");
+  prop = RNA_def_property(srna, "value", PROP_STRING, PROP_BYTESTRING);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_string_funcs(
+      prop, "rna_PrimitiveString_value_get", "rna_PrimitiveString_value_length", NULL);
+
+  srna = RNA_def_struct(brna, "PrimitiveInt", NULL);
+  RNA_def_struct_ui_text(srna, "Primitive Int", "RNA wrapped int");
+  prop = RNA_def_property(srna, "value", PROP_INT, PROP_NONE);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_int_funcs(prop, "rna_PrimitiveInt_value_get", NULL, NULL);
+
+  srna = RNA_def_struct(brna, "PrimitiveFloat", NULL);
+  RNA_def_struct_ui_text(srna, "Primitive Float", "RNA wrapped float");
+  prop = RNA_def_property(srna, "value", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_float_funcs(prop, "rna_PrimitiveFloat_value_get", NULL, NULL);
+
+  srna = RNA_def_struct(brna, "PrimitiveBoolean", NULL);
+  RNA_def_struct_ui_text(srna, "Primitive Boolean", "RNA wrapped boolean");
+  prop = RNA_def_property(srna, "value", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_boolean_funcs(prop, "rna_PrimitiveBoolean_value_get", NULL);
+}
+
 void RNA_def_rna(BlenderRNA *brna)
 {
   StructRNA *srna;
@@ -3455,6 +3531,8 @@ void RNA_def_rna(BlenderRNA *brna)
 #  endif
 
   RNA_def_property_ui_text(prop, "Structs", "");
+
+  rna_def_rna_primitive(brna);
 }
 
 #endif

@@ -9,8 +9,8 @@
  */
 
 #ifdef __GNUC__
-/* NOTE(@campbellbarton): CLANG behaves slightly differently to GCC,
- * these can be enabled but do so carefully as they can introduce build-errors.  */
+/* NOTE(@ideasman42): CLANG behaves slightly differently to GCC,
+ * these can be enabled but do so carefully as they can introduce build-errors. */
 #  if !defined(__clang__)
 #    pragma GCC diagnostic error "-Wsign-compare"
 #    pragma GCC diagnostic error "-Wconversion"

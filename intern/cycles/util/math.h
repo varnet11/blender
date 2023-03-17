@@ -483,6 +483,12 @@ ccl_device_inline float compatible_signf(float f)
 
 ccl_device_inline float smoothstepf(float f)
 {
+  if (f <= 0.0f) {
+    return 0.0f;
+  }
+  if (f >= 1.0f) {
+    return 1.0f;
+  }
   float ff = f * f;
   return (3.0f * ff - 2.0f * ff * f);
 }
@@ -495,6 +501,11 @@ ccl_device_inline int mod(int x, int m)
 ccl_device_inline float3 float2_to_float3(const float2 a)
 {
   return make_float3(a.x, a.y, 0.0f);
+}
+
+ccl_device_inline float2 float3_to_float2(const float3 a)
+{
+  return make_float2(a.x, a.y);
 }
 
 ccl_device_inline float3 float4_to_float3(const float4 a)
@@ -750,6 +761,16 @@ ccl_device_inline float sqr(float a)
   return a * a;
 }
 
+ccl_device_inline float sin_from_cos(const float c)
+{
+  return safe_sqrtf(1.0f - sqr(c));
+}
+
+ccl_device_inline float cos_from_sin(const float s)
+{
+  return safe_sqrtf(1.0f - sqr(s));
+}
+
 ccl_device_inline float pow20(float a)
 {
   return sqr(sqr(sqr(sqr(a)) * a));
@@ -796,11 +817,11 @@ ccl_device float bits_to_01(uint bits)
 ccl_device_inline uint popcount(uint x)
 {
   /* TODO(Stefan): pop-count intrinsic for Windows with fallback for older CPUs. */
-  uint i = x & 0xaaaaaaaa;
+  uint i = x;
   i = i - ((i >> 1) & 0x55555555);
   i = (i & 0x33333333) + ((i >> 2) & 0x33333333);
   i = (((i + (i >> 4)) & 0xF0F0F0F) * 0x1010101) >> 24;
-  return i & 1;
+  return i;
 }
 #  endif
 #elif defined(__KERNEL_ONEAPI__)
@@ -860,7 +881,7 @@ ccl_device_inline uint find_first_set(uint x)
   return (x != 0) ? ctz(x) + 1 : 0;
 #else
 #  ifdef _MSC_VER
-  return (x != 0) ? (32 - count_leading_zeros(x & (-x))) : 0;
+  return (x != 0) ? (32 - count_leading_zeros(x & (~x + 1))) : 0;
 #  else
   return __builtin_ffs(x);
 #  endif

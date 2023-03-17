@@ -304,7 +304,7 @@ static void graphedit_activekey_handles_cb(bContext *C, void *fcu_ptr, void *bez
 
 /* update callback for editing coordinates of right handle in active keyframe properties
  * NOTE: we cannot just do graphedit_activekey_handles_cb() due to "order of computation"
- *       weirdness (see calchandleNurb_intern() and T39911)
+ *       weirdness (see calchandleNurb_intern() and #39911)
  */
 static void graphedit_activekey_left_handle_coord_cb(bContext *C, void *fcu_ptr, void *bezt_ptr)
 {
@@ -528,7 +528,7 @@ static void graph_panel_key_properties(const bContext *C, Panel *panel)
 
     /* next handle - only if current is Bezier interpolation */
     if (bezt->ipo == BEZT_IPO_BEZ) {
-      /* NOTE: special update callbacks are needed on the coords here due to T39911 */
+      /* NOTE: special update callbacks are needed on the coords here due to #39911 */
 
       col = uiLayoutColumn(layout, true);
       uiItemL_respect_property_split(col, IFACE_("Right Handle Type"), ICON_NONE);
@@ -902,6 +902,29 @@ static void graph_panel_driverVar__transChan(uiLayout *layout, ID *id, DriverVar
   uiItemR(sub, &dtar_ptr, "transform_space", 0, IFACE_("Space"), ICON_NONE);
 }
 
+/* Settings for 'Context Property' driver variable type. */
+static void graph_panel_driverVar__contextProp(uiLayout *layout, ID *id, DriverVar *dvar)
+{
+  DriverTarget *dtar = &dvar->targets[0];
+
+  /* Initialize RNA pointer to the target. */
+  PointerRNA dtar_ptr;
+  RNA_pointer_create(id, &RNA_DriverTarget, dtar, &dtar_ptr);
+
+  /* Target Property. */
+  {
+    uiLayout *row = uiLayoutRow(layout, false);
+    uiItemR(row, &dtar_ptr, "context_property", 0, NULL, ICON_NONE);
+  }
+
+  /* Target Path */
+  {
+    uiLayout *col = uiLayoutColumn(layout, true);
+    uiLayoutSetRedAlert(col, (dtar->flag & DTAR_FLAG_INVALID));
+    uiTemplatePathBuilder(col, &dtar_ptr, "data_path", NULL, IFACE_("Path"));
+  }
+}
+
 /* ----------------------------------------------------------------- */
 
 /* property driven by the driver - duplicates Active FCurve, but useful for clarity */
@@ -942,6 +965,7 @@ static void graph_panel_drivers_header(const bContext *C, Panel *panel)
   }
 
   graph_draw_driven_property_enabled_btn(panel->layout, ale->id, fcu, IFACE_("Driver"));
+  MEM_freeN(ale);
 }
 
 static void graph_draw_driven_property_panel(uiLayout *layout, ID *id, FCurve *fcu)
@@ -1212,6 +1236,9 @@ static void graph_draw_driver_settings_panel(uiLayout *layout,
       case DVAR_TYPE_TRANSFORM_CHAN: /* transform channel */
         graph_panel_driverVar__transChan(box, id, dvar);
         break;
+      case DVAR_TYPE_CONTEXT_PROP: /* context property */
+        graph_panel_driverVar__contextProp(box, id, dvar);
+        break;
     }
 
     /* 3) value of variable */
@@ -1323,7 +1350,7 @@ static void graph_panel_drivers_popover(const bContext *C, Panel *panel)
   uiBut *but = NULL;
 
   /* Get active property to show driver properties for */
-  but = UI_context_active_but_prop_get((bContext *)C, &ptr, &prop, &index);
+  but = UI_region_active_but_prop_get(CTX_wm_region(C), &ptr, &prop, &index);
   if (but) {
     FCurve *fcu;
     bool driven, special;

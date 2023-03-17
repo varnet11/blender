@@ -24,7 +24,7 @@
 #include "collada_utils.h"
 
 #include "BLI_edgehash.h"
-#include "BLI_math_vec_types.hh"
+#include "BLI_math_vector_types.hh"
 
 #include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
@@ -81,7 +81,7 @@ class MeshImporter : public MeshImporterBase {
    * it holds a portion of Mesh faces and corresponds to a DAE primitive list
    * (<triangles>, <polylist>, etc.) */
   struct Primitive {
-    MPoly *mpoly;
+    int poly_index;
     int *material_indices;
     unsigned int totpoly;
   };
@@ -93,9 +93,9 @@ class MeshImporter : public MeshImporterBase {
   std::multimap<COLLADAFW::UniqueId, COLLADAFW::UniqueId> materials_mapped_to_geom;
 
   bool set_poly_indices(
-      MPoly *mpoly, MLoop *mloop, int loop_index, const unsigned int *indices, int loop_count);
+      MPoly *poly, MLoop *mloop, int loop_index, const unsigned int *indices, int loop_count);
 
-  void set_face_uv(MLoopUV *mloopuv,
+  void set_face_uv(blender::float2 *mloopuv,
                    UVDataWrapper &uvs,
                    int start_index,
                    COLLADAFW::IndexList &index_list,

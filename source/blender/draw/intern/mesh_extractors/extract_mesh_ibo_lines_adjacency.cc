@@ -123,9 +123,9 @@ static void extract_lines_adjacency_iter_looptri_mesh(const MeshRenderData *mr,
   if (hidden) {
     return;
   }
-  lines_adjacency_triangle(mr->mloop[mlt->tri[0]].v,
-                           mr->mloop[mlt->tri[1]].v,
-                           mr->mloop[mlt->tri[2]].v,
+  lines_adjacency_triangle(mr->loops[mlt->tri[0]].v,
+                           mr->loops[mlt->tri[1]].v,
+                           mr->loops[mlt->tri[2]].v,
                            mlt->tri[0],
                            mlt->tri[1],
                            mlt->tri[2],
@@ -148,7 +148,7 @@ static void extract_lines_adjacency_finish(const MeshRenderData * /*mr*/,
       BLI_edgehashIterator_getKey(ehi, &v2, &v3);
       l1 = uint(abs(v_data)) - 1;
       if (v_data < 0) { /* `inv_opposite`. */
-        SWAP(uint, v2, v3);
+        std::swap(v2, v3);
       }
       l2 = data->vert_to_loop[v2];
       l3 = data->vert_to_loop[v3];

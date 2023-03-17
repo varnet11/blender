@@ -8,6 +8,10 @@
 
 #include "IMB_imbuf.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* -------------------------------------------------------------------- */
 /** \name Generic File Type
  * \{ */
@@ -49,12 +53,6 @@ typedef struct ImFileType {
                                            size_t *r_height);
   /** Save to a file (or memory if #IB_mem is set in `flags` and the format supports it). */
   bool (*save)(struct ImBuf *ibuf, const char *filepath, int flags);
-  void (*load_tile)(struct ImBuf *ibuf,
-                    const unsigned char *mem,
-                    size_t size,
-                    int tx,
-                    int ty,
-                    unsigned int *rect);
 
   int flag;
 
@@ -72,15 +70,6 @@ const ImFileType *IMB_file_type_from_ibuf(const struct ImBuf *ibuf);
 
 void imb_filetypes_init(void);
 void imb_filetypes_exit(void);
-
-void imb_tile_cache_init(void);
-void imb_tile_cache_exit(void);
-
-void imb_loadtile(struct ImBuf *ibuf, int tx, int ty, unsigned int *rect);
-/**
- * External free.
- */
-void imb_tile_cache_tile_free(struct ImBuf *ibuf, int tx, int ty);
 
 /** \} */
 
@@ -235,8 +224,6 @@ struct ImBuf *imb_loadtiff(const unsigned char *mem,
                            size_t size,
                            int flags,
                            char colorspace[IM_MAX_SPACE]);
-void imb_loadtiletiff(
-    struct ImBuf *ibuf, const unsigned char *mem, size_t size, int tx, int ty, unsigned int *rect);
 /**
  * Saves a TIFF file.
  *
@@ -273,3 +260,20 @@ struct ImBuf *imb_load_filepath_thumbnail_webp(const char *filepath,
 bool imb_savewebp(struct ImBuf *ibuf, const char *name, int flags);
 
 /** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Format: PSD (#IMB_FTYPE_PSD)
+ * \{ */
+
+bool imb_is_a_psd(const unsigned char *buf, size_t size);
+
+struct ImBuf *imb_load_psd(const uchar *mem,
+                           size_t size,
+                           int flags,
+                           char colorspace[IM_MAX_SPACE]);
+
+/** \} */
+
+#ifdef __cplusplus
+};
+#endif

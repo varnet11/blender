@@ -7,6 +7,15 @@
 
 #pragma once
 
+#include "BLI_utildefines.h"
+
+#include "DNA_space_types.h"
+#include "DNA_tracking_types.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct ARegion;
 struct MovieClip;
 struct MovieTrackingMarker;
@@ -33,21 +42,21 @@ struct wmOperatorType;
 
 /* internal exports only */
 
-/* clip_buttons.c */
+/* clip_buttons.cc */
 
 void ED_clip_buttons_register(struct ARegionType *art);
 
-/* clip_dopesheet_draw.c */
+/* clip_dopesheet_draw.cc */
 
 void clip_draw_dopesheet_main(struct SpaceClip *sc, struct ARegion *region, struct Scene *scene);
 void clip_draw_dopesheet_channels(const struct bContext *C, struct ARegion *region);
 
-/* clip_dopesheet_ops.c */
+/* clip_dopesheet_ops.cc */
 
 void CLIP_OT_dopesheet_select_channel(struct wmOperatorType *ot);
 void CLIP_OT_dopesheet_view_all(struct wmOperatorType *ot);
 
-/* clip_draw.c */
+/* clip_draw.cc */
 
 void clip_draw_main(const struct bContext *C, struct SpaceClip *sc, struct ARegion *region);
 
@@ -56,15 +65,15 @@ void clip_draw_main(const struct bContext *C, struct SpaceClip *sc, struct ARegi
 void clip_draw_grease_pencil(struct bContext *C, int onlyv2d);
 void clip_draw_cache_and_notes(const bContext *C, SpaceClip *sc, ARegion *region);
 
-/* clip_editor.c */
+/* clip_editor.cc */
 
 void clip_start_prefetch_job(const struct bContext *C);
 
-/* clip_graph_draw.c */
+/* clip_graph_draw.cc */
 
 void clip_draw_graph(struct SpaceClip *sc, struct ARegion *region, struct Scene *scene);
 
-/* clip_graph_ops.c */
+/* clip_graph_ops.cc */
 
 void ED_clip_graph_center_current_frame(struct Scene *scene, struct ARegion *region);
 
@@ -77,7 +86,7 @@ void CLIP_OT_graph_view_all(struct wmOperatorType *ot);
 void CLIP_OT_graph_center_current_frame(struct wmOperatorType *ot);
 void CLIP_OT_graph_disable_markers(struct wmOperatorType *ot);
 
-/* clip_ops.c */
+/* clip_ops.cc */
 
 void CLIP_OT_open(struct wmOperatorType *ot);
 void CLIP_OT_reload(struct wmOperatorType *ot);
@@ -105,11 +114,11 @@ void CLIP_OT_cursor_set(struct wmOperatorType *ot);
 
 void CLIP_OT_lock_selection_toggle(struct wmOperatorType *ot);
 
-/* clip_toolbar.c */
+/* clip_toolbar.cc */
 
 struct ARegion *ED_clip_has_properties_region(struct ScrArea *area);
 
-/* clip_utils.c */
+/* clip_utils.cc */
 
 typedef enum {
   CLIP_VALUE_SOURCE_SPEED_X,
@@ -185,7 +194,7 @@ bool clip_view_has_locked_selection(const struct bContext *C);
 
 void clip_draw_sfra_efra(struct View2D *v2d, struct Scene *scene);
 
-/* tracking_ops.c */
+/* tracking_ops.cc */
 
 /* Find track which can be slid in a proximity of the given event.
  * Uses the same distance tolerance rule as the "Slide Marker" operator. */
@@ -220,8 +229,6 @@ void CLIP_OT_set_scale(struct wmOperatorType *ot);
 void CLIP_OT_set_solution_scale(struct wmOperatorType *ot);
 void CLIP_OT_apply_solution_scale(struct wmOperatorType *ot);
 
-void CLIP_OT_set_center_principal(struct wmOperatorType *ot);
-
 void CLIP_OT_slide_marker(struct wmOperatorType *ot);
 
 void CLIP_OT_frame_jump(struct wmOperatorType *ot);
@@ -254,7 +261,7 @@ void CLIP_OT_keyframe_delete(struct wmOperatorType *ot);
 void CLIP_OT_new_image_from_plane_marker(struct wmOperatorType *ot);
 void CLIP_OT_update_image_from_plane_marker(struct wmOperatorType *ot);
 
-/* tracking_select.c */
+/* tracking_select.cc */
 
 void CLIP_OT_select(struct wmOperatorType *ot);
 void CLIP_OT_select_all(struct wmOperatorType *ot);
@@ -262,3 +269,36 @@ void CLIP_OT_select_box(struct wmOperatorType *ot);
 void CLIP_OT_select_lasso(struct wmOperatorType *ot);
 void CLIP_OT_select_circle(struct wmOperatorType *ot);
 void CLIP_OT_select_grouped(struct wmOperatorType *ot);
+
+/* -------------------------------------------------------------------- */
+/** \name Inlined utilities.
+ * \{ */
+
+/* Check whether the marker can is visible within the given context.
+ * The track must be visible, and no restrictions from the clip editor are to be in effect on the
+ * disabled marker visibility (unless the track is active). */
+BLI_INLINE bool ED_space_clip_marker_is_visible(const SpaceClip *space_clip,
+                                                const MovieTrackingObject *tracking_object,
+                                                const MovieTrackingTrack *track,
+                                                const MovieTrackingMarker *marker)
+{
+  if (track->flag & TRACK_HIDDEN) {
+    return false;
+  }
+
+  if ((marker->flag & MARKER_DISABLED) == 0) {
+    return true;
+  }
+
+  if ((space_clip->flag & SC_HIDE_DISABLED) == 0) {
+    return true;
+  }
+
+  return track == tracking_object->active_track;
+}
+
+/** \} */
+
+#ifdef __cplusplus
+}
+#endif

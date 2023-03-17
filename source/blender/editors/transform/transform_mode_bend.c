@@ -9,7 +9,7 @@
 
 #include "MEM_guardedalloc.h"
 
-#include "DNA_gpencil_types.h"
+#include "DNA_gpencil_legacy_types.h"
 
 #include "BLI_math.h"
 #include "BLI_string.h"
@@ -262,7 +262,7 @@ static void Bend(TransInfo *t, const int UNUSED(mval[2]))
                  +values.scale * shell_angle_to_dist((float)M_PI_2 + values.angle));
   }
 
-  /* TODO(@campbellbarton): xform, compensate object center. */
+  /* TODO(@ideasman42): xform, compensate object center. */
   FOREACH_TRANS_DATA_CONTAINER (t, tc) {
 
     float warp_sta_local[3];

@@ -29,7 +29,7 @@
 #include "DNA_curve_types.h"
 #include "DNA_curves_types.h"
 #include "DNA_effect_types.h"
-#include "DNA_gpencil_types.h"
+#include "DNA_gpencil_legacy_types.h"
 #include "DNA_key_types.h"
 #include "DNA_light_types.h"
 #include "DNA_lightprobe_types.h"
@@ -63,7 +63,7 @@
 #include "BKE_curve.h"
 #include "BKE_effect.h"
 #include "BKE_fcurve_driver.h"
-#include "BKE_gpencil_modifier.h"
+#include "BKE_gpencil_modifier_legacy.h"
 #include "BKE_idprop.h"
 #include "BKE_image.h"
 #include "BKE_key.h"
@@ -224,8 +224,14 @@ OperationCode bone_target_opcode(ID *target,
 
 bool object_have_geometry_component(const Object *object)
 {
-  return ELEM(
-      object->type, OB_MESH, OB_CURVES_LEGACY, OB_FONT, OB_SURF, OB_MBALL, OB_LATTICE, OB_GPENCIL);
+  return ELEM(object->type,
+              OB_MESH,
+              OB_CURVES_LEGACY,
+              OB_FONT,
+              OB_SURF,
+              OB_MBALL,
+              OB_LATTICE,
+              OB_GPENCIL_LEGACY);
 }
 
 }  // namespace
@@ -542,7 +548,7 @@ void DepsgraphRelationBuilder::build_id(ID *id)
     case ID_CV:
     case ID_PT:
     case ID_VO:
-    case ID_GD:
+    case ID_GD_LEGACY:
       build_object_data_geometry_datablock(id);
       break;
     case ID_SPK:
@@ -942,7 +948,7 @@ void DepsgraphRelationBuilder::build_object_data(Object *object)
     case OB_SURF:
     case OB_MBALL:
     case OB_LATTICE:
-    case OB_GPENCIL:
+    case OB_GPENCIL_LEGACY:
     case OB_CURVES:
     case OB_POINTCLOUD:
     case OB_VOLUME: {
@@ -1675,8 +1681,11 @@ void DepsgraphRelationBuilder::build_driver_data(ID *id, FCurve *fcu)
         continue;
       }
 
-      OperationCode target_op = driver_targets_bbone ? OperationCode::BONE_SEGMENTS :
-                                                       OperationCode::BONE_LOCAL;
+      OperationCode target_op = OperationCode::BONE_LOCAL;
+      if (driver_targets_bbone) {
+        target_op = check_pchan_has_bbone_segments(object, pchan) ? OperationCode::BONE_SEGMENTS :
+                                                                    OperationCode::BONE_DONE;
+      }
       OperationKey bone_key(&object->id, NodeType::BONE, pchan->name, target_op);
       add_relation(driver_key, bone_key, "Arm Bone -> Driver -> Bone");
     }
@@ -1740,16 +1749,30 @@ void DepsgraphRelationBuilder::build_driver_variables(ID *id, FCurve *fcu)
                           fcu->rna_path ? fcu->rna_path : "",
                           fcu->array_index);
   const char *rna_path = fcu->rna_path ? fcu->rna_path : "";
+
   const RNAPathKey self_key(id, rna_path, RNAPointerSource::ENTRY);
+
+  DriverTargetContext driver_target_context;
+  driver_target_context.scene = graph_->scene;
+  driver_target_context.view_layer = graph_->view_layer;
+
   LISTBASE_FOREACH (DriverVar *, dvar, &driver->variables) {
     /* Only used targets. */
     DRIVER_TARGETS_USED_LOOPER_BEGIN (dvar) {
-      ID *target_id = dtar->id;
-      if (target_id == nullptr) {
+      PointerRNA target_prop;
+      if (!driver_get_target_property(&driver_target_context, dvar, dtar, &target_prop)) {
         continue;
       }
+
+      /* Property is always expected to be resolved to a non-null RNA property, which is always
+       * relative to some ID. */
+      BLI_assert(target_prop.owner_id);
+
+      ID *target_id = target_prop.owner_id;
+
       build_id(target_id);
-      build_driver_id_property(target_id, dtar->rna_path);
+      build_driver_id_property(target_prop, dtar->rna_path);
+
       Object *object = nullptr;
       if (GS(target_id->name) == ID_OB) {
         object = (Object *)target_id;
@@ -1828,7 +1851,7 @@ void DepsgraphRelationBuilder::build_driver_variables(ID *id, FCurve *fcu)
          * For the sake of making the code more generic/defensive, the relation
          * is added for any geometry type.
          *
-         * See T96289 for more info. */
+         * See #96289 for more info. */
         if (object != nullptr && OB_TYPE_IS_GEOMETRY(object->type)) {
           StringRef rna_path(dtar->rna_path);
           if (rna_path == "data" || rna_path.startswith("data.")) {
@@ -1846,16 +1869,17 @@ void DepsgraphRelationBuilder::build_driver_variables(ID *id, FCurve *fcu)
   }
 }
 
-void DepsgraphRelationBuilder::build_driver_id_property(ID *id, const char *rna_path)
+void DepsgraphRelationBuilder::build_driver_id_property(const PointerRNA &target_prop,
+                                                        const char *rna_path_from_target_prop)
 {
-  if (id == nullptr || rna_path == nullptr) {
+  if (rna_path_from_target_prop == nullptr || rna_path_from_target_prop[0] == '\0') {
     return;
   }
-  PointerRNA id_ptr, ptr;
+
+  PointerRNA ptr;
   PropertyRNA *prop;
   int index;
-  RNA_id_pointer_create(id, &id_ptr);
-  if (!RNA_path_resolve_full(&id_ptr, rna_path, &ptr, &prop, &index)) {
+  if (!RNA_path_resolve_full(&target_prop, rna_path_from_target_prop, &ptr, &prop, &index)) {
     return;
   }
   if (prop == nullptr) {
@@ -2417,7 +2441,7 @@ void DepsgraphRelationBuilder::build_object_data_geometry_datablock(ID *obdata)
     }
     case ID_LT:
       break;
-    case ID_GD: /* Grease Pencil */
+    case ID_GD_LEGACY: /* Grease Pencil */
     {
       bGPdata *gpd = (bGPdata *)obdata;
 
@@ -2627,7 +2651,7 @@ void DepsgraphRelationBuilder::build_nodetree(bNodeTree *ntree)
                  RELATION_FLAG_NO_FLUSH);
   }
   /* nodetree's nodes... */
-  LISTBASE_FOREACH (bNode *, bnode, &ntree->nodes) {
+  for (bNode *bnode : ntree->all_nodes()) {
     build_idproperties(bnode->prop);
     LISTBASE_FOREACH (bNodeSocket *, socket, &bnode->inputs) {
       build_nodetree_socket(socket);
@@ -2970,6 +2994,11 @@ void DepsgraphRelationBuilder::build_sound(bSound *sound)
   build_idproperties(sound->id.properties);
   build_animdata(&sound->id);
   build_parameters(&sound->id);
+
+  const ComponentKey parameters_key(&sound->id, NodeType::PARAMETERS);
+  const ComponentKey audio_key(&sound->id, NodeType::AUDIO);
+
+  add_relation(parameters_key, audio_key, "Parameters -> Audio");
 }
 
 void DepsgraphRelationBuilder::build_simulation(Simulation *simulation)

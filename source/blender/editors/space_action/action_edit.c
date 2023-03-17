@@ -17,7 +17,7 @@
 #include "BLT_translation.h"
 
 #include "DNA_anim_types.h"
-#include "DNA_gpencil_types.h"
+#include "DNA_gpencil_legacy_types.h"
 #include "DNA_key_types.h"
 #include "DNA_mask_types.h"
 #include "DNA_object_types.h"
@@ -32,7 +32,7 @@
 #include "BKE_context.h"
 #include "BKE_fcurve.h"
 #include "BKE_global.h"
-#include "BKE_gpencil.h"
+#include "BKE_gpencil_legacy.h"
 #include "BKE_key.h"
 #include "BKE_nla.h"
 #include "BKE_report.h"
@@ -54,10 +54,9 @@
 
 #include "action_intern.h"
 
-/* ************************************************************************** */
-/* POSE MARKERS STUFF */
-
-/* *************************** Localize Markers ***************************** */
+/* -------------------------------------------------------------------- */
+/** \name Pose Markers: Localize Markers
+ * \{ */
 
 /* ensure that there is:
  * 1) an active action editor
@@ -142,10 +141,11 @@ void ACTION_OT_markers_make_local(wmOperatorType *ot)
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
 
-/* ************************************************************************** */
-/* KEYFRAME-RANGE STUFF */
+/** \} */
 
-/* *************************** Calculate Range ************************** */
+/* -------------------------------------------------------------------- */
+/** \name Calculate Range
+ * \{ */
 
 /* Get the min/max keyframes. */
 static bool get_keyframe_extents(bAnimContext *ac, float *min, float *max, const short onlySel)
@@ -203,7 +203,7 @@ static bool get_keyframe_extents(bAnimContext *ac, float *min, float *max, const
         float tmin, tmax;
 
         /* get range and apply necessary scaling before processing */
-        if (BKE_fcurve_calc_range(fcu, &tmin, &tmax, onlySel, false)) {
+        if (BKE_fcurve_calc_range(fcu, &tmin, &tmax, onlySel)) {
 
           if (adt) {
             tmin = BKE_nla_tweakedit_remap(adt, tmin, NLATIME_CONVERT_MAP);
@@ -242,7 +242,11 @@ static bool get_keyframe_extents(bAnimContext *ac, float *min, float *max, const
   return found;
 }
 
-/* ****************** Automatic Preview-Range Operator ****************** */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name View: Automatic Preview-Range Operator
+ * \{ */
 
 static int actkeys_previewrange_exec(bContext *C, wmOperator *UNUSED(op))
 {
@@ -292,7 +296,11 @@ void ACTION_OT_previewrange_set(wmOperatorType *ot)
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
 
-/* ****************** View-All Operator ****************** */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name View: All Operator
+ * \{ */
 
 /**
  * Find the extents of the active channel
@@ -315,16 +323,16 @@ static bool actkeys_channels_get_selected_extents(bAnimContext *ac, float *r_min
   ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 
   /* loop through all channels, finding the first one that's selected */
-  float ymax = ACHANNEL_FIRST_TOP(ac);
-
-  for (ale = anim_data.first; ale; ale = ale->next, ymax -= ACHANNEL_STEP(ac)) {
+  float ymax = ANIM_UI_get_first_channel_top(&ac->region->v2d);
+  const float channel_step = ANIM_UI_get_channel_step();
+  for (ale = anim_data.first; ale; ale = ale->next, ymax -= channel_step) {
     const bAnimChannelType *acf = ANIM_channel_get_typeinfo(ale);
 
     /* must be selected... */
     if (acf && acf->has_setting(ac, ale, ACHANNEL_SETTING_SELECT) &&
         ANIM_channel_setting_get(ac, ale, ACHANNEL_SETTING_SELECT)) {
       /* update best estimate */
-      *r_min = ymax - ACHANNEL_HEIGHT(ac);
+      *r_min = ymax - ANIM_UI_get_channel_height();
       *r_max = ymax;
 
       /* is this high enough priority yet? */
@@ -459,7 +467,11 @@ void ACTION_OT_view_selected(wmOperatorType *ot)
   ot->flag = 0;
 }
 
-/* ****************** View-All Operator ****************** */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name View: Frame Operator
+ * \{ */
 
 static int actkeys_view_frame_exec(bContext *C, wmOperator *op)
 {
@@ -484,10 +496,12 @@ void ACTION_OT_view_frame(wmOperatorType *ot)
   ot->flag = 0;
 }
 
-/* ************************************************************************** */
-/* GENERAL STUFF */
+/** \} */
 
-/* ******************** Copy/Paste Keyframes Operator ************************* */
+/* -------------------------------------------------------------------- */
+/** \name Keyframes: Copy/Paste Operator
+ * \{ */
+
 /* NOTE: the backend code for this is shared with the graph editor */
 
 static short copy_action_keys(bAnimContext *ac)
@@ -524,7 +538,7 @@ static eKeyPasteError paste_action_keys(bAnimContext *ac,
    * - First time we try to filter more strictly, allowing only selected channels
    *   to allow copying animation between channels
    * - Second time, we loosen things up if nothing was found the first time, allowing
-   *   users to just paste keyframes back into the original curve again T31670.
+   *   users to just paste keyframes back into the original curve again #31670.
    */
   filter = (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE | ANIMFILTER_FOREDIT |
             ANIMFILTER_FCURVESONLY | ANIMFILTER_NODUPLIS);
@@ -533,8 +547,9 @@ static eKeyPasteError paste_action_keys(bAnimContext *ac,
     ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
   }
 
-  /* paste keyframes */
-  const eKeyPasteError ok = paste_animedit_keys(ac, &anim_data, offset_mode, merge_mode, flip);
+  /* Value offset is always None because the user cannot see the effect of it. */
+  const eKeyPasteError ok = paste_animedit_keys(
+      ac, &anim_data, offset_mode, KEYFRAME_PASTE_VALUE_OFFSET_NONE, merge_mode, flip);
 
   /* clean up */
   ANIM_animdata_freelist(&anim_data);
@@ -711,7 +726,11 @@ void ACTION_OT_paste(wmOperatorType *ot)
   RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 }
 
-/* ******************** Insert Keyframes Operator ************************* */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Keyframes: Insert Operator
+ * \{ */
 
 /* defines for insert keyframes tool */
 static const EnumPropertyItem prop_actkeys_insertkey_types[] = {
@@ -901,7 +920,11 @@ void ACTION_OT_keyframe_insert(wmOperatorType *ot)
   ot->prop = RNA_def_enum(ot->srna, "type", prop_actkeys_insertkey_types, 0, "Type", "");
 }
 
-/* ******************** Duplicate Keyframes Operator ************************* */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Keyframes: Duplicate Operator
+ * \{ */
 
 static bool duplicate_action_keys(bAnimContext *ac)
 {
@@ -977,7 +1000,11 @@ void ACTION_OT_duplicate(wmOperatorType *ot)
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
 
-/* ******************** Delete Keyframes Operator ************************* */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Keyframes: Delete Operator
+ * \{ */
 
 static bool delete_action_keys(bAnimContext *ac)
 {
@@ -1066,7 +1093,11 @@ void ACTION_OT_delete(wmOperatorType *ot)
   WM_operator_properties_confirm_or_exec(ot);
 }
 
-/* ******************** Clean Keyframes Operator ************************* */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Keyframes: Clean Operator
+ * \{ */
 
 static void clean_action_keys(bAnimContext *ac, float thresh, bool clean_chan)
 {
@@ -1142,7 +1173,11 @@ void ACTION_OT_clean(wmOperatorType *ot)
   RNA_def_boolean(ot->srna, "channels", false, "Channels", "");
 }
 
-/* ******************** Sample Keyframes Operator *********************** */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Keyframes: Sample Operator
+ * \{ */
 
 /* Evaluates the curves between each selected keyframe on each frame, and keys the value. */
 static void sample_action_keys(bAnimContext *ac)
@@ -1207,10 +1242,11 @@ void ACTION_OT_sample(wmOperatorType *ot)
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
 
-/* ************************************************************************** */
-/* SETTINGS STUFF */
+/** \} */
 
-/* ******************** Set Extrapolation-Type Operator *********************** */
+/* -------------------------------------------------------------------- */
+/** \name Settings: Set Extrapolation-Type Operator
+ * \{ */
 
 /* defines for make/clear cyclic extrapolation tools */
 #define MAKE_CYCLIC_EXPO -1
@@ -1342,7 +1378,11 @@ void ACTION_OT_extrapolation_type(wmOperatorType *ot)
   ot->prop = RNA_def_enum(ot->srna, "type", prop_actkeys_expo_types, 0, "Type", "");
 }
 
-/* ******************** Set Interpolation-Type Operator *********************** */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Settings: Set Interpolation-Type Operator
+ * \{ */
 
 static int actkeys_ipo_exec(bContext *C, wmOperator *op)
 {
@@ -1397,7 +1437,11 @@ void ACTION_OT_interpolation_type(wmOperatorType *ot)
   RNA_def_property_translation_context(ot->prop, BLT_I18NCONTEXT_ID_ACTION);
 }
 
-/* ******************** Set Easing Operator *********************** */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Settings: Set Easing Operator
+ * \{ */
 
 static int actkeys_easing_exec(bContext *C, wmOperator *op)
 {
@@ -1446,7 +1490,11 @@ void ACTION_OT_easing_type(wmOperatorType *ot)
       ot->srna, "type", rna_enum_beztriple_interpolation_easing_items, 0, "Type", "");
 }
 
-/* ******************** Set Handle-Type Operator *********************** */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Settings: Set Handle-Type Operator
+ * \{ */
 
 /* this function is responsible for setting handle-type of selected keyframes */
 static void sethandles_action_keys(bAnimContext *ac, short mode)
@@ -1531,7 +1579,11 @@ void ACTION_OT_handle_type(wmOperatorType *ot)
   ot->prop = RNA_def_enum(ot->srna, "type", rna_enum_keyframe_handle_type_items, 0, "Type", "");
 }
 
-/* ******************** Set Keyframe-Type Operator *********************** */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Settings: Set Keyframe-Type Operator
+ * \{ */
 
 /* this function is responsible for setting keyframe type for keyframes */
 static void setkeytype_action_keys(bAnimContext *ac, short mode)
@@ -1619,10 +1671,11 @@ void ACTION_OT_keyframe_type(wmOperatorType *ot)
   ot->prop = RNA_def_enum(ot->srna, "type", rna_enum_beztriple_keyframe_type_items, 0, "Type", "");
 }
 
-/* ************************************************************************** */
-/* TRANSFORM STUFF */
+/** \} */
 
-/* ***************** Jump to Selected Frames Operator *********************** */
+/* -------------------------------------------------------------------- */
+/** \name Transform: Jump to Selected Frames Operator
+ * \{ */
 
 static bool actkeys_framejump_poll(bContext *C)
 {
@@ -1721,7 +1774,11 @@ void ACTION_OT_frame_jump(wmOperatorType *ot)
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
 
-/* ******************** Snap Keyframes Operator *********************** */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Transform: Snap Keyframes Operator
+ * \{ */
 
 /* defines for snap keyframes tool */
 static const EnumPropertyItem prop_actkeys_snap_types[] = {
@@ -1735,7 +1792,7 @@ static const EnumPropertyItem prop_actkeys_snap_types[] = {
      0,
      "Selection to Nearest Frame",
      "Snap selected keyframes to the nearest (whole) frame "
-     "(use to fix accidental sub-frame offsets)"},
+     "(use to fix accidental subframe offsets)"},
     {ACTKEYS_SNAP_NEAREST_SECOND,
      "NEAREST_SECOND",
      0,
@@ -1791,10 +1848,14 @@ static void snap_action_keys(bAnimContext *ac, short mode)
     else if (adt) {
       ANIM_nla_mapping_apply_fcurve(adt, ale->key_data, 0, 0);
       ANIM_fcurve_keyframes_loop(&ked, ale->key_data, NULL, edit_cb, BKE_fcurve_handles_recalc);
+      BKE_fcurve_merge_duplicate_keys(
+          ale->key_data, SELECT, false); /* only use handles in graph editor */
       ANIM_nla_mapping_apply_fcurve(adt, ale->key_data, 1, 0);
     }
     else {
       ANIM_fcurve_keyframes_loop(&ked, ale->key_data, NULL, edit_cb, BKE_fcurve_handles_recalc);
+      BKE_fcurve_merge_duplicate_keys(
+          ale->key_data, SELECT, false); /* only use handles in graph editor */
     }
 
     ale->update |= ANIM_UPDATE_DEFAULT;
@@ -1847,7 +1908,11 @@ void ACTION_OT_snap(wmOperatorType *ot)
   ot->prop = RNA_def_enum(ot->srna, "type", prop_actkeys_snap_types, 0, "Type", "");
 }
 
-/* ******************** Mirror Keyframes Operator *********************** */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Transform: Mirror Keyframes Operator
+ * \{ */
 
 /* defines for mirror keyframes tool */
 static const EnumPropertyItem prop_actkeys_mirror_types[] = {
@@ -1971,4 +2036,4 @@ void ACTION_OT_mirror(wmOperatorType *ot)
   ot->prop = RNA_def_enum(ot->srna, "type", prop_actkeys_mirror_types, 0, "Type", "");
 }
 
-/* ************************************************************************** */
+/** \} */

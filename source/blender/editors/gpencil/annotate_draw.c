@@ -23,7 +23,7 @@
 #include "BLF_api.h"
 #include "BLT_translation.h"
 
-#include "DNA_gpencil_types.h"
+#include "DNA_gpencil_legacy_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
@@ -33,7 +33,7 @@
 
 #include "BKE_context.h"
 #include "BKE_global.h"
-#include "BKE_gpencil.h"
+#include "BKE_gpencil_legacy.h"
 
 #include "WM_api.h"
 
@@ -279,7 +279,7 @@ static void annotation_draw_stroke_point(const bGPDspoint *points,
     immBindBuiltinProgram(GPU_SHADER_3D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_AA);
   }
   else {
-    immBindBuiltinProgram(GPU_SHADER_2D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_AA);
+    immBindBuiltinProgram(GPU_SHADER_3D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_AA);
 
     /* get 2D coordinates of point */
     float co[3] = {0.0f};

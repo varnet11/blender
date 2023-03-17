@@ -13,7 +13,7 @@
 
 #include "DNA_anim_types.h"
 #include "DNA_armature_types.h"
-#include "DNA_gpencil_types.h"
+#include "DNA_gpencil_legacy_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
@@ -30,7 +30,7 @@
 #include "BKE_armature.h"
 #include "BKE_blender.h"
 #include "BKE_context.h"
-#include "BKE_gpencil.h"
+#include "BKE_gpencil_legacy.h"
 #include "BKE_layer.h"
 #include "BKE_object.h"
 #include "BKE_tracking.h"
@@ -761,13 +761,9 @@ static eContextResult screen_ctx_selected_movieclip_tracks(const bContext *C,
   if (clip == NULL) {
     return CTX_RESULT_NO_DATA;
   }
-  MovieTracking *tracking = &clip->tracking;
-  if (tracking == NULL) {
-    return CTX_RESULT_NO_DATA;
-  }
 
-  ListBase *tracks_list = BKE_tracking_get_active_tracks(tracking);
-  LISTBASE_FOREACH (MovieTrackingTrack *, track, tracks_list) {
+  const MovieTrackingObject *tracking_object = BKE_tracking_object_get_active(&clip->tracking);
+  LISTBASE_FOREACH (MovieTrackingTrack *, track, &tracking_object->tracks) {
     if (!TRACK_SELECTED(track)) {
       continue;
     }

@@ -7,7 +7,7 @@
 
 #include <stdio.h>
 
-#include "DNA_gpencil_types.h"
+#include "DNA_gpencil_legacy_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
@@ -61,19 +61,19 @@ static void panelRegister(ARegionType *region_type)
 }
 
 ShaderFxTypeInfo shaderfx_Type_Flip = {
-    /* name */ N_("Flip"),
-    /* structName */ "FlipShaderFxData",
-    /* structSize */ sizeof(FlipShaderFxData),
-    /* type */ eShaderFxType_GpencilType,
-    /* flags */ 0,
+    /*name*/ N_("Flip"),
+    /*structName*/ "FlipShaderFxData",
+    /*structSize*/ sizeof(FlipShaderFxData),
+    /*type*/ eShaderFxType_GpencilType,
+    /*flags*/ 0,
 
-    /* copyData */ copyData,
+    /*copyData*/ copyData,
 
-    /* initData */ initData,
-    /* freeData */ NULL,
-    /* isDisabled */ NULL,
-    /* updateDepsgraph */ NULL,
-    /* dependsOnTime */ NULL,
-    /* foreachIDLink */ NULL,
-    /* panelRegister */ panelRegister,
+    /*initData*/ initData,
+    /*freeData*/ NULL,
+    /*isDisabled*/ NULL,
+    /*updateDepsgraph*/ NULL,
+    /*dependsOnTime*/ NULL,
+    /*foreachIDLink*/ NULL,
+    /*panelRegister*/ panelRegister,
 };

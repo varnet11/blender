@@ -43,7 +43,7 @@
 #include "UI_interface.h"
 #include "UI_view2d.h"
 
-#include "interface_intern.h"
+#include "interface_intern.hh"
 
 static void ui_view2d_curRect_validate_resize(View2D *v2d, bool resize);
 
@@ -150,7 +150,7 @@ static void view2d_masks(View2D *v2d, const rcti *mask_scroll)
   }
 
   /* Do not use mapped scroll here because we want to update scroller rects
-   * even if they are not displayed. For initialization purposes. See T75003. */
+   * even if they are not displayed. For initialization purposes. See #75003. */
   scroll = v2d->scroll;
 
   /* Scrollers are based off region-size:
@@ -1034,7 +1034,7 @@ void UI_view2d_zoom_cache_reset(void)
     return;
   }
   /* While scaling we can accumulate fonts at many sizes (~20 or so).
-   * Not an issue with embedded font, but can use over 500Mb with i18n ones! See T38244. */
+   * Not an issue with embedded font, but can use over 500Mb with i18n ones! See #38244. */
 
   /* NOTE: only some views draw text, we could check for this case to avoid cleaning cache. */
   BLF_cache_clear();
@@ -1288,7 +1288,7 @@ void UI_view2d_dot_grid_draw(const View2D *v2d,
   immBindBuiltinProgram(GPU_SHADER_3D_FLAT_COLOR);
 
   /* Scaling the dots fully with the zoom looks too busy, but a bit of size variation is nice. */
-  const float min_point_size = 2.0f * UI_DPI_FAC;
+  const float min_point_size = 2.0f * UI_SCALE_FAC;
   const float point_size_factor = 1.5f;
   const float max_point_size = point_size_factor * min_point_size;
 

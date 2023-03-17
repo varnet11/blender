@@ -195,7 +195,7 @@ static void external_cache_populate(void *vedata, Object *ob)
     return;
   }
 
-  if (ob->type == OB_GPENCIL) {
+  if (ob->type == OB_GPENCIL_LEGACY) {
     /* Grease Pencil objects need correct depth to do the blending. */
     stl->g_data->need_depth = true;
     return;
@@ -221,7 +221,7 @@ static void external_cache_populate(void *vedata, Object *ob)
   }
   struct GPUBatch *geom = DRW_cache_object_surface_get(ob);
   if (geom) {
-    /* Depth Prepass */
+    /* Depth Pre-pass. */
     DRW_shgroup_call(stl->g_data->depth_shgrp, geom, ob);
   }
 }
@@ -440,7 +440,7 @@ DrawEngineType draw_engine_external_type = {
     &external_data_size,
     &external_engine_init,
     &external_engine_free,
-    NULL, /* instance_free */
+    /*instance_free*/ NULL,
     &external_cache_init,
     &external_cache_populate,
     &external_cache_finish,

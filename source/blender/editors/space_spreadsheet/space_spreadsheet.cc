@@ -356,7 +356,7 @@ static float get_column_width(const ColumnValues &values)
 {
   float data_width = get_default_column_width(values);
   const int fontid = UI_style_get()->widget.uifont_id;
-  BLF_size(fontid, UI_DEFAULT_TEXT_POINTS * U.dpi_fac);
+  BLF_size(fontid, UI_DEFAULT_TEXT_POINTS * UI_SCALE_FAC);
   const StringRefNull name = values.name();
   const float name_width = BLF_width(fontid, name.data(), name.size());
   return std::max<float>(name_width / UI_UNIT_X + 1.0f, data_width);
@@ -370,7 +370,7 @@ static float get_column_width_in_pixels(const ColumnValues &values)
 static int get_index_column_width(const int tot_rows)
 {
   const int fontid = UI_style_get()->widget.uifont_id;
-  BLF_size(fontid, UI_style_get_dpi()->widget.points * U.dpi_fac);
+  BLF_size(fontid, UI_style_get_dpi()->widget.points * UI_SCALE_FAC);
   return std::to_string(std::max(0, tot_rows - 1)).size() * BLF_width(fontid, "0", 1) +
          UI_UNIT_X * 0.75;
 }
@@ -571,11 +571,11 @@ static void spreadsheet_footer_region_draw(const bContext *C, ARegion *region)
   std::stringstream ss;
   ss << "Rows: ";
   if (runtime->visible_rows != runtime->tot_rows) {
-    char visible_rows_str[16];
+    char visible_rows_str[BLI_STR_FORMAT_INT32_GROUPED_SIZE];
     BLI_str_format_int_grouped(visible_rows_str, runtime->visible_rows);
     ss << visible_rows_str << " / ";
   }
-  char tot_rows_str[16];
+  char tot_rows_str[BLI_STR_FORMAT_INT32_GROUPED_SIZE];
   BLI_str_format_int_grouped(tot_rows_str, runtime->tot_rows);
   ss << tot_rows_str << "   |   Columns: " << runtime->tot_columns;
   std::string stats_str = ss.str();

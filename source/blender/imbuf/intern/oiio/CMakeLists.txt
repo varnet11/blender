@@ -13,41 +13,29 @@ set(INC
 )
 
 set(INC_SYS
-
+  ${OPENIMAGEIO_INCLUDE_DIRS}
 )
 
 set(SRC
   openimageio_api.h
+  openimageio_support.hh
 
   openimageio_api.cpp
+  openimageio_support.cc
 )
 
 set(LIB
+  ${OPENIMAGEIO_LIBRARIES}
+  ${PUGIXML_LIBRARIES}
 )
 
-if(WITH_OPENIMAGEIO)
+if(WITH_IMAGE_OPENEXR)
   list(APPEND INC_SYS
-    ${OPENIMAGEIO_INCLUDE_DIRS}
-    ${BOOST_INCLUDE_DIR}
+    ${OPENEXR_INCLUDE_DIRS}
   )
   list(APPEND LIB
-    ${OPENIMAGEIO_LIBRARIES}
-    ${PUGIXML_LIBRARIES}
+    ${OPENEXR_LIBRARIES}
   )
-  if(WITH_IMAGE_OPENEXR)
-    list(APPEND INC_SYS
-      ${OPENEXR_INCLUDE_DIRS}
-    )
-    list(APPEND LIB
-      ${OPENEXR_LIBRARIES}
-    )
-  endif()
-
-  list(APPEND LIB
-    ${BOOST_LIBRARIES}
-  )
-
-  add_definitions(-DWITH_OPENIMAGEIO)
 endif()
 
 blender_add_lib(bf_imbuf_openimageio "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")

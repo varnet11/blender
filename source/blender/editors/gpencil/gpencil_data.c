@@ -25,7 +25,7 @@
 
 #include "DNA_anim_types.h"
 #include "DNA_brush_types.h"
-#include "DNA_gpencil_types.h"
+#include "DNA_gpencil_legacy_types.h"
 #include "DNA_material_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_modifier_types.h"
@@ -41,8 +41,8 @@
 #include "BKE_context.h"
 #include "BKE_deform.h"
 #include "BKE_fcurve_driver.h"
-#include "BKE_gpencil.h"
-#include "BKE_gpencil_modifier.h"
+#include "BKE_gpencil_legacy.h"
+#include "BKE_gpencil_modifier_legacy.h"
 #include "BKE_lib_id.h"
 #include "BKE_main.h"
 #include "BKE_material.h"
@@ -221,9 +221,19 @@ static int gpencil_layer_add_exec(bContext *C, wmOperator *op)
   else {
     /* GP Object */
     Object *ob = CTX_data_active_object(C);
-    if ((ob != NULL) && (ob->type == OB_GPENCIL)) {
+    if ((ob != NULL) && (ob->type == OB_GPENCIL_LEGACY)) {
       gpd = (bGPdata *)ob->data;
-      bGPDlayer *gpl = BKE_gpencil_layer_addnew(gpd, DATA_("GP_Layer"), true, false);
+      PropertyRNA *prop;
+      char name[128];
+      prop = RNA_struct_find_property(op->ptr, "new_layer_name");
+      if (RNA_property_is_set(op->ptr, prop)) {
+        RNA_property_string_get(op->ptr, prop, name);
+      }
+      else {
+        strcpy(name, "GP_Layer");
+      }
+      bGPDlayer *gpl = BKE_gpencil_layer_addnew(gpd, name, true, false);
+
       /* Add a new frame to make it visible in Dopesheet. */
       if (gpl != NULL) {
         gpl->actframe = BKE_gpencil_layer_frame_get(gpl, scene->r.cfra, GP_GETFRAME_ADD_NEW);
@@ -237,22 +247,39 @@ static int gpencil_layer_add_exec(bContext *C, wmOperator *op)
                       ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY | ID_RECALC_COPY_ON_WRITE);
   }
   WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED, NULL);
+  WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_SELECTED, NULL);
 
   return OPERATOR_FINISHED;
 }
-
+static int gpencil_layer_add_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
+{
+  const int tmp = ED_gpencil_new_layer_dialog(C, op);
+  if (tmp != 0) {
+    return tmp;
+  }
+  return gpencil_layer_add_exec(C, op);
+}
 void GPENCIL_OT_layer_add(wmOperatorType *ot)
 {
+  PropertyRNA *prop;
   /* identifiers */
   ot->name = "Add New Layer";
   ot->idname = "GPENCIL_OT_layer_add";
   ot->description = "Add new layer or note for the active data-block";
 
-  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
-
   /* callbacks */
   ot->exec = gpencil_layer_add_exec;
+  ot->invoke = gpencil_layer_add_invoke;
   ot->poll = gpencil_add_poll;
+
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+  prop = RNA_def_int(ot->srna, "layer", 0, -1, INT_MAX, "Grease Pencil Layer", "", -1, INT_MAX);
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
+
+  prop = RNA_def_string(
+      ot->srna, "new_layer_name", NULL, MAX_NAME, "Name", "Name of the newly added layer");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+  ot->prop = prop;
 }
 
 static bool gpencil_add_annotation_poll(bContext *C)
@@ -509,7 +536,7 @@ enum {
 static bool gpencil_layer_duplicate_object_poll(bContext *C)
 {
   Object *ob = CTX_data_active_object(C);
-  if ((ob == NULL) || (ob->type != OB_GPENCIL)) {
+  if ((ob == NULL) || (ob->type != OB_GPENCIL_LEGACY)) {
     return false;
   }
 
@@ -534,7 +561,7 @@ static int gpencil_layer_duplicate_object_exec(bContext *C, wmOperator *op)
   bGPDlayer *gpl_active = BKE_gpencil_layer_active_get(gpd_src);
 
   CTX_DATA_BEGIN (C, Object *, ob, selected_objects) {
-    if ((ob == ob_src) || (ob->type != OB_GPENCIL)) {
+    if ((ob == ob_src) || (ob->type != OB_GPENCIL_LEGACY)) {
       continue;
     }
     bGPdata *gpd_dst = (bGPdata *)ob->data;
@@ -855,7 +882,7 @@ void GPENCIL_OT_frame_clean_loose(wmOperatorType *ot)
               INT_MAX);
 }
 
-/* ********************* Clean Duplicated Frames ************************** */
+/* ********************* Clean Duplicate Frames ************************** */
 static bool gpencil_frame_is_equal(const bGPDframe *gpf_a, const bGPDframe *gpf_b)
 {
   if ((gpf_a == NULL) || (gpf_b == NULL)) {
@@ -989,9 +1016,9 @@ void GPENCIL_OT_frame_clean_duplicate(wmOperatorType *ot)
   };
 
   /* identifiers */
-  ot->name = "Clean Duplicated Frames";
+  ot->name = "Clean Duplicate Frames";
   ot->idname = "GPENCIL_OT_frame_clean_duplicate";
-  ot->description = "Remove any duplicated frame";
+  ot->description = "Remove duplicate keyframes";
 
   /* callbacks */
   ot->exec = gpencil_frame_clean_duplicate_exec;
@@ -2198,7 +2225,7 @@ static bool gpencil_vertex_group_poll(bContext *C)
 {
   Object *ob = CTX_data_active_object(C);
 
-  if ((ob) && (ob->type == OB_GPENCIL)) {
+  if ((ob) && (ob->type == OB_GPENCIL_LEGACY)) {
     Main *bmain = CTX_data_main(C);
     const bGPdata *gpd = (const bGPdata *)ob->data;
     if (BKE_id_is_editable(bmain, &ob->id) && BKE_id_is_editable(bmain, ob->data) &&
@@ -2216,7 +2243,7 @@ static bool gpencil_vertex_group_weight_poll(bContext *C)
 {
   Object *ob = CTX_data_active_object(C);
 
-  if ((ob) && (ob->type == OB_GPENCIL)) {
+  if ((ob) && (ob->type == OB_GPENCIL_LEGACY)) {
     Main *bmain = CTX_data_main(C);
     const bGPdata *gpd = (const bGPdata *)ob->data;
     if (BKE_id_is_editable(bmain, &ob->id) && BKE_id_is_editable(bmain, ob->data) &&
@@ -2812,7 +2839,7 @@ int ED_gpencil_join_objects_exec(bContext *C, wmOperator *op)
   bool ok = false;
 
   /* Ensure we're in right mode and that the active object is correct */
-  if (!ob_active || ob_active->type != OB_GPENCIL) {
+  if (!ob_active || ob_active->type != OB_GPENCIL_LEGACY) {
     return OPERATOR_CANCELLED;
   }
 
@@ -2823,7 +2850,7 @@ int ED_gpencil_join_objects_exec(bContext *C, wmOperator *op)
 
   /* Ensure all rotations are applied before */
   CTX_DATA_BEGIN (C, Object *, ob_iter, selected_editable_objects) {
-    if (ob_iter->type == OB_GPENCIL) {
+    if (ob_iter->type == OB_GPENCIL_LEGACY) {
       if ((ob_iter->rot[0] != 0) || (ob_iter->rot[1] != 0) || (ob_iter->rot[2] != 0)) {
         BKE_report(op->reports, RPT_ERROR, "Apply all rotations before join objects");
         return OPERATOR_CANCELLED;
@@ -2851,7 +2878,7 @@ int ED_gpencil_join_objects_exec(bContext *C, wmOperator *op)
 
   /* loop and join all data */
   CTX_DATA_BEGIN (C, Object *, ob_iter, selected_editable_objects) {
-    if ((ob_iter->type == OB_GPENCIL) && (ob_iter != ob_active)) {
+    if ((ob_iter->type == OB_GPENCIL_LEGACY) && (ob_iter != ob_active)) {
       /* we assume that each datablock is not already used in active object */
       if (ob_active->data != ob_iter->data) {
         Object *ob_src = ob_iter;
@@ -3019,7 +3046,7 @@ int ED_gpencil_join_objects_exec(bContext *C, wmOperator *op)
 static bool gpencil_active_material_poll(bContext *C)
 {
   Object *ob = CTX_data_active_object(C);
-  if (ob && ob->data && (ob->type == OB_GPENCIL)) {
+  if (ob && ob->data && (ob->type == OB_GPENCIL_LEGACY)) {
     short *totcolp = BKE_object_material_len_p(ob);
     return *totcolp > 0;
   }
@@ -3621,7 +3648,7 @@ void GPENCIL_OT_set_active_material(wmOperatorType *ot)
 static bool gpencil_materials_copy_to_object_poll(bContext *C)
 {
   Object *ob = CTX_data_active_object(C);
-  if ((ob == NULL) || (ob->type != OB_GPENCIL)) {
+  if ((ob == NULL) || (ob->type != OB_GPENCIL_LEGACY)) {
     return false;
   }
   short *totcolp = BKE_object_material_len_p(ob);
@@ -3640,7 +3667,7 @@ static int gpencil_materials_copy_to_object_exec(bContext *C, wmOperator *op)
   Material *ma_active = BKE_gpencil_material(ob_src, ob_src->actcol);
 
   CTX_DATA_BEGIN (C, Object *, ob, selected_objects) {
-    if ((ob == ob_src) || (ob->type != OB_GPENCIL)) {
+    if ((ob == ob_src) || (ob->type != OB_GPENCIL_LEGACY)) {
       continue;
     }
     /* Duplicate materials. */
@@ -3736,7 +3763,7 @@ bool ED_gpencil_add_lattice_modifier(const bContext *C,
 static int gpencil_layer_mask_add_exec(bContext *C, wmOperator *op)
 {
   Object *ob = CTX_data_active_object(C);
-  if ((ob == NULL) || (ob->type != OB_GPENCIL)) {
+  if ((ob == NULL) || (ob->type != OB_GPENCIL_LEGACY)) {
     return OPERATOR_CANCELLED;
   }
 
@@ -3804,7 +3831,7 @@ void GPENCIL_OT_layer_mask_add(wmOperatorType *ot)
 static int gpencil_layer_mask_remove_exec(bContext *C, wmOperator *UNUSED(op))
 {
   Object *ob = CTX_data_active_object(C);
-  if ((ob == NULL) || (ob->type != OB_GPENCIL)) {
+  if ((ob == NULL) || (ob->type != OB_GPENCIL_LEGACY)) {
     return OPERATOR_CANCELLED;
   }
 

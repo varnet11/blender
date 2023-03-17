@@ -20,14 +20,17 @@
 
 #include "bpy_rna_driver.h" /* own include */
 
-PyObject *pyrna_driver_get_variable_value(struct ChannelDriver *driver, struct DriverTarget *dtar)
+PyObject *pyrna_driver_get_variable_value(const struct AnimationEvalContext *anim_eval_context,
+                                          struct ChannelDriver *driver,
+                                          struct DriverVar *dvar,
+                                          struct DriverTarget *dtar)
 {
   PyObject *driver_arg = NULL;
   PointerRNA ptr;
   PropertyRNA *prop = NULL;
   int index;
 
-  if (driver_get_variable_property(driver, dtar, &ptr, &prop, &index)) {
+  if (driver_get_variable_property(anim_eval_context, driver, dvar, dtar, &ptr, &prop, &index)) {
     if (prop) {
       if (index != -1) {
         if (index < RNA_property_array_length(&ptr, prop) && index >= 0) {
@@ -43,7 +46,7 @@ PyObject *pyrna_driver_get_variable_value(struct ChannelDriver *driver, struct D
         const PropertyType type = RNA_property_type(prop);
         if (type == PROP_ENUM) {
           /* Note that enum's are converted to strings by default,
-           * we want to avoid that, see: T52213 */
+           * we want to avoid that, see: #52213 */
           driver_arg = PyLong_FromLong(RNA_property_enum_get(&ptr, prop));
         }
         else {

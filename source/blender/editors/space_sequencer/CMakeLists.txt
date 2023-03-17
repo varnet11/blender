@@ -24,6 +24,8 @@ set(INC
   ${CMAKE_BINARY_DIR}/source/blender/makesrna
 )
 
+set(INC_SYS
+)
 
 set(SRC
   sequencer_add.c
@@ -33,10 +35,13 @@ set(SRC
   sequencer_drag_drop.c
   sequencer_draw.c
   sequencer_edit.c
+  sequencer_gizmo_retime.cc
+  sequencer_gizmo_retime_type.cc
   sequencer_modifier.c
   sequencer_ops.c
   sequencer_preview.c
   sequencer_proxy.c
+  sequencer_retiming.cc
   sequencer_scopes.c
   sequencer_select.c
   sequencer_thumbnails.c
@@ -52,15 +57,16 @@ set(LIB
 )
 
 if(WITH_AUDASPACE)
-  add_definitions(-DWITH_AUDASPACE)
-
   list(APPEND INC_SYS
     ${AUDASPACE_C_INCLUDE_DIRS}
   )
-  list(APPEND LIB
-    ${AUDASPACE_C_LIBRARIES}
-    ${AUDASPACE_PY_LIBRARIES}
-  )
+  if(WITH_SYSTEM_AUDASPACE)
+    list(APPEND LIB
+      ${AUDASPACE_C_LIBRARIES}
+      ${AUDASPACE_PY_LIBRARIES}
+    )
+  endif()
+  add_definitions(-DWITH_AUDASPACE)
 endif()
 
 

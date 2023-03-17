@@ -5,8 +5,8 @@
  * \ingroup draw
  */
 
-#include "BKE_gpencil.h"
-#include "BKE_gpencil_modifier.h"
+#include "BKE_gpencil_legacy.h"
+#include "BKE_gpencil_modifier_legacy.h"
 #include "BLI_listbase_wrapper.hh"
 #include "DEG_depsgraph_query.h"
 #include "DNA_shader_fx_types.h"
@@ -62,8 +62,13 @@ class Instance {
 
   /** Dummy textures. */
   static constexpr float dummy_px_[4] = {1.0f, 0.0f, 1.0f, 1.0f};
-  Texture dummy_depth_tx_ = {"dummy_depth", GPU_DEPTH_COMPONENT32F, int2(1), (float *)dummy_px_};
-  Texture dummy_color_tx_ = {"dummy_color", GPU_RGBA16F, int2(1), (float *)dummy_px_};
+  Texture dummy_depth_tx_ = {"dummy_depth",
+                             GPU_DEPTH_COMPONENT32F,
+                             GPU_TEXTURE_USAGE_SHADER_READ,
+                             int2(1),
+                             (float *)dummy_px_};
+  Texture dummy_color_tx_ = {
+      "dummy_color", GPU_RGBA16F, GPU_TEXTURE_USAGE_SHADER_READ, int2(1), (float *)dummy_px_};
 
   /** Scene depth used for manual depth testing. Default to dummy depth to skip depth test. */
   GPUTexture *scene_depth_tx_ = dummy_depth_tx_;
@@ -134,7 +139,7 @@ class Instance {
   void object_sync(Manager &manager, ObjectRef &object_ref)
   {
     switch (object_ref.object->type) {
-      case OB_GPENCIL:
+      case OB_GPENCIL_LEGACY:
         objects.sync_gpencil(manager, object_ref, main_fb_, main_ps_);
         break;
       case OB_LAMP:
@@ -287,7 +292,7 @@ static void gpencil_engine_free()
 static void gpencil_render_to_image(void *vedata,
                                     struct RenderEngine *engine,
                                     struct RenderLayer *layer,
-                                    const struct rcti *UNUSED(rect))
+                                    const struct rcti * /*rect*/)
 {
   UNUSED_VARS(vedata, engine, layer);
 }

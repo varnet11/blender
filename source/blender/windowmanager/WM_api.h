@@ -26,7 +26,6 @@ extern "C" {
 
 struct ARegion;
 struct AssetHandle;
-struct AssetLibraryReference;
 struct GHashIterator;
 struct GPUViewport;
 struct ID;
@@ -39,7 +38,6 @@ struct MenuType;
 struct PointerRNA;
 struct PropertyRNA;
 struct ScrArea;
-struct SelectPick_Params;
 struct View3D;
 struct ViewLayer;
 struct bContext;
@@ -126,6 +124,15 @@ void WM_init_opengl(void);
  */
 const char *WM_ghost_backend(void);
 
+typedef enum eWM_CapabilitiesFlag {
+  /** Ability to warp the cursor (set it's location). */
+  WM_CAPABILITY_CURSOR_WARP = (1 << 0),
+  /** Ability to access window positions & move them. */
+  WM_CAPABILITY_WINDOW_POSITION = (1 << 1),
+} eWM_CapabilitiesFlag;
+
+eWM_CapabilitiesFlag WM_capabilities_flag(void);
+
 void WM_check(struct bContext *C);
 void WM_reinit_gizmomap_all(struct Main *bmain);
 
@@ -136,6 +143,13 @@ void WM_reinit_gizmomap_all(struct Main *bmain);
 void WM_script_tag_reload(void);
 
 wmWindow *WM_window_find_under_cursor(wmWindow *win, const int mval[2], int r_mval[2]);
+
+/**
+ * Knowing the area, return it's screen.
+ * \note This should typically be avoided, only use when the context is not available.
+ */
+wmWindow *WM_window_find_by_area(wmWindowManager *wm, const struct ScrArea *area);
+
 void WM_window_pixel_sample_read(const wmWindowManager *wm,
                                  const wmWindow *win,
                                  const int pos[2],
@@ -173,7 +187,7 @@ int WM_window_pixels_y(const struct wmWindow *win);
 void WM_window_rect_calc(const struct wmWindow *win, struct rcti *r_rect);
 /**
  * Get boundaries usable by screen-layouts, excluding global areas.
- * \note Depends on #U.dpi_fac. Should that be outdated, call #WM_window_set_dpi first.
+ * \note Depends on #UI_SCALE_FAC. Should that be outdated, call #WM_window_set_dpi first.
  */
 void WM_window_screen_rect_calc(const struct wmWindow *win, struct rcti *r_rect);
 bool WM_window_is_fullscreen(const struct wmWindow *win);
@@ -267,7 +281,7 @@ void WM_window_set_dpi(const wmWindow *win);
 
 bool WM_stereo3d_enabled(struct wmWindow *win, bool only_fullscreen_test);
 
-/* wm_files.c */
+/* wm_files.cc */
 
 void WM_file_autoexec_init(const char *filepath);
 bool WM_file_read(struct bContext *C, const char *filepath, struct ReportList *reports);
@@ -312,9 +326,22 @@ void WM_cursor_modal_restore(struct wmWindow *win);
  */
 void WM_cursor_wait(bool val);
 /**
- * \param bounds: can be NULL
+ * Enable cursor grabbing, optionally hiding the cursor and wrapping cursor-motion
+ * within a sub-region of the window.
+ *
+ * \param wrap: an enum (#WM_CURSOR_WRAP_NONE, #WM_CURSOR_WRAP_XY... etc).
+ * \param wrap_region: Window-relative region for cursor wrapping (when `wrap` is
+ * #WM_CURSOR_WRAP_XY). When NULL, the window bounds are used for wrapping.
+ *
+ * \note The current grab state can be accessed by #wmWindowManager.grabcursor although.
  */
-void WM_cursor_grab_enable(struct wmWindow *win, int wrap, bool hide, int bounds[4]);
+void WM_cursor_grab_enable(struct wmWindow *win,
+                           eWM_CursorWrapAxis wrap,
+                           const struct rcti *wrap_region,
+                           bool hide);
+/**
+ *
+ */
 void WM_cursor_grab_disable(struct wmWindow *win, const int mouse_ungrab_xy[2]);
 /**
  * After this you can call restore too.
@@ -335,7 +362,10 @@ void WM_paint_cursor_remove_by_type(struct wmWindowManager *wm,
 void WM_paint_cursor_tag_redraw(struct wmWindow *win, struct ARegion *region);
 
 /**
- * This function requires access to the GHOST_SystemHandle (g_system).
+ * Set the cursor location in window coordinates (compatible with #wmEvent.xy).
+ *
+ * \note Some platforms don't support this, check: #WM_CAPABILITY_WINDOW_POSITION
+ * before relying on this functionality.
  */
 void WM_cursor_warp(struct wmWindow *win, int x, int y);
 
@@ -514,6 +544,8 @@ struct wmTimer *WM_event_add_timer_notifier(struct wmWindowManager *wm,
                                             struct wmWindow *win,
                                             unsigned int type,
                                             double timestep);
+/** Mark the given `timer` to be removed, actual removal and deletion is deferred and handled
+ * internally by the window manager code. */
 void WM_event_remove_timer(struct wmWindowManager *wm,
                            struct wmWindow *win,
                            struct wmTimer *timer);
@@ -599,7 +631,7 @@ int WM_operator_props_popup_confirm(struct bContext *C,
 /**
  * Same as #WM_operator_props_popup but call the operator first,
  * This way - the button values correspond to the result of the operator.
- * Without this, first access to a button will make the result jump, see T32452.
+ * Without this, first access to a button will make the result jump, see #32452.
  */
 int WM_operator_props_popup_call(struct bContext *C,
                                  struct wmOperator *op,
@@ -649,7 +681,7 @@ bool WM_operator_poll_context(struct bContext *C, struct wmOperatorType *ot, sho
  * \param store: Store properties for re-use when an operator has finished
  * (unless #PROP_SKIP_SAVE is set).
  *
- * \warning do not use this within an operator to call itself! T29537.
+ * \warning do not use this within an operator to call itself! #29537.
  */
 int WM_operator_call_ex(struct bContext *C, struct wmOperator *op, bool store);
 int WM_operator_call(struct bContext *C, struct wmOperator *op);
@@ -1226,6 +1258,15 @@ bool WM_gesture_is_modal_first(const struct wmGesture *gesture);
 void WM_event_add_fileselect(struct bContext *C, struct wmOperator *op);
 void WM_event_fileselect_event(struct wmWindowManager *wm, void *ophandle, int eventval);
 
+/* Event consecutive data. */
+
+/** Return a borrowed reference to the custom-data. */
+void *WM_event_consecutive_data_get(wmWindow *win, const char *id);
+/** Set the custom-data (and own the pointer), free with #MEM_freeN. */
+void WM_event_consecutive_data_set(wmWindow *win, const char *id, void *custom_data);
+/** Clear and free the consecutive custom-data. */
+void WM_event_consecutive_data_free(wmWindow *win);
+
 /**
  * Sets the active region for this space from the context.
  *
@@ -1234,7 +1275,26 @@ void WM_event_fileselect_event(struct wmWindowManager *wm, void *ophandle, int e
 void WM_operator_region_active_win_set(struct bContext *C);
 
 /**
- * Only finish + pass through for press events (allowing press-tweak).
+ * Indented for use in a selection (picking) operators #wmOperatorType::invoke callback
+ * to implement click-drag, where the initial click selects and the drag action
+ * grabs or performs box-select (for example).
+ *
+ * - In this case, returning `OPERATOR_FINISHED` causes the PRESS event
+ *   to be handled and prevents further CLICK (on release) or DRAG (on cursor motion)
+ *   from being generated & handled.
+ *
+ * - Returning `OPERATOR_FINISHED | OPERATOR_PASS_THROUGH` allows for CLICK/DRAG but only makes
+ *   sense if the event's value is PRESS. If the operator was already mapped to a CLICK/DRAG event,
+ *   a single CLICK/DRAG could invoke multiple operators.
+ *
+ * This function handles the details of checking the operator return value,
+ * clearing #OPERATOR_PASS_THROUGH when the #wmEvent::val is not #KM_PRESS.
+ *
+ * \note Combining selection with other actions should only be used
+ * in situations where selecting doesn't change the visibility of other items.
+ * Since it means for example click-drag to box select could hide-show elements the user
+ * intended to box-select. In this case it's preferred to select on CLICK instead of PRESS
+ * (see the Outliner use of click-drag).
  */
 int WM_operator_flag_only_pass_through_on_press(int retval, const struct wmEvent *event);
 
@@ -1303,7 +1363,7 @@ bool WM_drag_is_ID_type(const struct wmDrag *drag, int idcode);
  */
 wmDragAsset *WM_drag_create_asset_data(const struct AssetHandle *asset,
                                        const char *path,
-                                       int import_type);
+                                       int /* #eAssetImportMethod */ import_type);
 struct wmDragAsset *WM_drag_get_asset_data(const struct wmDrag *drag, int idcode);
 struct AssetMetaData *WM_drag_get_asset_meta_data(const struct wmDrag *drag, int idcode);
 /**
@@ -1332,13 +1392,23 @@ struct wmDragAssetCatalog *WM_drag_get_asset_catalog_data(const struct wmDrag *d
 /**
  * \note Does not store \a asset in any way, so it's fine to pass a temporary.
  */
-void WM_drag_add_asset_list_item(wmDrag *drag,
-                                 const struct bContext *C,
-                                 const struct AssetLibraryReference *asset_library_ref,
-                                 const struct AssetHandle *asset);
+void WM_drag_add_asset_list_item(wmDrag *drag, const struct AssetHandle *asset);
 const ListBase *WM_drag_asset_list_get(const wmDrag *drag);
 
 const char *WM_drag_get_item_name(struct wmDrag *drag);
+
+/* Path drag and drop. */
+/**
+ * \param path: The path to drag. Value will be copied into the drag data so the passed string may
+ *              be destructed.
+ */
+wmDragPath *WM_drag_create_path_data(const char *path);
+const char *WM_drag_get_path(const wmDrag *drag);
+/**
+ * Note that even though the enum return type uses bit-flags, this should never have multiple
+ * type-bits set, so `ELEM()` like comparison is possible.
+ */
+int /* eFileSel_File_Types */ WM_drag_get_path_file_type(const wmDrag *drag);
 
 /* Set OpenGL viewport and scissor */
 void wmViewport(const struct rcti *winrct);
@@ -1580,7 +1650,7 @@ char WM_event_utf8_to_ascii(const struct wmEvent *event) ATTR_NONNULL(1) ATTR_WA
  * \param mval: Region relative coordinates, call with (-1, -1) resets the last cursor location.
  * \returns True when there was motion since last called.
  *
- * NOTE(@campbellbarton): The logic used here isn't foolproof.
+ * NOTE(@ideasman42): The logic used here isn't foolproof.
  * It's possible that users move the cursor past #WM_EVENT_CURSOR_MOTION_THRESHOLD then back to
  * a position within the threshold (between mouse clicks).
  * In practice users never reported this since the threshold is very small (a few pixels).
@@ -1588,6 +1658,9 @@ char WM_event_utf8_to_ascii(const struct wmEvent *event) ATTR_NONNULL(1) ATTR_WA
  * changing regions resets this value to (-1, -1).
  */
 bool WM_cursor_test_motion_and_update(const int mval[2]) ATTR_NONNULL(1) ATTR_WARN_UNUSED_RESULT;
+
+bool WM_event_consecutive_gesture_test(const wmEvent *event);
+bool WM_event_consecutive_gesture_test_break(const wmWindow *win, const wmEvent *event);
 
 int WM_event_drag_threshold(const struct wmEvent *event);
 bool WM_event_drag_test(const struct wmEvent *event, const int prev_xy[2]);
