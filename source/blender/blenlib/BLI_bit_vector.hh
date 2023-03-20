@@ -195,6 +195,16 @@ class BitVector {
     return size_in_bits_ == 0;
   }
 
+  BitInt *data()
+  {
+    return data_;
+  }
+
+  const BitInt *data() const
+  {
+    return data_;
+  }
+
   /**
    * Get a read-only reference to a specific bit.
    */

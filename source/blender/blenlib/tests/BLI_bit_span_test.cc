@@ -142,4 +142,31 @@ TEST(bit_span, SetSliced)
   }
 }
 
+TEST(bit_span, IsBounded)
+{
+  std::array<uint64_t, 10> data;
+
+  EXPECT_TRUE(is_bounded_span(BitSpan(data.data(), 0)));
+  EXPECT_TRUE(is_bounded_span(BitSpan(data.data(), 1)));
+  EXPECT_TRUE(is_bounded_span(BitSpan(data.data(), 50)));
+  EXPECT_TRUE(is_bounded_span(BitSpan(data.data(), 63)));
+  EXPECT_TRUE(is_bounded_span(BitSpan(data.data(), 64)));
+  EXPECT_TRUE(is_bounded_span(BitSpan(data.data(), 65)));
+  EXPECT_TRUE(is_bounded_span(BitSpan(data.data(), 100)));
+  EXPECT_TRUE(is_bounded_span(BitSpan(data.data(), 400)));
+
+  EXPECT_TRUE(is_bounded_span(BitSpan(data.data(), IndexRange(0, 3))));
+  EXPECT_TRUE(is_bounded_span(BitSpan(data.data(), IndexRange(1, 3))));
+  EXPECT_TRUE(is_bounded_span(BitSpan(data.data(), IndexRange(10, 20))));
+  EXPECT_TRUE(is_bounded_span(BitSpan(data.data(), IndexRange(63, 1))));
+  EXPECT_TRUE(is_bounded_span(BitSpan(data.data(), IndexRange(64, 0))));
+  EXPECT_TRUE(is_bounded_span(BitSpan(data.data(), IndexRange(10, 54))));
+
+  EXPECT_FALSE(is_bounded_span(BitSpan(data.data(), IndexRange(1, 64))));
+  EXPECT_FALSE(is_bounded_span(BitSpan(data.data(), IndexRange(10, 64))));
+  EXPECT_FALSE(is_bounded_span(BitSpan(data.data(), IndexRange(10, 200))));
+  EXPECT_FALSE(is_bounded_span(BitSpan(data.data(), IndexRange(60, 5))));
+  EXPECT_FALSE(is_bounded_span(BitSpan(data.data(), IndexRange(70, 5))));
+}
+
 }  // namespace blender::bits::tests
