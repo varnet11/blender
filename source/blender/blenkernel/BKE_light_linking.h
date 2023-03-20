@@ -13,9 +13,11 @@
 extern "C" {
 #endif
 
+struct ID;
 struct Main;
 struct Object;
 struct Collection;
+struct ReportList;
 
 /* Create new collection and assign it as a receiver collection for the light linking configuration
  * of the given object.
@@ -26,6 +28,19 @@ struct Collection;
  * Returns the newly created collection. */
 struct Collection *BKE_light_linking_receiver_collection_new(struct Main *bmain,
                                                              struct Object *object);
+
+/* Remove the given ID from the receiver collection of the given object.
+ * The ID is expected to either be collection or an object.
+ *
+ * Returns true if the ID was unlinked from the receiver collection, false otherwise. The unlinking
+ * will be unsuccessful if, for example, the receiver collection is a linked data-block.
+ *
+ * The optional reports argument is used to provide human-readable details about why unlinking was
+ * not successful. */
+bool BKE_light_linking_unlink_id_from_receiver_collection(struct Main *bmain,
+                                                          struct Object *object,
+                                                          struct ID *id,
+                                                          struct ReportList *reports);
 
 #ifdef __cplusplus
 }

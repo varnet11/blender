@@ -168,6 +168,7 @@ void COLLECTION_OT_objects_remove_active(struct wmOperatorType *ot);
 /* object_light_linking_ops.cc */
 
 void OBJECT_OT_light_linking_receiver_collection_new(struct wmOperatorType *ot);
+void OBJECT_OT_light_linking_unlink_from_receiver_collection(struct wmOperatorType *ot);
 
 /* object_modifier.c */
 

@@ -18,6 +18,7 @@
 #include "RNA_access.h"
 #include "RNA_prototypes.h"
 
+#include "UI_interface.h"
 #include "UI_interface.hh"
 #include "UI_resources.h"
 #include "UI_tree_view.hh"
@@ -28,12 +29,27 @@ namespace {
 
 class ReceiverCollectionViewItem : public ui::BasicTreeViewItem {
  public:
-  using ui::BasicTreeViewItem::BasicTreeViewItem;
+  ReceiverCollectionViewItem(ID &id, const BIFIconID icon)
+      : ui::BasicTreeViewItem(id.name + 2, icon), id_(&id)
+  {
+  }
 
   void build_row(uiLayout &row) override
   {
     add_label(row);
+
+    if (!is_hovered()) {
+      return;
+    }
+
+    PointerRNA id_ptr{id_, &RNA_ID, (ID *)id_};
+    uiLayoutSetContextPointer(&row, "id", &id_ptr);
+
+    uiItemO(&row, "", ICON_X, "OBJECT_OT_light_linking_unlink_from_receiver_collection");
   }
+
+ private:
+  ID *id_{nullptr};
 };
 
 class ReceiverCollectionView : public ui::AbstractTreeView {
@@ -46,13 +62,12 @@ class ReceiverCollectionView : public ui::AbstractTreeView {
   {
     LISTBASE_FOREACH (CollectionChild *, collection_child, &collection_->children) {
       Collection *child_collection = collection_child->collection;
-      add_tree_item<ReceiverCollectionViewItem>(child_collection->id.name + 2,
-                                                ICON_OUTLINER_COLLECTION);
+      add_tree_item<ReceiverCollectionViewItem>(child_collection->id, ICON_OUTLINER_COLLECTION);
     }
 
     LISTBASE_FOREACH (CollectionObject *, collection_object, &collection_->gobject) {
       Object *child_object = collection_object->ob;
-      add_tree_item<ReceiverCollectionViewItem>(child_object->id.name + 2, ICON_OBJECT_DATA);
+      add_tree_item<ReceiverCollectionViewItem>(child_object->id, ICON_OBJECT_DATA);
     }
   }
 
@@ -106,7 +121,9 @@ void uiTemplateLightLinkingReceiverCollection(struct uiLayout *layout,
   uiBlock *block = uiLayoutGetBlock(layout);
 
   ui::AbstractTreeView *tree_view = UI_block_add_view(
-      *block, "My tree View", std::make_unique<blender::ReceiverCollectionView>(*collection));
+      *block,
+      "Receiver Collection Tree View",
+      std::make_unique<blender::ReceiverCollectionView>(*collection));
 
   ui::TreeViewBuilder builder(*block);
   builder.build_tree_view(*tree_view);
