@@ -1403,8 +1403,8 @@ void BKE_nodetree_remove_layer_n(struct bNodeTree *ntree, struct Scene *scene, i
 /** \name Geometry Nodes
  * \{ */
 
-#define GEO_NODE_SIMULATION_INPUT 1198
-#define GEO_NODE_SIMULATION_OUTPUT 1199
+#define GEO_NODE_SIMULATION_INPUT 2100
+#define GEO_NODE_SIMULATION_OUTPUT 2101
 
 #define GEO_NODE_TRIANGULATE 1000
 #define GEO_NODE_TRANSFORM_GEOMETRY 1002
