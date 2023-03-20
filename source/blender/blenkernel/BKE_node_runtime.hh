@@ -31,6 +31,9 @@ struct RelationsInNode;
 }
 namespace aal = anonymous_attribute_lifetime;
 }  // namespace blender::nodes
+namespace blender::bke::node_tree_zones {
+class TreeZones;
+}
 
 namespace blender {
 
@@ -137,6 +140,9 @@ class bNodeTreeRuntime : NonCopyable, NonMovable {
    * #bNodeTree. By default, this is protected against using an assert.
    */
   mutable std::atomic<int> allow_use_dirty_topology_cache = 0;
+
+  CacheMutex tree_zones_cache_mutex;
+  std::unique_ptr<node_tree_zones::TreeZones> tree_zones;
 
   /** Only valid when #topology_cache_is_dirty is false. */
   Vector<bNodeLink *> links;

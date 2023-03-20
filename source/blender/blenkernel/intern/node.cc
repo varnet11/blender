@@ -65,6 +65,7 @@
 #include "BKE_node.h"
 #include "BKE_node_runtime.hh"
 #include "BKE_node_tree_update.h"
+#include "BKE_node_tree_zones.hh"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
