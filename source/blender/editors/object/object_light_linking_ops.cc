@@ -106,3 +106,37 @@ void OBJECT_OT_light_linking_unlink_from_receiver_collection(struct wmOperatorTy
 }
 
 /** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Select Light Linking Receivers Operator
+ * \{ */
+
+static int light_linking_receivers_select_exec(bContext *C, wmOperator *op)
+{
+  Scene *scene = CTX_data_scene(C);
+  ViewLayer *view_layer = CTX_data_view_layer(C);
+  Object *emitter = CTX_data_active_object(C);
+
+  BKE_light_linking_select_receivers_of_emitter(scene, view_layer, emitter);
+
+  WM_event_add_notifier(C, NC_SCENE | ND_OB_SELECT, scene);
+
+  return OPERATOR_FINISHED;
+}
+
+void OBJECT_OT_light_linking_receivers_select(wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Select Light Linking Receivers";
+  ot->description = "Select all objects which receive light from this emitter";
+  ot->idname = "OBJECT_OT_light_linking_receivers_select";
+
+  /* api callbacks */
+  ot->exec = light_linking_receivers_select_exec;
+  ot->poll = ED_operator_object_active;
+
+  /* flags */
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+}
+
+/** \} */

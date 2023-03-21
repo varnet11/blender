@@ -18,6 +18,8 @@ struct Main;
 struct Object;
 struct Collection;
 struct ReportList;
+struct Scene;
+struct ViewLayer;
 
 /* Create new collection and assign it as a receiver collection for the light linking configuration
  * of the given object.
@@ -41,6 +43,12 @@ bool BKE_light_linking_unlink_id_from_receiver_collection(struct Main *bmain,
                                                           struct Object *object,
                                                           struct ID *id,
                                                           struct ReportList *reports);
+
+/* Select all objects which receive the light from the given emitter via the light linking
+ * configuration. */
+void BKE_light_linking_select_receivers_of_emitter(struct Scene *scene,
+                                                   struct ViewLayer *view_layer,
+                                                   struct Object *emitter);
 
 #ifdef __cplusplus
 }

@@ -6,8 +6,10 @@
 #include "DNA_ID.h"
 #include "DNA_collection_types.h"
 #include "DNA_object_types.h"
+#include "DNA_scene_types.h"
 
 #include "BKE_collection.h"
+#include "BKE_layer.h"
 #include "BKE_lib_id.h"
 #include "BKE_report.h"
 
@@ -99,4 +101,40 @@ bool BKE_light_linking_unlink_id_from_receiver_collection(Main *bmain,
   DEG_relations_tag_update(bmain);
 
   return true;
+}
+
+void BKE_light_linking_select_receivers_of_emitter(Scene *scene,
+                                                   ViewLayer *view_layer,
+                                                   Object *emitter)
+{
+  LightLinking &light_linking = light_linking_get(emitter);
+
+  Collection *receiver_collection = light_linking.receiver_collection;
+  if (!receiver_collection) {
+    return;
+  }
+
+  BKE_view_layer_synced_ensure(scene, view_layer);
+
+  /* Deselect all currently selected objects in the view layer, but keep the emitter selected.
+   * This is because the operation is called from the emitter being active, and it will be
+   * confusing to deselect it but keep active. */
+  LISTBASE_FOREACH (Base *, base, BKE_view_layer_object_bases_get(view_layer)) {
+    if (base->object == emitter) {
+      continue;
+    }
+    base->flag &= ~BASE_SELECTED;
+  }
+
+  /* Select objects which are reachable via the receiver collection hierarchy. */
+  LISTBASE_FOREACH (CollectionObject *, cob, &receiver_collection->gobject) {
+    Base *base = BKE_view_layer_base_find(view_layer, cob->ob);
+    if (!base) {
+      continue;
+    }
+
+    base->flag |= BASE_SELECTED;
+  }
+
+  DEG_id_tag_update(&scene->id, ID_RECALC_SELECT);
 }
