@@ -474,11 +474,6 @@ static void object_eval_light_linking_receiver_mask(Depsgraph *depsgraph, Object
 
     light_linking.runtime.receiver_mask |= emitter->light_linking.runtime.emitter_mask;
   }
-
-  /* If there are no explicit emitters which affect this object set the receiver mask to 0. */
-  if (!light_linking.runtime.receiver_mask) {
-    light_linking.runtime.receiver_mask = 0;
-  }
 }
 
 void BKE_object_eval_light_linking(Depsgraph *depsgraph, Object *object)

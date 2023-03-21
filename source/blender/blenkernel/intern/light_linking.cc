@@ -57,6 +57,8 @@ Collection *BKE_light_linking_receiver_collection_new(struct Main *bmain, Object
 
   receiver_collection_assign(light_linking, new_receiver_collection);
 
+  DEG_id_tag_update(&object->id, ID_RECALC_COPY_ON_WRITE | ID_RECALC_SHADING);
+
   return new_receiver_collection;
 }
 
@@ -137,4 +139,21 @@ void BKE_light_linking_select_receivers_of_emitter(Scene *scene,
   }
 
   DEG_id_tag_update(&scene->id, ID_RECALC_SELECT);
+}
+
+void BKE_light_linking_receiver_to_emitter(Main *bmain, Object *emitter, Object *receiver)
+{
+  LightLinking &light_linking = light_linking_get(emitter);
+  Collection *receiver_collection = light_linking.receiver_collection;
+
+  if (!receiver_collection) {
+    receiver_collection = BKE_light_linking_receiver_collection_new(bmain, emitter);
+  }
+
+  BKE_collection_object_add(bmain, receiver_collection, receiver);
+
+  DEG_id_tag_update(&emitter->id, ID_RECALC_SHADING);
+  DEG_id_tag_update(&receiver->id, ID_RECALC_SHADING);
+
+  DEG_relations_tag_update(bmain);
 }

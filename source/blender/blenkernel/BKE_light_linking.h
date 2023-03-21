@@ -50,6 +50,14 @@ void BKE_light_linking_select_receivers_of_emitter(struct Scene *scene,
                                                    struct ViewLayer *view_layer,
                                                    struct Object *emitter);
 
+/* Link receiver to the given emitter.
+ * if the emitter already has receiver collection specified the object is added to that collection.
+ * Otherwise, first a new collection is created and assigned as a receiver collection, and the
+ * receiver is added to it. */
+void BKE_light_linking_receiver_to_emitter(struct Main *bmain,
+                                           struct Object *emitter,
+                                           struct Object *receiver);
+
 #ifdef __cplusplus
 }
 #endif

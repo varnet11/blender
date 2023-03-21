@@ -17,6 +17,8 @@
 
 #include "RNA_prototypes.h"
 
+#include "DEG_depsgraph.h"
+
 /* -------------------------------------------------------------------- */
 /** \name Create New Light Linking Collection Operator
  * \{ */
@@ -134,6 +136,50 @@ void OBJECT_OT_light_linking_receivers_select(wmOperatorType *ot)
   /* api callbacks */
   ot->exec = light_linking_receivers_select_exec;
   ot->poll = ED_operator_object_active;
+
+  /* flags */
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Select Light Linking Receivers Operator
+ * \{ */
+
+static int light_linking_receivers_link_exec(bContext *C, wmOperator *op)
+{
+  Main *bmain = CTX_data_main(C);
+  Scene *scene = CTX_data_scene(C);
+  Object *emitter = CTX_data_active_object(C);
+
+  CTX_DATA_BEGIN (C, Object *, receiver, selected_objects) {
+    if (receiver == emitter) {
+      continue;
+    }
+
+    BKE_light_linking_receiver_to_emitter(bmain, emitter, receiver);
+  }
+  CTX_DATA_END;
+
+  /* It is possible that the receiver collection is also used by the view layer.
+   * For this case send a notifier so that the UI is updated for the changes in the collection
+   * content. */
+  WM_event_add_notifier(C, NC_SCENE | ND_LAYER_CONTENT, scene);
+
+  return OPERATOR_FINISHED;
+}
+
+void OBJECT_OT_light_linking_receivers_link(wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Light Link Receivers to Emitter";
+  ot->description = "Light link selected receivers to the active emitter object";
+  ot->idname = "OBJECT_OT_light_linking_receivers_link";
+
+  /* api callbacks */
+  ot->exec = light_linking_receivers_link_exec;
+  ot->poll = ED_operator_object_active_editable;
 
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;

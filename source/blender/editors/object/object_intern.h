@@ -171,6 +171,7 @@ void OBJECT_OT_light_linking_receiver_collection_new(struct wmOperatorType *ot);
 void OBJECT_OT_light_linking_unlink_from_receiver_collection(struct wmOperatorType *ot);
 
 void OBJECT_OT_light_linking_receivers_select(struct wmOperatorType *ot);
+void OBJECT_OT_light_linking_receivers_link(struct wmOperatorType *ot);
 
 /* object_modifier.c */
 

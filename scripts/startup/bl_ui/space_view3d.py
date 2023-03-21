@@ -3021,6 +3021,9 @@ class VIEW3D_MT_make_links(Menu):
         layout.operator("object.data_transfer")
         layout.operator("object.datalayout_transfer")
 
+        layout.separator()
+        layout.operator("object.light_linking_receivers_link")
+
 
 class VIEW3D_MT_brush_paint_modes(Menu):
     bl_label = "Enabled Modes"
