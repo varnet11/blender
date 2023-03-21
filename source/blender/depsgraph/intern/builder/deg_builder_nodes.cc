@@ -707,6 +707,8 @@ void DepsgraphNodeBuilder::build_collection(LayerCollection *from_layer_collecti
     id_node = add_id_node(&collection->id);
     id_node->is_visible_on_build = is_collection_visible;
 
+    add_operation_node(&collection->id, NodeType::HIERARCHY, OperationCode::HIERARCHY);
+
     build_idproperties(collection->id.properties);
     build_parameters(&collection->id);
     add_operation_node(&collection->id, NodeType::GEOMETRY, OperationCode::GEOMETRY_EVAL_DONE);
@@ -778,6 +780,9 @@ void DepsgraphNodeBuilder::build_object(int base_index,
     id_node->is_visible_on_build = is_visible;
   }
   id_node->has_base |= (base_index != -1);
+
+  add_operation_node(&object->id, NodeType::HIERARCHY, OperationCode::HIERARCHY);
+
   /* Various flags, flushing from bases/collections. */
   build_object_from_layer(base_index, object, linked_state);
   /* Transform. */
