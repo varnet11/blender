@@ -1609,8 +1609,7 @@ typedef struct NodeGeometrySimulationInput {
 typedef struct NodeGeometrySimulationOutput {
   NodeSimulationItem *items;
   int items_num;
-  int8_t use_persistent_cache;
-  char _pad[3];
+  char _pad[4];
 } NodeGeometrySimulationOutput;
 
 typedef struct NodeGeometryDistributePointsInVolume {

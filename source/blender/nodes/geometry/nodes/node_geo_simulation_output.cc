@@ -114,7 +114,6 @@ NODE_STORAGE_FUNCS(NodeGeometrySimulationOutput);
 class LazyFunctionForSimulationOutputNode final : public LazyFunction {
   int32_t node_id_;
   Span<NodeSimulationItem> simulation_items_;
-  bool use_persistent_cache_ = false;
 
  public:
   LazyFunctionForSimulationOutputNode(const bNode &node) : node_id_(node.identifier)
@@ -160,15 +159,6 @@ class LazyFunctionForSimulationOutputNode final : public LazyFunction {
       return;
     }
 
-    if (use_persistent_cache_) {
-      /* TODO: This probably isn't right. */
-      if (!cache.is_empty()) {
-        if (time.time < cache.start_time()->time) {
-          cache.clear();
-        }
-      }
-    }
-
     for (const int i : inputs_.index_range()) {
       if (params.get_output_usage(i) != lf::ValueUsage::Used) {
         continue;
@@ -186,13 +176,9 @@ class LazyFunctionForSimulationOutputNode final : public LazyFunction {
 
       GeometrySet &geometry_set = *static_cast<GeometrySet *>(value);
       geometry_set.ensure_owns_direct_data();
-      if (use_persistent_cache_) {
-        cache.store_persistent(name, time, geometry_set);
-      }
-      else {
-        cache.remove(name);
-        cache.store_temporary(name, time, geometry_set);
-      }
+
+      cache.remove(name);
+      cache.store_temporary(name, time, geometry_set);
 
       void *output = params.get_output_data_ptr(i);
       type.move_construct(&geometry_set, output);
@@ -231,7 +217,6 @@ static void node_init(bNodeTree * /*tree*/, bNode *node)
   data->items[0].name = BLI_strdup(DATA_("Geometry"));
   data->items[0].socket_type = SOCK_GEOMETRY;
   data->items_num = 1;
-  data->use_persistent_cache = false;
   node->storage = data;
 }
 
