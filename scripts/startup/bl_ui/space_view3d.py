@@ -8109,10 +8109,10 @@ class VIEW3D_PT_realtime_clock(Panel):
 
         row = layout.row(align=True)
         row.scale_x = 2
-        if not screen.is_realtime_playing:
-            row.operator("screen.realtime_play", text="", icon='PLAY')
+        if not screen.is_realtime_clock_running:
+            row.operator("screen.realtime_clock_stop", text="", icon='PLAY')
         else:
-            row.operator("screen.realtime_play", text="", icon='PAUSE')
+            row.operator("screen.realtime_clock_start", text="", icon='PAUSE')
         row.scale_x = 1
 
 

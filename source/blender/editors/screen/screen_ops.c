@@ -4932,6 +4932,109 @@ static void SCREEN_OT_animation_cancel(wmOperatorType *ot)
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name Realtime Clock Start
+ * \{ */
+
+bScreen *ED_screen_realtime_clock_running(const wmWindowManager *wm)
+{
+  LISTBASE_FOREACH (wmWindow *, win, &wm->windows) {
+    bScreen *screen = WM_window_get_active_screen(win);
+
+//    if (screen->animtimer || screen->scrubbing) {
+//      return screen;
+//    }
+  }
+
+  return NULL;
+}
+
+bool ED_screen_realtime_clock_start(bContext *C)
+{
+  bScreen *screen = CTX_wm_screen(C);
+  Scene *scene = CTX_data_scene(C);
+  Scene *scene_eval = DEG_get_evaluated_scene(CTX_data_ensure_evaluated_depsgraph(C));
+
+//  BKE_sound_play_scene(scene_eval);
+
+//  ED_screen_realtime_clock_timer(C, screen->redraws_flag, sync, mode);
+
+//  if (screen->animtimer) {
+//    wmTimer *wt = screen->animtimer;
+//    ScreenAnimData *sad = wt->customdata;
+
+//    sad->region = CTX_wm_region(C);
+//  }
+
+  return OPERATOR_FINISHED;
+}
+
+bool ED_screen_realtime_clock_stop(bContext *C)
+{
+  bScreen *screen = CTX_wm_screen(C);
+  Scene *scene = CTX_data_scene(C);
+  Scene *scene_eval = DEG_get_evaluated_scene(CTX_data_ensure_evaluated_depsgraph(C));
+
+//  /* stop playback now */
+//  ED_screen_animation_timer(C, 0, 0, 0);
+//  BKE_sound_stop_scene(scene_eval);
+
+//  WM_event_add_notifier(C, NC_SCENE | ND_FRAME, scene);
+
+  return OPERATOR_FINISHED;
+}
+
+static int screen_realtime_clock_start_exec(bContext *C, wmOperator *UNUSED(op))
+{
+  return ED_screen_realtime_clock_start(C);
+}
+
+static void SCREEN_OT_realtime_clock_start(wmOperatorType *ot)
+{
+  PropertyRNA *prop;
+
+  /* identifiers */
+  ot->name = "Start Realtime Clock";
+  ot->description = "Start realtime clock";
+  ot->idname = "SCREEN_OT_start_realtime_clock";
+
+  /* api callbacks */
+  ot->exec = screen_realtime_clock_start_exec;
+  ot->poll = ED_operator_screenactive_norender;
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Realtime Clock Stop Operator
+ * \{ */
+
+static int screen_realtime_clock_stop_exec(bContext *C, wmOperator *UNUSED(op))
+{
+  bScreen *screen = ED_screen_realtime_clock_running(CTX_wm_manager(C));
+
+  if (screen) {
+    /* call the other "toggling" operator to clean up now */
+    ED_screen_realtime_clock_stop(C);
+  }
+
+  return OPERATOR_PASS_THROUGH;
+}
+
+static void SCREEN_OT_realtime_clock_stop(wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Stop Realtime Clock";
+  ot->description = "Stop realtime clock";
+  ot->idname = "SCREEN_OT_realtime_clock_stop";
+
+  /* api callbacks */
+  ot->exec = screen_realtime_clock_stop_exec;
+  ot->poll = ED_operator_screenactive;
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Box Select Operator (Template)
  * \{ */
 
@@ -5718,6 +5821,10 @@ void ED_operatortypes_screen(void)
   WM_operatortype_append(SCREEN_OT_animation_step);
   WM_operatortype_append(SCREEN_OT_animation_play);
   WM_operatortype_append(SCREEN_OT_animation_cancel);
+
+  /* Realtime clock */
+  WM_operatortype_append(SCREEN_OT_realtime_clock_start);
+  WM_operatortype_append(SCREEN_OT_realtime_clock_stop);
 
   /* New/delete. */
   WM_operatortype_append(SCREEN_OT_new);

@@ -492,6 +492,19 @@ int ED_screen_animation_play(struct bContext *C, int sync, int mode);
 bScreen *ED_screen_animation_playing(const struct wmWindowManager *wm);
 bScreen *ED_screen_animation_no_scrub(const struct wmWindowManager *wm);
 
+/**
+ * Start realtime clock.
+ */
+bool ED_screen_realtime_clock_start(struct bContext *C);
+/**
+ * Stop realtime clock.
+ */
+bool ED_screen_realtime_clock_stop(struct bContext *C);
+/**
+ * Find screen that owns the realtime clock timer.
+ */
+bScreen *ED_screen_realtime_clock_running(const struct wmWindowManager *wm);
+
 /* screen keymaps */
 /* called in spacetypes.c */
 void ED_operatortypes_screen(void);

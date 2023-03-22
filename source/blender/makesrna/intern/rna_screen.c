@@ -87,6 +87,13 @@ static bool rna_Screen_is_scrubbing_get(PointerRNA *ptr)
   return screen->scrubbing;
 }
 
+static bool rna_Screen_is_realtime_clock_running_get(PointerRNA *UNUSED(ptr))
+{
+  /* can be NULL on file load, #42619 */
+  wmWindowManager *wm = G_MAIN->wm.first;
+  return wm ? (ED_screen_realtime_clock_running(wm) != NULL) : 0;
+}
+
 static int rna_region_alignment_get(PointerRNA *ptr)
 {
   ARegion *region = ptr->data;
@@ -598,6 +605,11 @@ static void rna_def_screen(BlenderRNA *brna)
   RNA_def_property_boolean_funcs(prop, "rna_Screen_is_scrubbing_get", NULL);
   RNA_def_property_ui_text(
       prop, "User is Scrubbing", "True when the user is scrubbing through time");
+
+  prop = RNA_def_property(srna, "is_realtime_clock_running", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_boolean_funcs(prop, "rna_Screen_is_realtime_clock_running_get", NULL);
+  RNA_def_property_ui_text(prop, "Realtime Clock Running", "Realtime clock is running");
 
   prop = RNA_def_property(srna, "is_temporary", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
