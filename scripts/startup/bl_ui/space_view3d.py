@@ -8097,6 +8097,25 @@ class VIEW3D_PT_viewport_debug(Panel):
         layout.prop(overlay, "use_debug_freeze_view_culling")
 
 
+class VIEW3D_PT_realtime_clock(Panel):
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "Realtime"
+    bl_label = "Realtime Clock"
+
+    def draw(self, context):
+        layout = self.layout
+        screen = context.screen
+
+        row = layout.row(align=True)
+        row.scale_x = 2
+        if not screen.is_realtime_playing:
+            row.operator("screen.realtime_play", text="", icon='PLAY')
+        else:
+            row.operator("screen.realtime_play", text="", icon='PAUSE')
+        row.scale_x = 1
+
+
 classes = (
     VIEW3D_HT_header,
     VIEW3D_HT_tool_header,
@@ -8339,6 +8358,7 @@ classes = (
     VIEW3D_PT_curves_sculpt_parameter_falloff,
     VIEW3D_PT_curves_sculpt_grow_shrink_scaling,
     VIEW3D_PT_viewport_debug,
+    VIEW3D_PT_realtime_clock,
 )
 
 
