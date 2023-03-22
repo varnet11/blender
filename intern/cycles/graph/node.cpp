@@ -555,6 +555,7 @@ bool Node::equals_value(const Node &other, const SocketType &socket) const
       return is_array_equal<void *>(this, &other, socket);
 
     case SocketType::UNDEFINED:
+    case SocketType::NUM_TYPES:
       return true;
   }
 
@@ -697,6 +698,7 @@ void Node::hash(MD5Hash &md5)
         break;
 
       case SocketType::UNDEFINED:
+      case SocketType::NUM_TYPES:
         break;
     }
   }
@@ -770,6 +772,7 @@ size_t Node::get_total_size_in_bytes() const
         break;
 
       case SocketType::UNDEFINED:
+      case SocketType::NUM_TYPES:
         break;
     }
   }

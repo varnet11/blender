@@ -21,7 +21,7 @@ typedef uint64_t SocketModifiedFlags;
 
 struct SocketType {
   enum Type {
-    UNDEFINED,
+    UNDEFINED = 0,
 
     BOOLEAN,
     FLOAT,
@@ -50,6 +50,8 @@ struct SocketType {
     STRING_ARRAY,
     TRANSFORM_ARRAY,
     NODE_ARRAY,
+
+    NUM_TYPES,
   };
 
   enum Flags {
