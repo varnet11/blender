@@ -246,18 +246,10 @@ AssetLibrary *AssetLibraryService::find_loaded_on_disk_asset_library_from_name(
   return nullptr;
 }
 
-/* TODO currently only works for asset libraries on disk (custom or essentials asset libraries).
- * Once there is a proper registry of asset libraries, this could contain an asset library locator
- * and/or identifier, so a full path (not necessarily file path) can be built for all asset
- * libraries. */
-std::string AssetLibraryService::resolve_asset_weak_reference_to_full_path(
+std::string AssetLibraryService::resolve_asset_weak_reference_to_library_path(
     const AssetWeakReference &asset_reference)
 {
-  if (asset_reference.relative_asset_identifier[0] == '\0') {
-    return "";
-  }
-
-  StringRef library_path;
+  StringRefNull library_path;
 
   switch (eAssetLibraryType(asset_reference.asset_library_type)) {
     case ASSET_LIBRARY_CUSTOM: {
@@ -287,16 +279,92 @@ std::string AssetLibraryService::resolve_asset_weak_reference_to_full_path(
       return "";
   }
 
-  std::string full_path = library_path + SEP_STR + asset_reference.relative_asset_identifier;
+  std::string normalized_library_path = utils::normalize_path(library_path);
+  return normalized_library_path;
+}
 
-  char *buf = BLI_strdupn(full_path.c_str(), full_path.size());
-  BLI_path_normalize(nullptr, buf);
-  BLI_path_slash_native(buf);
+/* TODO currently only works for asset libraries on disk (custom or essentials asset libraries).
+ * Once there is a proper registry of asset libraries, this could contain an asset library locator
+ * and/or identifier, so a full path (not necessarily file path) can be built for all asset
+ * libraries. */
+std::string AssetLibraryService::resolve_asset_weak_reference_to_full_path(
+    const AssetWeakReference &asset_reference)
+{
+  if (asset_reference.relative_asset_identifier[0] == '\0') {
+    return "";
+  }
 
-  std::string normalized_full_path = buf;
-  MEM_freeN(buf);
+  std::string library_path = resolve_asset_weak_reference_to_library_path(asset_reference);
+  if (library_path.empty()) {
+    return "";
+  }
 
+  std::string normalized_full_path = utils::normalize_path(
+      library_path + SEP_STR + asset_reference.relative_asset_identifier);
   return normalized_full_path;
+}
+
+std::optional<AssetLibraryService::ExplodedPath> AssetLibraryService::
+    resolve_asset_weak_reference_to_exploded_path(const AssetWeakReference &asset_reference)
+{
+  if (asset_reference.relative_asset_identifier[0] == '\0') {
+    return {};
+  }
+
+  switch (eAssetLibraryType(asset_reference.asset_library_type)) {
+    case ASSET_LIBRARY_LOCAL: {
+      std::string path_in_file = utils::normalize_path(asset_reference.relative_asset_identifier);
+      const int64_t group_len = int64_t(path_in_file.find(SEP));
+
+      ExplodedPath exploded{};
+      exploded.full_path = path_in_file;
+      exploded.group_component = StringRef(exploded.full_path).substr(0, group_len);
+      exploded.name_component = StringRef(exploded.full_path).substr(group_len + 1);
+
+      return exploded;
+    }
+    case ASSET_LIBRARY_CUSTOM:
+    case ASSET_LIBRARY_ESSENTIALS: {
+      std::string full_path = resolve_asset_weak_reference_to_full_path(asset_reference);
+
+      if (full_path.empty()) {
+        return {};
+      }
+
+      const std::vector<std::string> blendfile_extensions = {".blend/", ".blend.gz/", ".ble/"};
+      size_t blendfile_extension_pos = std::string::npos;
+      for (const std::string &blendfile_ext : blendfile_extensions) {
+        size_t ext_pos = full_path.rfind(blendfile_ext);
+        if (ext_pos != std::string::npos &&
+            (blendfile_extension_pos < ext_pos || blendfile_extension_pos == std::string::npos)) {
+          blendfile_extension_pos = ext_pos;
+        }
+      }
+      BLI_assert(blendfile_extension_pos != std::string::npos);
+
+      size_t group_pos = full_path.find(SEP, blendfile_extension_pos);
+      BLI_assert(group_pos != std::string::npos);
+
+      size_t name_pos = full_path.find(SEP, group_pos + 1);
+      BLI_assert(group_pos != std::string::npos);
+
+      const int64_t dir_len = int64_t(group_pos);
+      const int64_t group_len = int64_t(name_pos - group_pos - 1);
+
+      ExplodedPath exploded{};
+      exploded.full_path = full_path;
+      StringRef full_path_ref = exploded.full_path;
+      exploded.dir_component = full_path_ref.substr(0, dir_len);
+      exploded.group_component = full_path_ref.substr(dir_len + 1, group_len);
+      exploded.name_component = full_path_ref.substr(dir_len + 1 + group_len + 1);
+
+      return exploded;
+    }
+    case ASSET_LIBRARY_ALL:
+      return {};
+  }
+
+  return {};
 }
 
 bUserAssetLibrary *AssetLibraryService::find_custom_asset_library_from_library_ref(

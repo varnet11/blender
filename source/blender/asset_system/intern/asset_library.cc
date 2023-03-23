@@ -127,12 +127,62 @@ void AS_asset_library_remap_ids(const IDRemapper *mappings)
       true);
 }
 
-void AS_asset_full_path_resolve_from_weak_ref(const AssetWeakReference *asset_reference,
-                                              char r_path[1090 /* FILE_MAX_LIBEXTRA */])
+void AS_asset_full_path_explode_from_weak_ref(const AssetWeakReference *asset_reference,
+                                              char r_path_buffer[1090 /* FILE_MAX_LIBEXTRA */],
+                                              char **r_dir,
+                                              char **r_group,
+                                              char **r_name)
 {
   AssetLibraryService *service = AssetLibraryService::get();
-  std::string full_path = service->resolve_asset_weak_reference_to_full_path(*asset_reference);
-  BLI_strncpy(r_path, full_path.c_str(), 1090 /* FILE_MAX_LIBEXTRA */);
+  std::optional<AssetLibraryService::ExplodedPath> exploded =
+      service->resolve_asset_weak_reference_to_exploded_path(*asset_reference);
+
+  if (!exploded) {
+    if (r_dir) {
+      *r_dir = nullptr;
+    }
+    if (r_group) {
+      *r_group = nullptr;
+    }
+    if (r_name) {
+      *r_name = nullptr;
+    }
+    return;
+  }
+
+  BLI_assert(!exploded->group_component.is_empty());
+  BLI_assert(!exploded->name_component.is_empty());
+
+  BLI_strncpy(r_path_buffer, exploded->full_path.c_str(), 1090 /* FILE_MAX_LIBEXTRA */);
+
+  if (!exploded->dir_component.is_empty()) {
+    r_path_buffer[exploded->dir_component.size()] = '\0';
+    r_path_buffer[exploded->dir_component.size() + 1 + exploded->group_component.size()] = '\0';
+
+    if (r_dir) {
+      *r_dir = r_path_buffer;
+    }
+    if (r_group) {
+      *r_group = r_path_buffer + exploded->dir_component.size() + 1;
+    }
+    if (r_name) {
+      *r_name = r_path_buffer + exploded->dir_component.size() + 1 +
+                exploded->group_component.size() + 1;
+    }
+  }
+  else {
+    r_path_buffer[exploded->group_component.size()] = '\0';
+
+    if (r_dir) {
+      *r_dir = nullptr;
+    }
+    if (r_group) {
+      *r_group = r_path_buffer;
+    }
+    if (r_name) {
+      *r_name = r_path_buffer + exploded->group_component.size() + 1;
+    }
+  }
 }
 
 namespace blender::asset_system {
