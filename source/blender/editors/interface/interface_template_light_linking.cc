@@ -125,6 +125,5 @@ void uiTemplateLightLinkingReceiverCollection(struct uiLayout *layout,
       "Receiver Collection Tree View",
       std::make_unique<blender::ReceiverCollectionView>(*collection));
 
-  ui::TreeViewBuilder builder(*block);
-  builder.build_tree_view(*tree_view);
+  ui::TreeViewBuilder::build_tree_view(*tree_view, *layout);
 }
