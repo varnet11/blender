@@ -2664,13 +2664,7 @@ static void pointer_handle_enter(void *data,
 
   /* Resetting scroll events is likely unnecessary,
    * do this to avoid any possible problems as it's harmless. */
-  seat->pointer_scroll.smooth_xy[0] = 0;
-  seat->pointer_scroll.smooth_xy[1] = 0;
-  seat->pointer_scroll.discrete_xy[0] = 0;
-  seat->pointer_scroll.discrete_xy[1] = 0;
-  seat->pointer_scroll.inverted_xy[0] = false;
-  seat->pointer_scroll.inverted_xy[1] = false;
-  seat->pointer_scroll.axis_source = WL_POINTER_AXIS_SOURCE_WHEEL;
+  seat->pointer_scroll = GWL_SeatStatePointerScroll{};
 
   seat->pointer.wl_surface_window = wl_surface;
 
@@ -4275,8 +4269,26 @@ static void gwl_seat_capability_pointer_enable(GWL_Seat *seat)
   seat->cursor.visible = true;
   seat->cursor.wl_buffer = nullptr;
   if (!get_cursor_settings(seat->cursor.theme_name, seat->cursor.theme_size)) {
-    seat->cursor.theme_name = std::string();
+    /* Use environment variables, falling back to defaults.
+     * These environment variables are used by enough WAYLAND applications
+     * that it makes sense to check them (see `Xcursor` man page). */
+    const char *env;
+
+    env = getenv("XCURSOR_THEME");
+    seat->cursor.theme_name = std::string(env ? env : "");
+
+    env = getenv("XCURSOR_SIZE");
     seat->cursor.theme_size = default_cursor_size;
+
+    if (env && (*env != '\0')) {
+      char *env_end = nullptr;
+      /* While clamping is not needed on the WAYLAND side,
+       * GHOST's internal logic may get confused by negative values, so ensure it's at least 1. */
+      const long value = strtol(env, &env_end, 10);
+      if ((*env_end == '\0') && (value > 0)) {
+        seat->cursor.theme_size = int(value);
+      }
+    }
   }
   wl_pointer_add_listener(seat->wl_pointer, &pointer_listener, seat);
 
