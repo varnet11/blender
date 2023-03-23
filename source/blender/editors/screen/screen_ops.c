@@ -4789,32 +4789,6 @@ static void SCREEN_OT_animation_step(wmOperatorType *ot)
  * Animation Playback with Timer.
  * \{ */
 
-bScreen *ED_screen_animation_playing(const wmWindowManager *wm)
-{
-  LISTBASE_FOREACH (wmWindow *, win, &wm->windows) {
-    bScreen *screen = WM_window_get_active_screen(win);
-
-    if ((screen->active_clock & ANIMTIMER_ANIMATION) || screen->scrubbing) {
-      return screen;
-    }
-  }
-
-  return NULL;
-}
-
-bScreen *ED_screen_animation_no_scrub(const wmWindowManager *wm)
-{
-  LISTBASE_FOREACH (wmWindow *, win, &wm->windows) {
-    bScreen *screen = WM_window_get_active_screen(win);
-
-    if (screen->active_clock & ANIMTIMER_ANIMATION) {
-      return screen;
-    }
-  }
-
-  return NULL;
-}
-
 int ED_screen_animation_play(bContext *C, int sync, int mode)
 {
   bScreen *screen = CTX_wm_screen(C);
@@ -4837,8 +4811,7 @@ int ED_screen_animation_play(bContext *C, int sync, int mode)
     ED_screen_animation_timer(C, screen->redraws_flag, sync, mode);
 
     if (screen->active_clock & ANIMTIMER_ANIMATION) {
-      wmTimer *wt = screen->animtimer;
-      ScreenAnimData *sad = wt->customdata;
+      ScreenAnimData *sad = &((ScreenTimerData *)screen->animtimer->customdata)->animation;
 
       sad->region = CTX_wm_region(C);
     }
@@ -4847,9 +4820,78 @@ int ED_screen_animation_play(bContext *C, int sync, int mode)
   return OPERATOR_FINISHED;
 }
 
+bool ED_screen_realtime_clock_start(bContext *C)
+{
+  bScreen *screen = CTX_wm_screen(C);
+  //  Scene *scene_eval = DEG_get_evaluated_scene(CTX_data_ensure_evaluated_depsgraph(C));
+
+  //  BKE_sound_play_scene(scene_eval);
+  ED_screen_realtime_timer(C, screen->redraws_flag, true);
+
+  return OPERATOR_FINISHED;
+}
+
+bool ED_screen_realtime_clock_stop(bContext *C)
+{
+  Scene *scene = CTX_data_scene(C);
+  //  Scene *scene_eval = DEG_get_evaluated_scene(CTX_data_ensure_evaluated_depsgraph(C));
+
+  /* stop playback now */
+  ED_screen_realtime_timer(C, 0, false);
+  //  BKE_sound_stop_scene(scene_eval);
+
+  WM_event_add_notifier(C, NC_SCENE | ND_FRAME, scene);
+
+  return OPERATOR_FINISHED;
+}
+
 bool ED_screen_animation_is_playing(bScreen *screen)
 {
   return screen && screen->active_clock & ANIMTIMER_ANIMATION;
+}
+
+bool ED_screen_realtime_clock_is_running(bScreen *screen)
+{
+  return screen && screen->active_clock & ANIMTIMER_REALTIME;
+}
+
+bScreen *ED_screen_animation_playing(const wmWindowManager *wm)
+{
+  LISTBASE_FOREACH (wmWindow *, win, &wm->windows) {
+    bScreen *screen = WM_window_get_active_screen(win);
+
+    if (screen->active_clock & ANIMTIMER_ANIMATION || screen->scrubbing) {
+      return screen;
+    }
+  }
+
+  return NULL;
+}
+
+bScreen *ED_screen_animation_no_scrub(const wmWindowManager *wm)
+{
+  LISTBASE_FOREACH (wmWindow *, win, &wm->windows) {
+    bScreen *screen = WM_window_get_active_screen(win);
+
+    if (screen->active_clock & ANIMTIMER_ANIMATION) {
+      return screen;
+    }
+  }
+
+  return NULL;
+}
+
+bScreen *ED_screen_realtime_clock_running(const wmWindowManager *wm)
+{
+  LISTBASE_FOREACH (wmWindow *, win, &wm->windows) {
+    bScreen *screen = WM_window_get_active_screen(win);
+
+    if (screen->active_clock & ANIMTIMER_REALTIME) {
+      return screen;
+    }
+  }
+
+  return NULL;
 }
 
 static int screen_animation_play_exec(bContext *C, wmOperator *op)
@@ -4898,7 +4940,7 @@ static int screen_animation_cancel_exec(bContext *C, wmOperator *op)
   if (screen) {
     if (RNA_boolean_get(op->ptr, "restore_frame") &&
         (screen->active_clock & ANIMTIMER_ANIMATION)) {
-      ScreenAnimData *sad = screen->animtimer->customdata;
+      ScreenAnimData *sad = &((ScreenTimerData *)screen->animtimer->customdata)->animation;
       Scene *scene = CTX_data_scene(C);
 
       /* reset current frame before stopping, and just send a notifier to deal with the rest
@@ -4941,59 +4983,6 @@ static void SCREEN_OT_animation_cancel(wmOperatorType *ot)
 /** \name Realtime Clock Start
  * \{ */
 
-bool ED_screen_realtime_clock_is_running(bScreen *screen)
-{
-  return screen && screen->active_clock & ANIMTIMER_REALTIME;
-}
-
-bScreen *ED_screen_realtime_clock_running(const wmWindowManager *wm)
-{
-  LISTBASE_FOREACH (wmWindow *, win, &wm->windows) {
-    bScreen *screen = WM_window_get_active_screen(win);
-
-    if (screen->active_clock & ANIMTIMER_REALTIME) {
-      return screen;
-    }
-  }
-
-  return NULL;
-}
-
-bool ED_screen_realtime_clock_start(bContext *C)
-{
-  bScreen *screen = CTX_wm_screen(C);
-  Scene *scene = CTX_data_scene(C);
-  Scene *scene_eval = DEG_get_evaluated_scene(CTX_data_ensure_evaluated_depsgraph(C));
-
-//  BKE_sound_play_scene(scene_eval);
-
-//  ED_screen_realtime_clock_timer(C, screen->redraws_flag, sync, mode);
-
-//  if (screen->animtimer) {
-//    wmTimer *wt = screen->animtimer;
-//    ScreenAnimData *sad = wt->customdata;
-
-//    sad->region = CTX_wm_region(C);
-//  }
-
-  return OPERATOR_FINISHED;
-}
-
-bool ED_screen_realtime_clock_stop(bContext *C)
-{
-  bScreen *screen = CTX_wm_screen(C);
-  Scene *scene = CTX_data_scene(C);
-  Scene *scene_eval = DEG_get_evaluated_scene(CTX_data_ensure_evaluated_depsgraph(C));
-
-//  /* stop playback now */
-//  ED_screen_animation_timer(C, 0, 0, 0);
-//  BKE_sound_stop_scene(scene_eval);
-
-//  WM_event_add_notifier(C, NC_SCENE | ND_FRAME, scene);
-
-  return OPERATOR_FINISHED;
-}
-
 static int screen_realtime_clock_start_exec(bContext *C, wmOperator *UNUSED(op))
 {
   return ED_screen_realtime_clock_start(C);
@@ -5001,12 +4990,10 @@ static int screen_realtime_clock_start_exec(bContext *C, wmOperator *UNUSED(op))
 
 static void SCREEN_OT_realtime_clock_start(wmOperatorType *ot)
 {
-  PropertyRNA *prop;
-
   /* identifiers */
   ot->name = "Start Realtime Clock";
   ot->description = "Start realtime clock";
-  ot->idname = "SCREEN_OT_start_realtime_clock";
+  ot->idname = "SCREEN_OT_realtime_clock_start";
 
   /* api callbacks */
   ot->exec = screen_realtime_clock_start_exec;

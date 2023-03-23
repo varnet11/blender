@@ -1659,11 +1659,10 @@ static ScreenTimerData *screen_timer_ensure(bContext *C, int clock)
   return (ScreenTimerData *)screen->animtimer->customdata;
 }
 
-static void screen_timer_stop(bContext *C, int clock)
+static void screen_timer_stop(bContext *C, bScreen *screen, int clock)
 {
   wmWindowManager *wm = CTX_wm_manager(C);
   wmWindow *win = CTX_wm_window(C);
-  bScreen *screen = ED_screen_animation_playing(wm);
 
   if (screen) {
     /* Check that timer exists if any clock is active */
@@ -1680,9 +1679,11 @@ static void screen_timer_stop(bContext *C, int clock)
 
 void ED_screen_animation_timer(bContext *C, int redraws, int sync, int enable)
 {
+  wmWindowManager *wm = CTX_wm_manager(C);
   Scene *scene = CTX_data_scene(C);
+  bScreen *stopscreen = ED_screen_animation_playing(wm);
 
-  screen_timer_stop(C, ANIMTIMER_ANIMATION);
+  screen_timer_stop(C, stopscreen, ANIMTIMER_ANIMATION);
 
   if (enable) {
     ScreenAnimData *sad = &screen_timer_ensure(C, ANIMTIMER_ANIMATION)->animation;
@@ -1732,7 +1733,10 @@ void ED_screen_animation_timer(bContext *C, int redraws, int sync, int enable)
 
 void ED_screen_realtime_timer(bContext *C, int redraws, bool enable)
 {
-  screen_timer_stop(C, ANIMTIMER_REALTIME);
+  wmWindowManager *wm = CTX_wm_manager(C);
+  bScreen *stopscreen = ED_screen_realtime_clock_running(wm);
+
+  screen_timer_stop(C, stopscreen, ANIMTIMER_REALTIME);
 
   if (enable) {
     ScreenRealtimeData *srd = &screen_timer_ensure(C, ANIMTIMER_REALTIME)->realtime;
