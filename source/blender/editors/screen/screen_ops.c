@@ -4784,6 +4784,82 @@ static void SCREEN_OT_animation_step(wmOperatorType *ot)
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name Realtime Step Operator
+ * \{ */
+
+static int screen_realtime_step_invoke(bContext *C, wmOperator *UNUSED(op), const wmEvent *event)
+{
+  bScreen *screen = CTX_wm_screen(C);
+  wmTimer *wt = screen->animtimer;
+
+  if (!(screen->active_clock & ANIMTIMER_REALTIME) || !wt || wt != event->customdata) {
+    return OPERATOR_PASS_THROUGH;
+  }
+
+  wmWindow *win = CTX_wm_window(C);
+
+  Main *bmain = CTX_data_main(C);
+  Scene *scene = CTX_data_scene(C);
+  ViewLayer *view_layer = WM_window_get_active_view_layer(win);
+  Depsgraph *depsgraph = BKE_scene_get_depsgraph(scene, view_layer);
+  Scene *scene_eval = (depsgraph != NULL) ? DEG_get_evaluated_scene(depsgraph) : NULL;
+  ScreenRealtimeData *srd = &((ScreenTimerData *)wt->customdata)->realtime;
+  wmWindowManager *wm = CTX_wm_manager(C);
+
+  if (scene_eval == NULL) {
+    /* Happens when undo/redo system is used during playback, nothing meaningful we can do here. */
+  }
+  else if (scene_eval->id.recalc & ID_RECALC_FRAME_CHANGE) {
+    /* Ignore seek here, the audio will be updated to the scene frame after jump during next
+     * dependency graph update. */
+  }
+  else {
+//    scene->r.cfra++;
+  }
+
+  /* Since we follow draw-flags, we can't send notifier but tag regions ourselves. */
+  if (depsgraph != NULL) {
+    ED_update_for_newframe(bmain, depsgraph);
+  }
+
+  LISTBASE_FOREACH (wmWindow *, window, &wm->windows) {
+    const bScreen *win_screen = WM_window_get_active_screen(window);
+
+    LISTBASE_FOREACH (ScrArea *, area, &win_screen->areabase) {
+      LISTBASE_FOREACH (ARegion *, region, &area->regionbase) {
+        if (match_region_with_redraws(area, region->regiontype, srd->redraws, false)) {
+          ED_region_tag_redraw(region);
+        }
+      }
+    }
+  }
+
+  /* Recalculate the time-step for the timer now that we've finished calculating this,
+   * since the frames-per-second value may have been changed.
+   */
+  /* TODO: this may make evaluation a bit slower if the value doesn't change...
+   * any way to avoid this? */
+  wt->timestep = (1.0 / FPS);
+
+  return OPERATOR_FINISHED;
+}
+
+static void SCREEN_OT_realtime_step(wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Realtime Step";
+  ot->description = "Step realtime clock";
+  ot->idname = "SCREEN_OT_realtime_step";
+
+  /* api callbacks */
+  ot->invoke = screen_realtime_step_invoke;
+
+  ot->poll = ED_operator_screenactive_norender;
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Animation Playback Operator
  *
  * Animation Playback with Timer.
@@ -5821,6 +5897,7 @@ void ED_operatortypes_screen(void)
   WM_operatortype_append(SCREEN_OT_animation_cancel);
 
   /* Realtime clock */
+  WM_operatortype_append(SCREEN_OT_realtime_step);
   WM_operatortype_append(SCREEN_OT_realtime_clock_start);
   WM_operatortype_append(SCREEN_OT_realtime_clock_stop);
 
