@@ -931,7 +931,7 @@ void BKE_sound_seek_scene(Main *bmain, Scene *scene)
 
   animation_playing = 0;
   for (screen = bmain->screens.first; screen; screen = screen->id.next) {
-    if (screen->animtimer) {
+    if (screen->active_clock & ANIMTIMER_ANIMATION) {
       animation_playing = 1;
       break;
     }

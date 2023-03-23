@@ -81,7 +81,7 @@ typedef struct PrefetchJob {
 static bool seq_prefetch_is_playing(const Main *bmain)
 {
   for (bScreen *screen = bmain->screens.first; screen; screen = screen->id.next) {
-    if (screen->animtimer) {
+    if (screen->active_clock & ANIMTIMER_ANIMATION) {
       return true;
     }
   }

@@ -487,6 +487,10 @@ void ED_refresh_viewport_fps(struct bContext *C);
  */
 int ED_screen_animation_play(struct bContext *C, int sync, int mode);
 /**
+ * Animation is playing.
+ */
+bool ED_screen_animation_is_playing(struct bScreen *screen);
+/**
  * Find window that owns the animation timer.
  */
 bScreen *ED_screen_animation_playing(const struct wmWindowManager *wm);
@@ -500,6 +504,10 @@ bool ED_screen_realtime_clock_start(struct bContext *C);
  * Stop realtime clock.
  */
 bool ED_screen_realtime_clock_stop(struct bContext *C);
+/**
+ * Realtime clock is running.
+ */
+bool ED_screen_realtime_clock_is_running(struct bScreen *screen);
 /**
  * Find screen that owns the realtime clock timer.
  */

@@ -4794,7 +4794,7 @@ bScreen *ED_screen_animation_playing(const wmWindowManager *wm)
   LISTBASE_FOREACH (wmWindow *, win, &wm->windows) {
     bScreen *screen = WM_window_get_active_screen(win);
 
-    if (screen->animtimer || screen->scrubbing) {
+    if ((screen->active_clock & ANIMTIMER_ANIMATION) || screen->scrubbing) {
       return screen;
     }
   }
@@ -4807,7 +4807,7 @@ bScreen *ED_screen_animation_no_scrub(const wmWindowManager *wm)
   LISTBASE_FOREACH (wmWindow *, win, &wm->windows) {
     bScreen *screen = WM_window_get_active_screen(win);
 
-    if (screen->animtimer) {
+    if (screen->active_clock & ANIMTIMER_ANIMATION) {
       return screen;
     }
   }
@@ -4836,7 +4836,7 @@ int ED_screen_animation_play(bContext *C, int sync, int mode)
 
     ED_screen_animation_timer(C, screen->redraws_flag, sync, mode);
 
-    if (screen->animtimer) {
+    if (screen->active_clock & ANIMTIMER_ANIMATION) {
       wmTimer *wt = screen->animtimer;
       ScreenAnimData *sad = wt->customdata;
 
@@ -4845,6 +4845,11 @@ int ED_screen_animation_play(bContext *C, int sync, int mode)
   }
 
   return OPERATOR_FINISHED;
+}
+
+bool ED_screen_animation_is_playing(bScreen *screen)
+{
+  return screen->active_clock & ANIMTIMER_ANIMATION;
 }
 
 static int screen_animation_play_exec(bContext *C, wmOperator *op)
@@ -4891,7 +4896,7 @@ static int screen_animation_cancel_exec(bContext *C, wmOperator *op)
   bScreen *screen = ED_screen_animation_playing(CTX_wm_manager(C));
 
   if (screen) {
-    if (RNA_boolean_get(op->ptr, "restore_frame") && screen->animtimer) {
+    if (RNA_boolean_get(op->ptr, "restore_frame") && (screen->active_clock & ANIMTIMER_ANIMATION) {
       ScreenAnimData *sad = screen->animtimer->customdata;
       Scene *scene = CTX_data_scene(C);
 
@@ -4935,14 +4940,19 @@ static void SCREEN_OT_animation_cancel(wmOperatorType *ot)
 /** \name Realtime Clock Start
  * \{ */
 
+bool ED_screen_realtime_clock_is_running(bScreen *screen)
+{
+  return screen->active_clock & ANIMTIMER_REALTIME;
+}
+
 bScreen *ED_screen_realtime_clock_running(const wmWindowManager *wm)
 {
   LISTBASE_FOREACH (wmWindow *, win, &wm->windows) {
     bScreen *screen = WM_window_get_active_screen(win);
 
-//    if (screen->animtimer || screen->scrubbing) {
-//      return screen;
-//    }
+    if (screen->active_clock & ANIMTIMER_REALTIME) {
+      return screen;
+    }
   }
 
   return NULL;
