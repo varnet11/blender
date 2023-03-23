@@ -4849,7 +4849,7 @@ int ED_screen_animation_play(bContext *C, int sync, int mode)
 
 bool ED_screen_animation_is_playing(bScreen *screen)
 {
-  return screen->active_clock & ANIMTIMER_ANIMATION;
+  return screen && screen->active_clock & ANIMTIMER_ANIMATION;
 }
 
 static int screen_animation_play_exec(bContext *C, wmOperator *op)
@@ -4942,7 +4942,7 @@ static void SCREEN_OT_animation_cancel(wmOperatorType *ot)
 
 bool ED_screen_realtime_clock_is_running(bScreen *screen)
 {
-  return screen->active_clock & ANIMTIMER_REALTIME;
+  return screen && screen->active_clock & ANIMTIMER_REALTIME;
 }
 
 bScreen *ED_screen_realtime_clock_running(const wmWindowManager *wm)

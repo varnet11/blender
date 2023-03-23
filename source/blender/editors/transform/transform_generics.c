@@ -250,7 +250,7 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
   if (t->spacetype == SPACE_VIEW3D) {
     bScreen *animscreen = ED_screen_animation_playing(CTX_wm_manager(C));
 
-    t->animtimer = (animscreen) ? animscreen->animtimer : NULL;
+    t->animtimer = ED_screen_animation_is_playing(animscreen) ? animscreen->animtimer : NULL;
 
     if (t->scene->toolsettings->transform_flag & SCE_XFORM_AXIS_ALIGN) {
       t->flag |= T_V3D_ALIGN;
@@ -310,7 +310,7 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 
     /* Needed for autokeying transforms in preview during playback. */
     bScreen *animscreen = ED_screen_animation_playing(CTX_wm_manager(C));
-    t->animtimer = (animscreen) ? animscreen->animtimer : NULL;
+    t->animtimer = ED_screen_animation_is_playing(animscreen) ? animscreen->animtimer : NULL;
   }
 
   setTransformViewAspect(t, t->aspect);
