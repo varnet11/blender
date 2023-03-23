@@ -77,15 +77,16 @@ typedef struct bScreen {
   char skip_handling;
   /** Set when scrubbing to avoid some costly updates. */
   char scrubbing;
-  char _pad[1];
+  char _pad1[1];
 
   /** Active region that has mouse focus. */
   struct ARegion *active_region;
 
   /** If set, screen has timer handler added in window. */
   struct wmTimer *animtimer;
-  /** Clocks that are current running on this timer. */
+  /** Clocks that are currently running on this timer. */
   int active_clock;
+  char _pad2[4];
 
   /** Context callback. */
   void /*bContextDataCallback*/ *context;

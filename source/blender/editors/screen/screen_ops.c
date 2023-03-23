@@ -2995,14 +2995,14 @@ static void SCREEN_OT_frame_offset(wmOperatorType *ot)
 static int frame_jump_exec(bContext *C, wmOperator *op)
 {
   Scene *scene = CTX_data_scene(C);
-  wmTimer *animtimer = CTX_wm_screen(C)->animtimer;
+  bScreen *screen = CTX_wm_screen(C);
 
   /* Don't change scene->r.cfra directly if animtimer is running as this can cause
    * first/last frame not to be actually shown (bad since for example physics
    * simulations aren't reset properly).
    */
-  if (animtimer) {
-    ScreenAnimData *sad = animtimer->customdata;
+  if (ED_screen_animation_is_playing(screen)) {
+    ScreenAnimData *sad = &((ScreenTimerData *)screen->animtimer->customdata)->animation;
 
     sad->flag |= ANIMPLAY_FLAG_USE_NEXT_FRAME;
 
@@ -4570,7 +4570,7 @@ static int screen_animation_step_invoke(bContext *C, wmOperator *UNUSED(op), con
   bScreen *screen = CTX_wm_screen(C);
   wmTimer *wt = screen->animtimer;
 
-  if (!(wt && wt == event->customdata)) {
+  if (!(screen->active_clock & ANIMTIMER_ANIMATION) || !wt || wt != event->customdata) {
     return OPERATOR_PASS_THROUGH;
   }
 
@@ -4586,7 +4586,7 @@ static int screen_animation_step_invoke(bContext *C, wmOperator *UNUSED(op), con
   ViewLayer *view_layer = WM_window_get_active_view_layer(win);
   Depsgraph *depsgraph = BKE_scene_get_depsgraph(scene, view_layer);
   Scene *scene_eval = (depsgraph != NULL) ? DEG_get_evaluated_scene(depsgraph) : NULL;
-  ScreenAnimData *sad = wt->customdata;
+  ScreenAnimData *sad = &((ScreenTimerData *)wt->customdata)->animation;
   wmWindowManager *wm = CTX_wm_manager(C);
   int sync;
   double time;
@@ -4896,7 +4896,8 @@ static int screen_animation_cancel_exec(bContext *C, wmOperator *op)
   bScreen *screen = ED_screen_animation_playing(CTX_wm_manager(C));
 
   if (screen) {
-    if (RNA_boolean_get(op->ptr, "restore_frame") && (screen->active_clock & ANIMTIMER_ANIMATION) {
+    if (RNA_boolean_get(op->ptr, "restore_frame") &&
+        (screen->active_clock & ANIMTIMER_ANIMATION)) {
       ScreenAnimData *sad = screen->animtimer->customdata;
       Scene *scene = CTX_data_scene(C);
 

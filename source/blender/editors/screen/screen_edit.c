@@ -1636,23 +1636,56 @@ void ED_refresh_viewport_fps(bContext *C)
   }
 }
 
-void ED_screen_animation_timer(bContext *C, int redraws, int sync, int enable)
+static ScreenTimerData *screen_timer_ensure(bContext *C, int clock)
 {
   bScreen *screen = CTX_wm_screen(C);
   wmWindowManager *wm = CTX_wm_manager(C);
   wmWindow *win = CTX_wm_window(C);
   Scene *scene = CTX_data_scene(C);
-  bScreen *stopscreen = ED_screen_animation_playing(wm);
 
-  if (stopscreen) {
-    WM_event_remove_timer(wm, win, stopscreen->animtimer);
-    stopscreen->animtimer = NULL;
+  BLI_assert(screen != NULL);
+  /* Check that timer exists if any clock is active */
+  BLI_assert((screen->animtimer == NULL) == (screen->active_clock == 0));
+
+  if (screen->animtimer == NULL) {
+    screen->animtimer = WM_event_add_timer(wm, win, TIMER0, (1.0 / FPS));
+
+    ScreenTimerData *timer_data = MEM_callocN(sizeof(ScreenTimerData), "ScreenTimerData");
+    screen->animtimer->customdata = timer_data;
   }
 
-  if (enable) {
-    ScreenAnimData *sad = MEM_callocN(sizeof(ScreenAnimData), "ScreenAnimData");
+  screen->active_clock |= clock;
 
-    screen->animtimer = WM_event_add_timer(wm, win, TIMER0, (1.0 / FPS));
+  return (ScreenTimerData *)screen->animtimer->customdata;
+}
+
+static void screen_timer_stop(bContext *C, int clock)
+{
+  wmWindowManager *wm = CTX_wm_manager(C);
+  wmWindow *win = CTX_wm_window(C);
+  bScreen *screen = ED_screen_animation_playing(wm);
+
+  if (screen) {
+    /* Check that timer exists if any clock is active */
+    BLI_assert((screen->animtimer == NULL) == (screen->active_clock == 0));
+
+    screen->active_clock &= ~clock;
+
+    if (screen->active_clock == 0) {
+      WM_event_remove_timer(wm, win, screen->animtimer);
+      screen->animtimer = NULL;
+    }
+  }
+}
+
+void ED_screen_animation_timer(bContext *C, int redraws, int sync, int enable)
+{
+  Scene *scene = CTX_data_scene(C);
+
+  screen_timer_stop(C, ANIMTIMER_ANIMATION);
+
+  if (enable) {
+    ScreenAnimData *sad = &screen_timer_ensure(C, ANIMTIMER_ANIMATION)->animation;
 
     sad->region = CTX_wm_region(C);
     /* If start-frame is larger than current frame, we put current-frame on start-frame.
@@ -1688,8 +1721,6 @@ void ED_screen_animation_timer(bContext *C, int redraws, int sync, int enable)
     }
 
     sad->from_anim_edit = ELEM(spacetype, SPACE_GRAPH, SPACE_ACTION, SPACE_NLA);
-
-    screen->animtimer->customdata = sad;
   }
 
   /* Seek audio to ensure playback in preview range with AV sync. */
@@ -1697,6 +1728,24 @@ void ED_screen_animation_timer(bContext *C, int redraws, int sync, int enable)
 
   /* Notifier caught by top header, for button. */
   WM_event_add_notifier(C, NC_SCREEN | ND_ANIMPLAY, NULL);
+}
+
+void ED_screen_realtime_timer(bContext *C, int redraws, bool enable)
+{
+  screen_timer_stop(C, ANIMTIMER_REALTIME);
+
+  if (enable) {
+    ScreenRealtimeData *srd = &screen_timer_ensure(C, ANIMTIMER_REALTIME)->realtime;
+
+    srd->flag = 0;
+    srd->redraws = redraws;
+  }
+
+//  /* Seek audio to ensure playback in preview range with AV sync. */
+//  DEG_id_tag_update(&scene->id, ID_RECALC_FRAME_CHANGE);
+
+//  /* Notifier caught by top header, for button. */
+//  WM_event_add_notifier(C, NC_SCREEN | ND_ANIMPLAY, NULL);
 }
 
 /* helper for screen_animation_play() - only to be used for TimeLine */
@@ -1723,15 +1772,25 @@ static ARegion *time_top_left_3dwindow(bScreen *screen)
 
 void ED_screen_animation_timer_update(bScreen *screen, int redraws)
 {
-  if (screen && screen->animtimer) {
-    wmTimer *wt = screen->animtimer;
-    ScreenAnimData *sad = wt->customdata;
+  if (screen && (screen->active_clock & ANIMTIMER_ANIMATION)) {
+    ScreenTimerData *timer_data = screen->animtimer->customdata;
+    ScreenAnimData *sad = &timer_data->animation;
 
     sad->redraws = redraws;
     sad->region = NULL;
     if (redraws & TIME_REGION) {
       sad->region = time_top_left_3dwindow(screen);
     }
+  }
+}
+
+void ED_screen_realtime_timer_update(bScreen *screen, int redraws)
+{
+  if (screen && (screen->active_clock & ANIMTIMER_REALTIME)) {
+    ScreenTimerData *timer_data = screen->animtimer->customdata;
+    ScreenRealtimeData *srd = &timer_data->realtime;
+
+    srd->redraws = redraws;
   }
 }
 

@@ -14,24 +14,33 @@ extern "C" {
 /* ----------------------------------------------------- */
 
 /**
- * For animation playback operator, stored in #bScreen.animtimer.customdata.
+ * For animation playback operator.
  */
 typedef struct ScreenAnimData {
-  /* Animation playback data */
-  struct animation {
-    ARegion *region; /* do not read from this, only for comparing if region exists */
-    short redraws;
-    short flag;                 /* flags for playback */
-    int sfra;                   /* frame that playback was started from */
-    int nextfra;                /* next frame to go to (when ANIMPLAY_FLAG_USE_NEXT_FRAME is set) */
-    double lagging_frame_count; /* used for frame dropping */
-    bool from_anim_edit;        /* playback was invoked from animation editor */
-  };
-  /* Realtime clock data */
-  struct realtime {
-    short flag;
-  };
+  ARegion *region; /* do not read from this, only for comparing if region exists */
+  short redraws;
+  short flag;                 /* flags for playback */
+  int sfra;                   /* frame that playback was started from */
+  int nextfra;                /* next frame to go to (when ANIMPLAY_FLAG_USE_NEXT_FRAME is set) */
+  double lagging_frame_count; /* used for frame dropping */
+  bool from_anim_edit;        /* playback was invoked from animation editor */
 } ScreenAnimData;
+
+/**
+ * Realtime clock data.
+ */
+typedef struct ScreenRealtimeData {
+  short flag;
+  short redraws;
+} ScreenRealtimeData;
+
+/**
+ * Shared timer data for animation playback and realtime clock, stored in #bScreen.animtimer.customdata.
+ */
+typedef struct ScreenTimerData {
+  ScreenAnimData animation;
+  ScreenRealtimeData realtime;
+} ScreenTimerData;
 
 /** #ScreenAnimData.animation.flag */
 enum {

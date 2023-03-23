@@ -320,7 +320,9 @@ void ED_screen_exit(struct bContext *C, struct wmWindow *window, struct bScreen 
  * \param enable: 1 - forward on, -1 - backwards on, 0 - off.
  */
 void ED_screen_animation_timer(struct bContext *C, int redraws, int sync, int enable);
+void ED_screen_realtime_timer(struct bContext *C, int redraws, bool enable);
 void ED_screen_animation_timer_update(struct bScreen *screen, int redraws);
+void ED_screen_realtime_timer_update(struct bScreen *screen, int redraws);
 void ED_screen_restore_temp_type(struct bContext *C, ScrArea *area);
 ScrArea *ED_screen_full_newspace(struct bContext *C, ScrArea *area, int type);
 /**
