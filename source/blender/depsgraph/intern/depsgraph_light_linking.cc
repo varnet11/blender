@@ -86,7 +86,7 @@ void Cache::add_emitter(const Scene *scene, const Object *emitter)
   }
 
   /* Create emitter data for receiver collection, with unique bit. */
-  const uint64_t receiver_collection_bit = 1 << receiver_collection_id;
+  const uint64_t receiver_collection_bit = uint64_t(1) << receiver_collection_id;
   emitter_data_map_.add_new(receiver_collection, EmitterData(receiver_collection_bit));
 
   /* Add collection bit to all receivers affected by this emitter or any emitter with the same
@@ -136,7 +136,7 @@ void Cache::end_build(const Scene *scene)
         /* Mark emitters as a member of this light set. */
         for (EmitterData &info : emitter_data_map_.values()) {
           if (receiver_collection_mask & info.receiver_collection_bit) {
-            info.light_set_membership |= (1 << new_id);
+            info.light_set_membership |= (uint64_t(1) << new_id);
           }
         }
         return new_id;
@@ -162,9 +162,7 @@ void Cache::eval_runtime_data(Object *object_eval) const
 
   const Object *object_orig = DEG_get_original_object(object_eval);
 
-  const uint64_t set_membership_all = ~uint64_t(0);
-  light_linking.runtime.receiver_set = receiver_light_sets_.lookup_default(object_orig,
-                                                                           set_membership_all);
+  light_linking.runtime.receiver_set = receiver_light_sets_.lookup_default(object_orig, 0);
 
   const Collection *receiver_collection_eval = light_linking.receiver_collection;
   if (receiver_collection_eval) {
@@ -177,7 +175,7 @@ void Cache::eval_runtime_data(Object *object_eval) const
   }
   else {
     /* Member of all light sets. */
-    light_linking.runtime.set_membership = set_membership_all;
+    light_linking.runtime.set_membership = ~uint64_t(0);
   }
 }
 

@@ -58,7 +58,7 @@ ccl_device_inline bool light_link_light_match(KernelGlobals kg,
     return true;
   }
   const uint receiver_set = kernel_data_fetch(objects, object_receiver).light_link_receiver_set;
-  return (((uint64_t)1 << (uint64_t)receiver_set) & set_membership) != 0;
+  return ((uint64_t(1) << uint64_t(receiver_set)) & set_membership) != 0;
 }
 
 ccl_device_inline bool light_link_object_match(KernelGlobals kg,
@@ -78,7 +78,7 @@ ccl_device_inline bool light_link_object_match(KernelGlobals kg,
     return true;
   }
   const uint receiver_set = kernel_data_fetch(objects, object_receiver).light_link_receiver_set;
-  return (((uint64_t)1 << (uint64_t)receiver_set) & set_membership) != 0;
+  return ((uint64_t(1) << uint64_t(receiver_set)) & set_membership) != 0;
 }
 
 /* Sample point on an individual light. */
