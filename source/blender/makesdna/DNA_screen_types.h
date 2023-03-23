@@ -84,6 +84,9 @@ typedef struct bScreen {
 
   /** If set, screen has timer handler added in window. */
   struct wmTimer *animtimer;
+  /** Clocks that are current running on this timer. */
+  int active_clock;
+
   /** Context callback. */
   void /*bContextDataCallback*/ *context;
 
@@ -92,6 +95,14 @@ typedef struct bScreen {
 
   PreviewImage *preview;
 } bScreen;
+
+/** #ScreenAnimData.active_clock. */
+enum {
+  /** Animation playback. */
+  ANIMTIMER_ANIMATION = (1 << 0),
+  /** Realtime clock. */
+  ANIMTIMER_REALTIME = (1 << 1),
+};
 
 typedef struct ScrVert {
   struct ScrVert *next, *prev, *newv;
