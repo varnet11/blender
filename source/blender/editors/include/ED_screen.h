@@ -479,6 +479,10 @@ void ED_workspace_do_listen(struct bContext *C, const struct wmNotifier *note);
  * Results in fully updated anim system.
  */
 void ED_update_for_newframe(struct Main *bmain, struct Depsgraph *depsgraph);
+/**
+ * Evaluate changes from realtime clock step.
+ */
+void ED_update_for_realtime_step(struct Main *bmain, struct Depsgraph *depsgraph);
 
 /**
  * Update frame rate info for viewport drawing.

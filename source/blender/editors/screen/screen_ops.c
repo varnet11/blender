@@ -4819,7 +4819,7 @@ static int screen_realtime_step_invoke(bContext *C, wmOperator *UNUSED(op), cons
 
   /* Since we follow draw-flags, we can't send notifier but tag regions ourselves. */
   if (depsgraph != NULL) {
-    ED_update_for_newframe(bmain, depsgraph);
+    ED_update_for_realtime_step(bmain, depsgraph);
   }
 
   LISTBASE_FOREACH (wmWindow *, window, &wm->windows) {
