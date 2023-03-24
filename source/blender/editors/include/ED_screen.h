@@ -495,11 +495,11 @@ int ED_screen_animation_play(struct bContext *C, int sync, int mode);
 /**
  * Start realtime clock.
  */
-bool ED_screen_realtime_clock_start(struct bContext *C);
+int ED_screen_realtime_clock_start(struct bContext *C);
 /**
  * Stop realtime clock.
  */
-bool ED_screen_realtime_clock_stop(struct bContext *C);
+int ED_screen_realtime_clock_stop(struct bContext *C);
 /**
  * Animation is playing.
  */

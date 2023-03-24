@@ -4867,7 +4867,7 @@ int ED_screen_animation_play(bContext *C, int sync, int mode)
   return OPERATOR_FINISHED;
 }
 
-bool ED_screen_realtime_clock_start(bContext *C)
+int ED_screen_realtime_clock_start(bContext *C)
 {
   bScreen *screen = CTX_wm_screen(C);
   //  Scene *scene_eval = DEG_get_evaluated_scene(CTX_data_ensure_evaluated_depsgraph(C));
@@ -4878,7 +4878,7 @@ bool ED_screen_realtime_clock_start(bContext *C)
   return OPERATOR_FINISHED;
 }
 
-bool ED_screen_realtime_clock_stop(bContext *C)
+int ED_screen_realtime_clock_stop(bContext *C)
 {
   Scene *scene = CTX_data_scene(C);
   //  Scene *scene_eval = DEG_get_evaluated_scene(CTX_data_ensure_evaluated_depsgraph(C));
