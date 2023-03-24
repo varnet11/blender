@@ -4574,15 +4574,10 @@ static void screen_animation_region_tag_redraw(
 
 //#define PROFILE_AUDIO_SYNCH
 
-static int screen_animation_step_invoke(bContext *C, wmOperator *UNUSED(op), const wmEvent *event)
+static void screen_animation_step_playback(bContext *C)
 {
   bScreen *screen = CTX_wm_screen(C);
   wmTimer *wt = screen->animtimer;
-
-  if (!(screen->active_clock & ANIMTIMER_ANIMATION) || !wt || wt != event->customdata) {
-    return OPERATOR_PASS_THROUGH;
-  }
-
   wmWindow *win = CTX_wm_window(C);
 
 #ifdef PROFILE_AUDIO_SYNCH
@@ -4590,13 +4585,11 @@ static int screen_animation_step_invoke(bContext *C, wmOperator *UNUSED(op), con
   int newfra_int;
 #endif
 
-  Main *bmain = CTX_data_main(C);
   Scene *scene = CTX_data_scene(C);
   ViewLayer *view_layer = WM_window_get_active_view_layer(win);
   Depsgraph *depsgraph = BKE_scene_get_depsgraph(scene, view_layer);
   Scene *scene_eval = (depsgraph != NULL) ? DEG_get_evaluated_scene(depsgraph) : NULL;
   ScreenAnimData *sad = &((ScreenTimerData *)wt->customdata)->animation;
-  wmWindowManager *wm = CTX_wm_manager(C);
   int sync;
   double time;
 
@@ -4734,6 +4727,40 @@ static int screen_animation_step_invoke(bContext *C, wmOperator *UNUSED(op), con
     old_frame = scene->r.cfra;
 #endif
   }
+}
+
+static void screen_animation_step_realtime(bContext *C)
+{
+  bScreen *screen = CTX_wm_screen(C);
+  wmTimer *wt = screen->animtimer;
+  ScreenRealtimeData *srd = &((ScreenTimerData *)wt->customdata)->realtime;
+
+  srd->elapsed_real_time += wt->delta;
+  srd->elapsed_scene_time += wt->timestep;
+  srd->elapsed_frames += 1;
+}
+
+static int screen_animation_step_invoke(bContext *C, wmOperator *UNUSED(op), const wmEvent *event)
+{
+  wmWindowManager *wm = CTX_wm_manager(C);
+  bScreen *screen = CTX_wm_screen(C);
+  wmTimer *wt = screen->animtimer;
+  wmWindow *win = CTX_wm_window(C);
+  Main *bmain = CTX_data_main(C);
+  Scene *scene = CTX_data_scene(C);
+  ViewLayer *view_layer = WM_window_get_active_view_layer(win);
+  Depsgraph *depsgraph = BKE_scene_get_depsgraph(scene, view_layer);
+
+  if (screen->active_clock == 0 || !wt || wt != event->customdata) {
+    return OPERATOR_PASS_THROUGH;
+  }
+
+  if (screen->active_clock & ANIMTIMER_ANIMATION) {
+    screen_animation_step_playback(C);
+  }
+  if (screen->active_clock & ANIMTIMER_REALTIME) {
+    screen_animation_step_realtime(C);
+  }
 
   /* Since we follow draw-flags, we can't send notifier but tag regions ourselves. */
   if (depsgraph != NULL) {
@@ -4745,17 +4772,28 @@ static int screen_animation_step_invoke(bContext *C, wmOperator *UNUSED(op), con
 
     LISTBASE_FOREACH (ScrArea *, area, &win_screen->areabase) {
       LISTBASE_FOREACH (ARegion *, region, &area->regionbase) {
-        bool redraw = false;
-        if (region == sad->region) {
-          redraw = true;
+        if (screen->active_clock & ANIMTIMER_ANIMATION) {
+          ScreenAnimData *sad = &((ScreenTimerData *)wt->customdata)->animation;
+          bool redraw = false;
+          if (region == sad->region ||
+              match_region_with_redraws(
+                  area, region->regiontype, sad->redraws, sad->from_anim_edit, false)) {
+            redraw = true;
+          }
+          if (redraw) {
+            screen_animation_region_tag_redraw(C, area, region, scene, sad->redraws);
+          }
         }
-        else if (match_region_with_redraws(
-                     area, region->regiontype, sad->redraws, sad->from_anim_edit, false)) {
-          redraw = true;
-        }
-
-        if (redraw) {
-          screen_animation_region_tag_redraw(C, area, region, scene, sad->redraws);
+        if (screen->active_clock & ANIMTIMER_REALTIME) {
+          ScreenRealtimeData *srd = &((ScreenTimerData *)wt->customdata)->realtime;
+          bool redraw = false;
+          if (region == srd->region ||
+              match_region_with_redraws(area, region->regiontype, srd->redraws, false, true)) {
+            redraw = true;
+          }
+          if (redraw) {
+            screen_animation_region_tag_redraw(C, area, region, scene, srd->redraws);
+          }
         }
       }
     }
@@ -4786,82 +4824,6 @@ static void SCREEN_OT_animation_step(wmOperatorType *ot)
 
   /* api callbacks */
   ot->invoke = screen_animation_step_invoke;
-
-  ot->poll = ED_operator_screenactive_norender;
-}
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
-/** \name Realtime Step Operator
- * \{ */
-
-static int screen_realtime_step_invoke(bContext *C, wmOperator *UNUSED(op), const wmEvent *event)
-{
-  bScreen *screen = CTX_wm_screen(C);
-  wmTimer *wt = screen->animtimer;
-
-  if (!(screen->active_clock & ANIMTIMER_REALTIME) || !wt || wt != event->customdata) {
-    return OPERATOR_PASS_THROUGH;
-  }
-
-  wmWindow *win = CTX_wm_window(C);
-
-  Main *bmain = CTX_data_main(C);
-  Scene *scene = CTX_data_scene(C);
-  ViewLayer *view_layer = WM_window_get_active_view_layer(win);
-  Depsgraph *depsgraph = BKE_scene_get_depsgraph(scene, view_layer);
-  ScreenRealtimeData *srd = &((ScreenTimerData *)wt->customdata)->realtime;
-  wmWindowManager *wm = CTX_wm_manager(C);
-
-  srd->elapsed_real_time += wt->delta;
-  srd->elapsed_scene_time += wt->timestep;
-  srd->elapsed_frames += 1;
-
-  /* Since we follow draw-flags, we can't send notifier but tag regions ourselves. */
-  if (depsgraph != NULL) {
-    ED_update_for_realtime_step(bmain, depsgraph);
-  }
-
-  LISTBASE_FOREACH (wmWindow *, window, &wm->windows) {
-    const bScreen *win_screen = WM_window_get_active_screen(window);
-
-    LISTBASE_FOREACH (ScrArea *, area, &win_screen->areabase) {
-      LISTBASE_FOREACH (ARegion *, region, &area->regionbase) {
-        bool redraw = false;
-        if (region == srd->region) {
-          redraw = true;
-        }
-        else if (match_region_with_redraws(area, region->regiontype, srd->redraws, false, true)) {
-          redraw = true;
-        }
-
-        if (redraw) {
-          ED_region_tag_redraw(region);
-        }
-      }
-    }
-  }
-
-  /* Recalculate the time-step for the timer now that we've finished calculating this,
-   * since the frames-per-second value may have been changed.
-   */
-  /* TODO: this may make evaluation a bit slower if the value doesn't change...
-   * any way to avoid this? */
-  wt->timestep = (1.0 / FPS);
-
-  return OPERATOR_FINISHED;
-}
-
-static void SCREEN_OT_realtime_step(wmOperatorType *ot)
-{
-  /* identifiers */
-  ot->name = "Realtime Step";
-  ot->description = "Step realtime clock";
-  ot->idname = "SCREEN_OT_realtime_step";
-
-  /* api callbacks */
-  ot->invoke = screen_realtime_step_invoke;
 
   ot->poll = ED_operator_screenactive_norender;
 }
@@ -5912,7 +5874,6 @@ void ED_operatortypes_screen(void)
   WM_operatortype_append(SCREEN_OT_animation_cancel);
 
   /* Realtime clock */
-  WM_operatortype_append(SCREEN_OT_realtime_step);
   WM_operatortype_append(SCREEN_OT_realtime_clock_start);
   WM_operatortype_append(SCREEN_OT_realtime_clock_stop);
 

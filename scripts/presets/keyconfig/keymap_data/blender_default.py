@@ -678,8 +678,6 @@ def km_screen(params):
         # Animation
         ("screen.animation_step", {"type": 'TIMER0', "value": 'ANY', "any": True}, None),
         ("screen.region_blend", {"type": 'TIMERREGION', "value": 'ANY', "any": True}, None),
-        # Realtime clock
-        ("screen.realtime_step", {"type": 'TIMER0', "value": 'ANY', "any": True}, None),
         # Full screen and cycling
         ("screen.space_context_cycle", {"type": 'TAB', "value": 'PRESS', "ctrl": True},
          {"properties": [("direction", 'NEXT')]}),
