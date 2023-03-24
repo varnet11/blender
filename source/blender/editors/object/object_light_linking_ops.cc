@@ -23,7 +23,7 @@
 /** \name Create New Light Linking Collection Operator
  * \{ */
 
-static int light_linking_receiver_collection_new_exec(bContext *C, wmOperator *op)
+static int light_linking_receiver_collection_new_exec(bContext *C, wmOperator * /*op*/)
 {
   Main *bmain = CTX_data_main(C);
   Object *object = CTX_data_active_object(C);
@@ -113,7 +113,7 @@ void OBJECT_OT_light_linking_unlink_from_receiver_collection(struct wmOperatorTy
 /** \name Select Light Linking Receivers Operator
  * \{ */
 
-static int light_linking_receivers_select_exec(bContext *C, wmOperator *op)
+static int light_linking_receivers_select_exec(bContext *C, wmOperator * /*op*/)
 {
   Scene *scene = CTX_data_scene(C);
   ViewLayer *view_layer = CTX_data_view_layer(C);
@@ -147,7 +147,7 @@ void OBJECT_OT_light_linking_receivers_select(wmOperatorType *ot)
 /** \name Select Light Linking Receivers Operator
  * \{ */
 
-static int light_linking_receivers_link_exec(bContext *C, wmOperator *op)
+static int light_linking_receivers_link_exec(bContext *C, wmOperator * /*op*/)
 {
   Main *bmain = CTX_data_main(C);
   Scene *scene = CTX_data_scene(C);

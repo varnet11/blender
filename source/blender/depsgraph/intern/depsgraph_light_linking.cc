@@ -20,6 +20,7 @@
 #include "DNA_object_types.h"
 
 #include "DEG_depsgraph_light_linking.h"
+#include "DEG_depsgraph_light_linking.hh"
 #include "DEG_depsgraph_query.h"
 
 #include "intern/depsgraph.h"
