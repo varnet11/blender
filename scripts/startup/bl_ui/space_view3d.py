@@ -8115,6 +8115,12 @@ class VIEW3D_PT_realtime_clock(Panel):
             row.operator("screen.realtime_clock_stop", text="", icon='PAUSE')
         row.scale_x = 1
 
+        layout.separator_spacer()
+
+        layout.prop(screen, "realtime_clock_elapsed_real_time", text="Elapsed Real Time")
+        layout.prop(screen, "realtime_clock_elapsed_scene_time", text="Elapsed Scene Time")
+        layout.prop(screen, "realtime_clock_elapsed_frames", text="Elapsed Frames")
+
 
 classes = (
     VIEW3D_HT_header,

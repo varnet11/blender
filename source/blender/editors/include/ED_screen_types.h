@@ -30,8 +30,12 @@ typedef struct ScreenAnimData {
  * Realtime clock data.
  */
 typedef struct ScreenRealtimeData {
+  ARegion *region; /* do not read from this, only for comparing if region exists */
   short flag;
-  short redraws;
+  short redraws;            /* Which editors get redrawn during animation playback */
+  float elapsed_real_time;  /* Real physical time elapsed since the clock was started */
+  float elapsed_scene_time; /* Scene time (1/fps) elapsed since the clock was started */
+  int elapsed_frames;       /* Amount of frames since the clock was started */
 } ScreenRealtimeData;
 
 /**

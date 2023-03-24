@@ -1741,6 +1741,7 @@ void ED_screen_realtime_timer(bContext *C, int redraws, bool enable)
   if (enable) {
     ScreenRealtimeData *srd = &screen_timer_ensure(C, ANIMTIMER_REALTIME)->realtime;
 
+    srd->region = CTX_wm_region(C);
     srd->flag = 0;
     srd->redraws = redraws;
   }
@@ -1795,6 +1796,12 @@ void ED_screen_realtime_timer_update(bScreen *screen, int redraws)
     ScreenRealtimeData *srd = &timer_data->realtime;
 
     srd->redraws = redraws;
+    srd->redraws = redraws;
+    srd->region = NULL;
+    /* TODO this might require its own TIME_ region flag depending on where the realtime clock ends up. */
+//    if (redraws & TIME_REGION) {
+//      srd->region = time_top_left_3dwindow(screen);
+//    }
   }
 }
 

@@ -51,6 +51,8 @@ const EnumPropertyItem rna_enum_region_type_items[] = {
 
 #  include "DEG_depsgraph.h"
 
+#  include "ED_screen_types.h"
+
 #  include "UI_view2d.h"
 
 #  ifdef WITH_PYTHON
@@ -91,7 +93,49 @@ static bool rna_Screen_is_realtime_clock_running_get(PointerRNA *UNUSED(ptr))
 {
   /* can be NULL on file load, #42619 */
   wmWindowManager *wm = G_MAIN->wm.first;
-  return wm ? (ED_screen_realtime_clock_running(wm) != NULL) : 0;
+  return wm ? (ED_screen_realtime_clock_running(wm) != NULL) : false;
+}
+
+static float rna_Screen_realtime_clock_elapsed_real_time_get(PointerRNA *ptr)
+{
+  /* can be NULL on file load, #42619 */
+  wmWindowManager *wm = G_MAIN->wm.first;
+  if (wm) {
+    bScreen *screen = ED_screen_realtime_clock_running(wm);
+    if (screen) {
+      ScreenTimerData *timer_data = screen->animtimer->customdata;
+      return timer_data->realtime.elapsed_real_time;
+    }
+  }
+  return 0.0f;
+}
+
+static float rna_Screen_realtime_clock_elapsed_scene_time_get(PointerRNA *ptr)
+{
+  /* can be NULL on file load, #42619 */
+  wmWindowManager *wm = G_MAIN->wm.first;
+  if (wm) {
+    bScreen *screen = ED_screen_realtime_clock_running(wm);
+    if (screen) {
+      ScreenTimerData *timer_data = screen->animtimer->customdata;
+      return timer_data->realtime.elapsed_scene_time;
+    }
+  }
+  return 0.0f;
+}
+
+static int rna_Screen_realtime_clock_elapsed_frames_get(PointerRNA *ptr)
+{
+  /* can be NULL on file load, #42619 */
+  wmWindowManager *wm = G_MAIN->wm.first;
+  if (wm) {
+    bScreen *screen = ED_screen_realtime_clock_running(wm);
+    if (screen) {
+      ScreenTimerData *timer_data = screen->animtimer->customdata;
+      return timer_data->realtime.elapsed_frames;
+    }
+  }
+  return 0;
 }
 
 static int rna_region_alignment_get(PointerRNA *ptr)
@@ -610,6 +654,21 @@ static void rna_def_screen(BlenderRNA *brna)
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_boolean_funcs(prop, "rna_Screen_is_realtime_clock_running_get", NULL);
   RNA_def_property_ui_text(prop, "Realtime Clock Running", "Realtime clock is running");
+
+  prop = RNA_def_property(srna, "realtime_clock_elapsed_real_time", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_float_funcs(prop, "rna_Screen_realtime_clock_elapsed_real_time_get", NULL, NULL);
+  RNA_def_property_ui_text(prop, "Realtime Clock Elapsed Real Time", "Real physical time elapsed since the clock was started");
+
+  prop = RNA_def_property(srna, "realtime_clock_elapsed_scene_time", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_float_funcs(prop, "rna_Screen_realtime_clock_elapsed_scene_time_get", NULL, NULL);
+  RNA_def_property_ui_text(prop, "Realtime Clock Elapsed Scene Time", "Scene time (1/fps) elapsed since the clock was started");
+
+  prop = RNA_def_property(srna, "realtime_clock_elapsed_frames", PROP_INT, PROP_NONE);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_int_funcs(prop, "rna_Screen_realtime_clock_elapsed_frames_get", NULL, NULL);
+  RNA_def_property_ui_text(prop, "Realtime Clock Elapsed Frames", "Elapsed frames since the realtime clock was started");
 
   prop = RNA_def_property(srna, "is_temporary", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);

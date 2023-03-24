@@ -4414,7 +4414,8 @@ static bool screen_animation_region_supports_time_follow(eSpace_Type spacetype,
 static bool match_region_with_redraws(const ScrArea *area,
                                       eRegion_Type regiontype,
                                       eScreen_Redraws_Flag redraws,
-                                      bool from_anim_edit)
+                                      bool from_anim_edit,
+                                      bool from_realtime_clock)
 {
   const eSpace_Type spacetype = area->spacetype;
   if (regiontype == RGN_TYPE_WINDOW) {
@@ -4468,13 +4469,21 @@ static bool match_region_with_redraws(const ScrArea *area,
     }
   }
   else if (regiontype == RGN_TYPE_UI) {
-    if (spacetype == SPACE_CLIP) {
-      /* Track Preview button is on Properties Editor in SpaceClip,
-       * and it's very common case when users want it be refreshing
-       * during playback, so asking people to enable special option
-       * for this is a bit tricky, so add exception here for refreshing
-       * Properties Editor for SpaceClip always */
-      return true;
+    switch (spacetype) {
+      case SPACE_CLIP:
+        /* Track Preview button is on Properties Editor in SpaceClip,
+         * and it's very common case when users want it be refreshing
+         * during playback, so asking people to enable special option
+         * for this is a bit tricky, so add exception here for refreshing
+         * Properties Editor for SpaceClip always */
+        return true;
+      case SPACE_VIEW3D:
+        /* Realtime clock is displayed in View3D buttons */
+        if (from_realtime_clock) {
+          return true;
+        }
+      default:
+        break;
     }
 
     if (redraws & TIME_ALL_BUTS_WIN) {
@@ -4741,7 +4750,7 @@ static int screen_animation_step_invoke(bContext *C, wmOperator *UNUSED(op), con
           redraw = true;
         }
         else if (match_region_with_redraws(
-                     area, region->regiontype, sad->redraws, sad->from_anim_edit)) {
+                     area, region->regiontype, sad->redraws, sad->from_anim_edit, false)) {
           redraw = true;
         }
 
@@ -4802,20 +4811,12 @@ static int screen_realtime_step_invoke(bContext *C, wmOperator *UNUSED(op), cons
   Scene *scene = CTX_data_scene(C);
   ViewLayer *view_layer = WM_window_get_active_view_layer(win);
   Depsgraph *depsgraph = BKE_scene_get_depsgraph(scene, view_layer);
-  Scene *scene_eval = (depsgraph != NULL) ? DEG_get_evaluated_scene(depsgraph) : NULL;
   ScreenRealtimeData *srd = &((ScreenTimerData *)wt->customdata)->realtime;
   wmWindowManager *wm = CTX_wm_manager(C);
 
-  if (scene_eval == NULL) {
-    /* Happens when undo/redo system is used during playback, nothing meaningful we can do here. */
-  }
-  else if (scene_eval->id.recalc & ID_RECALC_FRAME_CHANGE) {
-    /* Ignore seek here, the audio will be updated to the scene frame after jump during next
-     * dependency graph update. */
-  }
-  else {
-//    scene->r.cfra++;
-  }
+  srd->elapsed_real_time += wt->delta;
+  srd->elapsed_scene_time += wt->timestep;
+  srd->elapsed_frames += 1;
 
   /* Since we follow draw-flags, we can't send notifier but tag regions ourselves. */
   if (depsgraph != NULL) {
@@ -4827,7 +4828,15 @@ static int screen_realtime_step_invoke(bContext *C, wmOperator *UNUSED(op), cons
 
     LISTBASE_FOREACH (ScrArea *, area, &win_screen->areabase) {
       LISTBASE_FOREACH (ARegion *, region, &area->regionbase) {
-        if (match_region_with_redraws(area, region->regiontype, srd->redraws, false)) {
+        bool redraw = false;
+        if (region == srd->region) {
+          redraw = true;
+        }
+        else if (match_region_with_redraws(area, region->regiontype, srd->redraws, false, true)) {
+          redraw = true;
+        }
+
+        if (redraw) {
           ED_region_tag_redraw(region);
         }
       }
@@ -4903,6 +4912,12 @@ bool ED_screen_realtime_clock_start(bContext *C)
 
   //  BKE_sound_play_scene(scene_eval);
   ED_screen_realtime_timer(C, screen->redraws_flag, true);
+
+  if (screen->active_clock & ANIMTIMER_REALTIME) {
+    ScreenRealtimeData *srd = &((ScreenTimerData *)screen->animtimer->customdata)->realtime;
+
+    srd->region = CTX_wm_region(C);
+  }
 
   return OPERATOR_FINISHED;
 }
