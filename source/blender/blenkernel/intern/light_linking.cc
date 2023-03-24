@@ -150,10 +150,24 @@ void BKE_light_linking_receiver_to_emitter(Main *bmain, Object *emitter, Object 
     receiver_collection = BKE_light_linking_receiver_collection_new(bmain, emitter);
   }
 
-  BKE_collection_object_add(bmain, receiver_collection, receiver);
+  BKE_light_linking_receiver_to_collection(bmain, receiver_collection, &receiver->id);
+}
 
-  DEG_id_tag_update(&emitter->id, ID_RECALC_SHADING);
-  DEG_id_tag_update(&receiver->id, ID_RECALC_SHADING);
+void BKE_light_linking_receiver_to_collection(Main *bmain,
+                                              Collection *receiver_collection,
+                                              ID *receiver)
+{
+  const ID_Type id_type = GS(receiver->name);
+
+  if (id_type == ID_OB) {
+    BKE_collection_object_add(bmain, receiver_collection, reinterpret_cast<Object *>(receiver));
+  }
+  else if (id_type == ID_GR) {
+    BKE_collection_child_add(bmain, receiver_collection, reinterpret_cast<Collection *>(receiver));
+  }
+
+  DEG_id_tag_update(&receiver_collection->id, ID_RECALC_HIERARCHY);
+  DEG_id_tag_update(receiver, ID_RECALC_SHADING);
 
   DEG_relations_tag_update(bmain);
 }

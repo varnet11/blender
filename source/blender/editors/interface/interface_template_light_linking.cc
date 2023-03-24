@@ -15,6 +15,9 @@
 #include "DNA_collection_types.h"
 #include "DNA_object_types.h"
 
+#include "BKE_context.h"
+#include "BKE_light_linking.h"
+
 #include "RNA_access.h"
 #include "RNA_prototypes.h"
 
@@ -23,9 +26,66 @@
 #include "UI_resources.h"
 #include "UI_tree_view.hh"
 
+#include "WM_api.h"
+
 namespace blender {
 
 namespace {
+
+class ReceiverCollectionDropTarget : public ui::AbstractViewItemDropTarget {
+ public:
+  ReceiverCollectionDropTarget(ui::AbstractView &view, Collection &collection)
+      : ui::AbstractViewItemDropTarget(view), collection_(collection)
+  {
+  }
+
+  bool can_drop(const wmDrag &drag, const char **r_disabled_hint) const override
+  {
+    if (drag.type != WM_DRAG_ID) {
+      return false;
+    }
+
+    const wmDragID *drag_id = static_cast<wmDragID *>(drag.ids.first);
+    if (!drag_id) {
+      return false;
+    }
+
+    /* The dragged IDs are guaranteed to be the same type, so only check the type of the first one.
+     */
+    const ID_Type id_type = GS(drag_id->id->name);
+    if (!ELEM(id_type, ID_OB, ID_GR)) {
+      *r_disabled_hint = "Can only add objects and collections to the receiver collection";
+      return false;
+    }
+
+    return true;
+  }
+
+  std::string drop_tooltip(const wmDrag & /*drag*/) const override
+  {
+    return TIP_("Add to receiver collection");
+  }
+
+  bool on_drop(struct bContext *C, const wmDrag &drag) const override
+  {
+    Main *bmain = CTX_data_main(C);
+    Scene *scene = CTX_data_scene(C);
+
+    LISTBASE_FOREACH (wmDragID *, drag_id, &drag.ids) {
+      BKE_light_linking_receiver_to_collection(bmain, &collection_, drag_id->id);
+    }
+
+    /* It is possible that the receiver collection is also used by the view layer.
+     * For this case send a notifier so that the UI is updated for the changes in the collection
+     * content. */
+    WM_event_add_notifier(C, NC_SCENE | ND_LAYER_CONTENT, scene);
+
+    return true;
+  }
+
+ private:
+  Collection &collection_;
+};
 
 class ReceiverCollectionViewItem : public ui::BasicTreeViewItem {
  public:
@@ -54,25 +114,30 @@ class ReceiverCollectionViewItem : public ui::BasicTreeViewItem {
 
 class ReceiverCollectionView : public ui::AbstractTreeView {
  public:
-  explicit ReceiverCollectionView(Collection &collection) : collection_(&collection)
+  explicit ReceiverCollectionView(Collection &collection) : collection_(collection)
   {
   }
 
   void build_tree() override
   {
-    LISTBASE_FOREACH (CollectionChild *, collection_child, &collection_->children) {
+    LISTBASE_FOREACH (CollectionChild *, collection_child, &collection_.children) {
       Collection *child_collection = collection_child->collection;
       add_tree_item<ReceiverCollectionViewItem>(child_collection->id, ICON_OUTLINER_COLLECTION);
     }
 
-    LISTBASE_FOREACH (CollectionObject *, collection_object, &collection_->gobject) {
+    LISTBASE_FOREACH (CollectionObject *, collection_object, &collection_.gobject) {
       Object *child_object = collection_object->ob;
       add_tree_item<ReceiverCollectionViewItem>(child_object->id, ICON_OBJECT_DATA);
     }
   }
 
+  std::unique_ptr<ui::AbstractViewDropTarget> create_drop_target() override
+  {
+    return std::make_unique<ReceiverCollectionDropTarget>(*this, collection_);
+  }
+
  private:
-  Collection *collection_{nullptr};
+  Collection &collection_;
 };
 
 }  // namespace
