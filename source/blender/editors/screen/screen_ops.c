@@ -4875,12 +4875,6 @@ bool ED_screen_realtime_clock_start(bContext *C)
   //  BKE_sound_play_scene(scene_eval);
   ED_screen_realtime_timer(C, screen->redraws_flag, true);
 
-  if (screen->active_clock & ANIMTIMER_REALTIME) {
-    ScreenRealtimeData *srd = &((ScreenTimerData *)screen->animtimer->customdata)->realtime;
-
-    srd->region = CTX_wm_region(C);
-  }
-
   return OPERATOR_FINISHED;
 }
 

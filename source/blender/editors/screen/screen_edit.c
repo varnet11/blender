@@ -1688,6 +1688,7 @@ void ED_screen_animation_timer(bContext *C, int redraws, int sync, int enable)
   if (enable) {
     ScreenAnimData *sad = &screen_timer_ensure(C, ANIMTIMER_ANIMATION)->animation;
 
+    memset(sad, 0, sizeof(*sad));
     sad->region = CTX_wm_region(C);
     /* If start-frame is larger than current frame, we put current-frame on start-frame.
      * NOTE(ton): first frame then is not drawn! */
@@ -1741,6 +1742,7 @@ void ED_screen_realtime_timer(bContext *C, int redraws, bool enable)
   if (enable) {
     ScreenRealtimeData *srd = &screen_timer_ensure(C, ANIMTIMER_REALTIME)->realtime;
 
+    memset(srd, 0, sizeof(*srd));
     srd->region = CTX_wm_region(C);
     srd->flag = 0;
     srd->redraws = redraws;
