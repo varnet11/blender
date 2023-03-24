@@ -28,6 +28,8 @@
 
 #include "WM_api.h"
 
+#include "ED_undo.h"
+
 namespace blender {
 
 namespace {
@@ -79,6 +81,8 @@ class ReceiverCollectionDropTarget : public ui::AbstractViewItemDropTarget {
      * For this case send a notifier so that the UI is updated for the changes in the collection
      * content. */
     WM_event_add_notifier(C, NC_SCENE | ND_LAYER_CONTENT, scene);
+
+    ED_undo_push(C, "Add to receiver collection");
 
     return true;
   }
