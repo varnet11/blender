@@ -476,13 +476,17 @@ void ED_workspace_do_listen(struct bContext *C, const struct wmNotifier *note);
 
 /* anim */
 /**
+ * Tag for depsgraph update after frame changes.
+ */
+void ED_tag_for_newframe(struct Main *bmain, struct Scene *scene);
+/**
+ * Tag for depsgraph update after realtime clock step.
+ */
+void ED_tag_for_realtime_clock(struct Main *bmain, struct Scene *scene);
+/**
  * Results in fully updated anim system.
  */
 void ED_update_for_newframe(struct Main *bmain, struct Depsgraph *depsgraph);
-/**
- * Evaluate changes from realtime clock step.
- */
-void ED_update_for_realtime_step(struct Main *bmain, struct Depsgraph *depsgraph);
 
 /**
  * Update frame rate info for viewport drawing.

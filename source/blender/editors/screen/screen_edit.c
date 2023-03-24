@@ -1807,10 +1807,8 @@ void ED_screen_realtime_timer_update(bScreen *screen, int redraws)
   }
 }
 
-void ED_update_for_newframe(Main *bmain, Depsgraph *depsgraph)
+void ED_tag_for_newframe(Main *bmain, Scene *scene)
 {
-  Scene *scene = DEG_get_input_scene(depsgraph);
-
   DEG_time_tag_update(bmain);
 
 #ifdef DURIAN_CAMERA_SWITCH
@@ -1826,14 +1824,17 @@ void ED_update_for_newframe(Main *bmain, Depsgraph *depsgraph)
 #endif
 
   ED_clip_update_frame(bmain, scene->r.cfra);
-
-  /* this function applies the changes too */
-  BKE_scene_graph_update_for_newframe(depsgraph);
 }
 
-void ED_update_for_realtime_step(Main *bmain, Depsgraph *depsgraph)
+void ED_tag_for_realtime_clock(Main *bmain, Scene *scene)
 {
   DEG_time_tag_update(bmain);
+}
+
+void ED_update_for_newframe(Main *bmain, Depsgraph *depsgraph)
+{
+  Scene *scene = DEG_get_input_scene(depsgraph);
+  ED_tag_for_newframe(bmain, scene);
 
   /* this function applies the changes too */
   BKE_scene_graph_update_for_newframe(depsgraph);

@@ -4746,7 +4746,6 @@ static int screen_animation_step_invoke(bContext *C, wmOperator *UNUSED(op), con
   bScreen *screen = CTX_wm_screen(C);
   wmTimer *wt = screen->animtimer;
   wmWindow *win = CTX_wm_window(C);
-  Main *bmain = CTX_data_main(C);
   Scene *scene = CTX_data_scene(C);
   ViewLayer *view_layer = WM_window_get_active_view_layer(win);
   Depsgraph *depsgraph = BKE_scene_get_depsgraph(scene, view_layer);
@@ -4764,7 +4763,17 @@ static int screen_animation_step_invoke(bContext *C, wmOperator *UNUSED(op), con
 
   /* Since we follow draw-flags, we can't send notifier but tag regions ourselves. */
   if (depsgraph != NULL) {
-    ED_update_for_newframe(bmain, depsgraph);
+    Main *bmain = CTX_data_main(C);
+    Scene *eval_scene = DEG_get_input_scene(depsgraph);
+
+    if (screen->active_clock & ANIMTIMER_ANIMATION) {
+      ED_tag_for_newframe(bmain, eval_scene);
+    }
+    if (screen->active_clock & ANIMTIMER_REALTIME) {
+      ED_tag_for_realtime_clock(bmain, eval_scene);
+    }
+
+    BKE_scene_graph_update_for_newframe(depsgraph);
   }
 
   LISTBASE_FOREACH (wmWindow *, window, &wm->windows) {
