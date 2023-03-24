@@ -10,6 +10,7 @@
 #include "BKE_context.h"
 #include "BKE_light_linking.h"
 
+#include "ED_object.h"
 #include "ED_screen.h"
 
 #include "WM_api.h"
@@ -70,7 +71,7 @@ static bool light_linking_unlink_from_receiver_collection_poll(bContext *C)
 static int light_linking_unlink_from_receiver_collection_exec(bContext *C, wmOperator *op)
 {
   Main *bmain = CTX_data_main(C);
-  Object *object = CTX_data_active_object(C);
+  Object *object = ED_object_active_context(C);
 
   ID *id = static_cast<ID *>(CTX_data_pointer_get_type(C, "id", &RNA_ID).data);
 
