@@ -444,42 +444,8 @@ void BKE_object_eval_eval_base_flags(Depsgraph *depsgraph,
   }
 }
 
-static void object_eval_light_linking_emitter_mask(Depsgraph *depsgraph, Object *emitter)
-{
-  LightLinking &light_linking = emitter->light_linking;
-
-  light_linking.runtime.emitter_mask = deg::light_linking::get_emitter_mask(depsgraph, emitter);
-}
-
-static void object_eval_light_linking_receiver_mask(Depsgraph *depsgraph, Object *receiver)
-{
-  LightLinking &light_linking = receiver->light_linking;
-
-  light_linking.runtime.receiver_mask = 0;
-
-  const blender::Span<const Object *> original_emitters =
-      deg::light_linking::get_original_emitters_for_receiver(depsgraph, receiver);
-
-  for (const Object *original_emitter : original_emitters) {
-    /* TODO(sergey): The const_cast here works around const-correctness mistake in the dependency
-     * graph API. Neither the accessor of th evaluated object itself, neither the evaluated object
-     * does modification of the original object.
-     * Look into ensuring the cost correctness in the dependency graph query API and remove this
-     * const once that is done. */
-    const Object *emitter = DEG_get_evaluated_object(depsgraph,
-                                                     const_cast<Object *>(original_emitter));
-
-    /* TODO(sergey): Check emitter was evaluated (so that we do not attempt to access non-evaluated
-     * state here). */
-
-    light_linking.runtime.receiver_mask |= emitter->light_linking.runtime.emitter_mask;
-  }
-}
-
 void BKE_object_eval_light_linking(Depsgraph *depsgraph, Object *object)
 {
   DEG_debug_print_eval(depsgraph, __func__, object->id.name, object);
-
-  object_eval_light_linking_emitter_mask(depsgraph, object);
-  object_eval_light_linking_receiver_mask(depsgraph, object);
+  deg::light_linking::eval_runtime_data(depsgraph, object);
 }

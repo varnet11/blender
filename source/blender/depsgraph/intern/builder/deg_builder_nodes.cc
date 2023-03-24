@@ -538,6 +538,7 @@ void DepsgraphNodeBuilder::tag_previously_tagged_nodes()
 
 void DepsgraphNodeBuilder::end_build()
 {
+  graph_->light_linking_cache.end_build(graph_->scene);
   tag_previously_tagged_nodes();
   update_invalid_cow_pointers();
 }
@@ -1115,7 +1116,7 @@ void DepsgraphNodeBuilder::build_object_light_linking(Object *object)
                        BKE_object_eval_light_linking(depsgraph, object_cow);
                      });
 
-  graph_->light_linking_cache.add_emitter(object);
+  graph_->light_linking_cache.add_emitter(graph_->scene, object);
 
   build_light_linking_receiver_collection(object->light_linking.receiver_collection);
 }

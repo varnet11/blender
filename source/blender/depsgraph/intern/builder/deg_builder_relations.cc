@@ -1268,9 +1268,9 @@ void DepsgraphRelationBuilder::build_object_light_linking(Object *object)
       &receiver_collection->id, NodeType::PARAMETERS, OperationCode::LIGHT_LINKING_UPDATE);
 
   /* Order to ensure the emitter's light linking is only evaluated after the receiver collection.
-   * This is because the emitter mask is "cached" om the emitter object for the simplicity of
-   * access, but the mask is allocated per collection bases (so that if two emitters share the
-   * same receiving collection they share the same emitter_mask). */
+   * This is because light linking runtime data is "cached" om the emitter object for the
+   * simplicity of access, but the mask is allocated per collection bases (so that if two emitters
+   * share the same receiving collection they share the same runtime data). */
   add_relation(
       collection_light_linking_key, light_linking_key, "Collection -> Object Light Linking");
 

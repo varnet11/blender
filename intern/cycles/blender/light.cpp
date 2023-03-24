@@ -148,7 +148,7 @@ void BlenderSync::sync_light(BL::Object &b_parent,
 
   /* Light group and linking. */
   light->set_lightgroup(ustring(b_ob_info.real_object.lightgroup()));
-  light->set_light_link_emitter_mask(light_linking_get_emitter_mask(b_ob_info.real_object));
+  light->set_light_link_set_membership(light_linking_get_set_membership(b_ob_info.real_object));
 
   /* tag */
   light->tag_update(scene);

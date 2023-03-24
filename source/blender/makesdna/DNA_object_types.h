@@ -248,18 +248,21 @@ enum eObjectLineArt_Flags {
 };
 
 typedef struct LightLinkingRuntime {
-  /* For objects which emit light: contains a single bit set at an index which corresponds to an
-   * unique identifier of an emitter with light linking enabled in the scene.
+  /* For objects that emit light: a bitmask of light sets this emitter is part of.
+   * A light set is a combination of emitters used by one or more receiver objects.
    *
-   * For objects which are not an emitters with light linking configures is assigned to zero.
+   * If there is no light linking in the scene, this is assigned zero. If the emitter does
+   * not specify light linking, it is a member of all light sets.
    *
-   * NOTE: There could only be 64 emitters with light linking enabled in the scene. */
-  uint64_t emitter_mask;
+   * NOTE: There can only be 64 light sets in a scene. */
+  uint64_t set_membership;
 
-  /* For the receiver objects contains a bitmask of emitters from which this object receives light.
+  /* For receiver objects, the index of the light set from which this object receives light.
    *
-   * Objects which are not explicitly specified as receiver this field is assigned to zero. */
-  uint64_t receiver_mask;
+   * If there is no light linking in the scene, this is assigned zero. */
+  uint8_t receiver_set;
+
+  uint8_t _pad[7];
 } LightLinkingRuntime;
 
 typedef struct LightLinking {

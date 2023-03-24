@@ -137,7 +137,7 @@ NODE_DEFINE(Light)
   SOCKET_NODE(shader, "Shader", Shader::get_node_type());
 
   SOCKET_STRING(lightgroup, "Light Group", ustring());
-  SOCKET_UINT64(light_link_emitter_mask, "Light Link Emitter Mask", 0);
+  SOCKET_UINT64(light_link_set_membership, "Light Link Set Membership", 0);
 
   return type;
 }
@@ -1145,7 +1145,7 @@ void LightManager::device_update_lights(Device *device, DeviceScene *dscene, Sce
       klights[light_index].lightgroup = LIGHTGROUP_NONE;
     }
 
-    klights[light_index].light_link_emitter_mask = light->light_link_emitter_mask;
+    klights[light_index].light_link_set_membership = light->light_link_set_membership;
 
     light_index++;
   }

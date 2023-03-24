@@ -10,7 +10,7 @@
 
 CCL_NAMESPACE_BEGIN
 
-uint64_t light_linking_get_emitter_mask(const BL::Object &object);
-uint64_t light_linking_get_receiver_mask(const BL::Object &object);
+uint64_t light_linking_get_set_membership(const BL::Object &object);
+uint light_linking_get_receiver_set(const BL::Object &object);
 
 CCL_NAMESPACE_END

@@ -13,8 +13,9 @@
 #include "BLI_span.hh"
 #include "BLI_vector.hh"
 
-struct Object;
 struct Collection;
+struct Object;
+struct Scene;
 
 namespace blender::deg::light_linking {
 
@@ -39,46 +40,45 @@ class Cache {
    *
    * The emitter must be original. This is asserted, but in release builds passing evaluated
    * object leads to an undefined behavior. */
-  void add_emitter(const Object *emitter);
+  void add_emitter(const Scene *scene, const Object *emitter);
 
-  /* Get emitters which has light linking configured to affect the given receiver.
-   * The receiver can either be evaluated or original. The function returns original objects. */
-  Span<const Object *> get_original_emitters_for_receiver(const Object *receiver) const;
+  /* Compute unique sets of emitters used by receivers.
+   *
+   * This must be called at the end of depsgraph relations build after all emitters have been
+   * added, and before runtime data can be set as part of evaluation. */
+  void end_build(const Scene *scene);
 
-  /* Get pre-calculated emission mask of the given emitter.
-   *
-   * The mask is a bit-field with a single bit set, which corresponds to an identifier of the
-   * emitter within the evaluation context.
-   *
-   * If the given emitter does not have light linking configured (the receiver collection is
-   * nullptr) the function returns 0.
-   *
-   * The emitter can either be evaluated or original. The function returns mask which is only valid
-   * within the given dependency graph. */
-  uint64_t get_emitter_mask(const Object *emitter) const;
+  /* Set runtime light linking data on evaluated object. */
+  void eval_runtime_data(Object *object_eval) const;
 
  private:
-  /* Collection of emitters, stored in an efficient for traversal manner. */
-  using Emitters = Vector<const Object *>;
+  /* Maximum number of bits available for light linking relations. */
+  const int MAX_RELATION_BITS = 64;
 
-  /* Add emitter to the cached lookup for the emitters-of-receiver.
+  struct EmitterData {
+    EmitterData(const uint64_t receiver_collection_bit)
+        : receiver_collection_bit(receiver_collection_bit)
+    {
+    }
+
+    /* Unique bit for receiver collection, added to receiver objects during build
+     * to find which receiver collections affect them. */
+    uint64_t receiver_collection_bit;
+    /* Bitmask indicating which unique light sets an emitter object is part of. */
+    uint64_t light_set_membership = 0;
+  };
+
+  /* Map from a receiver collection to data for any emitters using it. */
+  Map<const Collection *, EmitterData> emitter_data_map_;
+
+  /* Next unique receiver collection ID. */
+  uint64_t next_receiver_collection_id_{0};
+
+  /* Map from an original receiver object.
    *
-   * The receiver_collection can be nullptr, in which case the function does nothing.
-   * The collection is non-const because of the BKE API which receivers it as such for the cached
-   * object iteration. This call itself does not modify the collection. */
-  void add_emitter_to_receivers(const Object *emitter, /*const*/ Collection *receiver_collection);
-
-  /* Cached lookup of emitters affecting a receiver.
-   *
-   * The map is indexed by an original receiver object, contains a collection of original emitters
-   * which has light linking configured to affect the receiver. */
-  Map<const Object *, Emitters> emitters_of_receivers_;
-
-  /* A map from an emitter to its emitter_mask. Indexed by an original emitter object. */
-  Map<const Collection *, uint64_t> receiver_collection_emitter_mask_map_;
-
-  /* An identifier of an emitter which will be used for the next emitter added to the cache. */
-  uint64_t next_unused_id_{0};
+   * During build: map to bitmask of receiver collections affecting this receiver.
+   * After build: map to index of light set for this receiver. */
+  Map<const Object *, uint64_t> receiver_light_sets_;
 };
 
 }  // namespace blender::deg::light_linking

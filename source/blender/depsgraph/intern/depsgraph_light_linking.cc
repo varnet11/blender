@@ -18,6 +18,7 @@
 #include "DNA_collection_types.h"
 #include "DNA_layer_types.h"
 #include "DNA_object_types.h"
+#include "DNA_scene_types.h"
 
 #include "DEG_depsgraph_light_linking.h"
 #include "DEG_depsgraph_light_linking.hh"
@@ -33,17 +34,10 @@ namespace deg = blender::deg;
 
 namespace blender::deg::light_linking {
 
-Span<const Object *> get_original_emitters_for_receiver(const ::Depsgraph *depsgraph,
-                                                        const Object *receiver)
+void eval_runtime_data(const ::Depsgraph *depsgraph, Object *object_eval)
 {
   const deg::Depsgraph *deg_graph = reinterpret_cast<const deg::Depsgraph *>(depsgraph);
-  return deg_graph->light_linking_cache.get_original_emitters_for_receiver(receiver);
-}
-
-uint64_t get_emitter_mask(const ::Depsgraph *depsgraph, const Object *emitter)
-{
-  const deg::Depsgraph *deg_graph = reinterpret_cast<const deg::Depsgraph *>(depsgraph);
-  return deg_graph->light_linking_cache.get_emitter_mask(emitter);
+  deg_graph->light_linking_cache.eval_runtime_data(object_eval);
 }
 
 }  // namespace blender::deg::light_linking
@@ -58,12 +52,12 @@ namespace blender::deg::light_linking {
 
 void Cache::clear()
 {
-  emitters_of_receivers_.clear();
-  receiver_collection_emitter_mask_map_.clear();
-  next_unused_id_ = 0;
+  receiver_light_sets_.clear();
+  emitter_data_map_.clear();
+  next_receiver_collection_id_ = 0;
 }
 
-void Cache::add_emitter(const Object *emitter)
+void Cache::add_emitter(const Scene *scene, const Object *emitter)
 {
   BLI_assert(DEG_is_original_id(&emitter->id));
 
@@ -71,60 +65,120 @@ void Cache::add_emitter(const Object *emitter)
   Collection *receiver_collection = light_linking.receiver_collection;
 
   if (!receiver_collection) {
-    /* The given object is not really an emitter.
-     * At least, not an emitter which requires special caching. */
+    /* (Potential) emitter does not use light linking. */
     return;
   }
 
-  add_emitter_to_receivers(emitter, receiver_collection);
-
-  receiver_collection_emitter_mask_map_.lookup_or_add_cb(receiver_collection, [&]() {
-    const uint64_t id = next_unused_id_++;
-    return uint64_t(1) << id;
-  });
-}
-
-void Cache::add_emitter_to_receivers(const Object *emitter,
-                                     /*const*/ Collection *receiver_collection)
-{
-  if (!receiver_collection) {
+  if (emitter_data_map_.contains(receiver_collection)) {
+    /* Receiver collection already handled. */
     return;
   }
 
+  /* TODO: auto dedup collections with same content? */
+  const uint64_t receiver_collection_id = next_receiver_collection_id_++;
+  if (receiver_collection_id >= MAX_RELATION_BITS) {
+    if (receiver_collection_id == MAX_RELATION_BITS) {
+      printf("Maximum number of light linking collections (%d) exceeded scene \"%s\".",
+             MAX_RELATION_BITS,
+             scene->id.name + 2);
+    }
+    return;
+  }
+
+  /* Create emitter data for receiver collection, with unique bit. */
+  const uint64_t receiver_collection_bit = 1 << receiver_collection_id;
+  emitter_data_map_.add_new(receiver_collection, EmitterData(receiver_collection_bit));
+
+  /* Add collection bit to all receivers affected by this emitter or any emitter with the same
+   * receiver collection. */
+  /* TODO: optimize by doing this non-recursively, and only going recursive in end_build()? */
   FOREACH_COLLECTION_OBJECT_RECURSIVE_BEGIN (receiver_collection, receiver) {
     /* If the object has receiver collection configure do not consider it as a receiver, avoiding
      * dependency cycles. */
     if (receiver->light_linking.receiver_collection == nullptr) {
-      Emitters &emitters_of_receiver = emitters_of_receivers_.lookup_or_add_cb(
-          receiver, []() { return Emitters(); });
-      emitters_of_receiver.append(emitter);
+      receiver_light_sets_.add_or_modify(
+          receiver,
+          [&](uint64_t *value) { *value = receiver_collection_bit; },
+          [&](uint64_t *value) { *value |= receiver_collection_bit; });
     }
   }
   FOREACH_COLLECTION_OBJECT_RECURSIVE_END;
 }
 
-Span<const Object *> Cache::get_original_emitters_for_receiver(const Object *receiver) const
+void Cache::end_build(const Scene *scene)
 {
-  /* TODO(sergey): Fix the const correctness of the depsgraph query API and avoid the cons cast. */
-  const Object *receiver_orig = DEG_get_original_object(const_cast<Object *>(receiver));
+  /* Compute unique combinations of emitters used by receiver objects. */
+  Map<uint64_t, uint> unique_light_sets;
+  uint unique_light_set_id = 0;
 
-  return emitters_of_receivers_.lookup_default(receiver_orig, Span<const Object *>{});
+  /* Default light set for any emitter without light linking. */
+  unique_light_sets.add_new(0, unique_light_set_id++);
+
+  /* TODO: parallelize for performance? */
+  uint64_t last_mask = 0;
+  uint64_t last_set = 0;
+  for (uint64_t &receiver_collection_mask : receiver_light_sets_.values()) {
+    /* Skip hash map lookup for consecutive objects with same mask for performance. */
+    if (receiver_collection_mask != last_mask) {
+      last_mask = receiver_collection_mask;
+      last_set = unique_light_sets.lookup_or_add_cb(receiver_collection_mask, [&]() {
+        /* Assign unique ID for this light set. */
+        uint64_t new_id = unique_light_set_id++;
+        if (new_id >= MAX_RELATION_BITS) {
+          if (new_id == MAX_RELATION_BITS) {
+            printf("Maximum number of light linking combinations (%d) exceeded in scene \"%s\".",
+                   MAX_RELATION_BITS,
+                   scene->id.name + 2);
+          }
+          return uint64_t(0);
+        }
+
+        /* Mark emitters as a member of this light set. */
+        for (EmitterData &info : emitter_data_map_.values()) {
+          if (receiver_collection_mask & info.receiver_collection_bit) {
+            info.light_set_membership |= (1 << new_id);
+          }
+        }
+        return new_id;
+      });
+    }
+
+    /* Assign set index. */
+    receiver_collection_mask = last_set;
+  }
 }
 
-uint64_t Cache::get_emitter_mask(const Object *emitter) const
+/* Set runtime data in light linking. */
+void Cache::eval_runtime_data(Object *object_eval) const
 {
-  const LightLinking &light_linking = emitter->light_linking;
+  LightLinking &light_linking = object_eval->light_linking;
 
-  const Collection *receiver_collection = light_linking.receiver_collection;
-  if (!receiver_collection) {
-    return 0;
+  if (receiver_light_sets_.size() == 0) {
+    /* No light linking used in the scene. */
+    light_linking.runtime.receiver_set = 0;
+    light_linking.runtime.set_membership = 0;
+    return;
   }
 
-  /* TODO(sergey): Fix the const correctness of the depsgraph query API and avoid the cons cast. */
-  const Collection *receiver_collection_orig = reinterpret_cast<const Collection *>(
-      DEG_get_original_id(const_cast<ID *>(&receiver_collection->id)));
+  const Object *object_orig = DEG_get_original_object(object_eval);
 
-  return receiver_collection_emitter_mask_map_.lookup_default(receiver_collection_orig, 0);
+  const uint64_t set_membership_all = ~uint64_t(0);
+  light_linking.runtime.receiver_set = receiver_light_sets_.lookup_default(object_orig,
+                                                                           set_membership_all);
+
+  const Collection *receiver_collection_eval = light_linking.receiver_collection;
+  if (receiver_collection_eval) {
+    /* TODO(sergey): Fix the const correctness of the depsgraph query API and avoid the const cast.
+     */
+    const Collection *receiver_collection_orig = reinterpret_cast<const Collection *>(
+        DEG_get_original_id(const_cast<ID *>(&receiver_collection_eval->id)));
+    light_linking.runtime.set_membership =
+        emitter_data_map_.lookup(receiver_collection_orig).light_set_membership;
+  }
+  else {
+    /* Member of all light sets. */
+    light_linking.runtime.set_membership = set_membership_all;
+  }
 }
 
 }  // namespace blender::deg::light_linking

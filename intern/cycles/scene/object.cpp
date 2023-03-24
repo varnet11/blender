@@ -100,8 +100,8 @@ NODE_DEFINE(Object)
   SOCKET_FLOAT(ao_distance, "AO Distance", 0.0f);
 
   SOCKET_STRING(lightgroup, "Light Group", ustring());
-  SOCKET_UINT64(light_link_receiver_mask, "Light Link Receiver Mask", 0);
-  SOCKET_UINT64(light_link_emitter_mask, "Light Link Emitter Mask", 0);
+  SOCKET_UINT(light_link_receiver_set, "Light Link Set Index", 0);
+  SOCKET_UINT64(light_link_set_membership, "Light Link Set Membership", 0);
 
   return type;
 }
@@ -433,8 +433,10 @@ void ObjectManager::device_update_object_transform(UpdateObjectTransformState *s
   kobject.particle_index = particle_index;
   kobject.motion_offset = 0;
   kobject.ao_distance = ob->ao_distance;
-  kobject.light_link_receiver_mask = ob->light_link_receiver_mask;
-  kobject.light_link_emitter_mask = ob->light_link_emitter_mask;
+  kobject.light_link_receiver_set = ob->light_link_receiver_set >= LIGHT_LINK_SET_MAX ?
+                                        0 :
+                                        ob->light_link_receiver_set;
+  kobject.light_link_set_membership = ob->light_link_set_membership;
 
   if (geom->get_use_motion_blur()) {
     state->have_motion = true;

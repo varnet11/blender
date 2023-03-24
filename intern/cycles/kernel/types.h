@@ -42,6 +42,9 @@ CCL_NAMESPACE_BEGIN
 #define PASS_UNUSED (~0)
 #define LIGHTGROUP_NONE (~0)
 
+#define LIGHT_LINK_SET_MAX 64
+#define LIGHT_LINK_MASK_ALL (~uint64_t(0))
+
 #define INTEGRATOR_SHADOW_ISECT_SIZE_CPU 1024U
 #define INTEGRATOR_SHADOW_ISECT_SIZE_GPU 4U
 
@@ -1275,8 +1278,9 @@ typedef struct KernelObject {
   float velocity_scale;
 
   /* TODO: separate array to avoid memory overhead when not used. */
-  uint64_t light_link_emitter_mask;
-  uint64_t light_link_receiver_mask;
+  uint64_t light_link_set_membership;
+  uint light_link_receiver_set;
+  uint pad;
 } KernelObject;
 static_assert_align(KernelObject, 16);
 
@@ -1342,7 +1346,7 @@ typedef struct KernelLight {
     KernelAreaLight area;
     KernelDistantLight distant;
   };
-  uint64_t light_link_emitter_mask;
+  uint64_t light_link_set_membership;
   uint64_t pad;
 } KernelLight;
 static_assert_align(KernelLight, 16);
