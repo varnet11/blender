@@ -73,7 +73,7 @@ bool BKE_light_linking_unlink_id_from_receiver_collection(Main *bmain,
   if (!receiver_collection) {
     if (reports) {
       BKE_reportf(
-          reports, RPT_ERROR, "No light linking collection for object '%s'", object->id.name);
+          reports, RPT_ERROR, "No light linking collection for object '%s'", object->id.name + 2);
     }
     return false;
   }
