@@ -21,15 +21,63 @@ struct Collection;
 struct Object;
 struct GHash;
 
+/* Light linking relation of a collection or an object. */
+typedef struct CollectionLightLinking {
+  /* Light configuration, an enumerator of eCollectionLightLinkingState.
+   *
+   * - NONE: the light received by the receiver (corresponding collection or object) from the
+   *   emitter is not affected by this collection and receives light as any object in the scene
+   *   which is not a part of any light linking.
+   *   This state is used when the receiver is only used for shadow linking.
+   *
+   * - INCLUDE: the receiver is included into the light linking and is only receiving lights from
+   *   emitters which include it in their light linking collections. The receiver is not affected
+   *   by regular scene lights.
+   *
+   * - EXCLUDE: the receiver does not receive light from this emitter, but is lit by regular lights
+   *   in the scene or by emitters which are linked to it via INCLUDE on their light_state. */
+  uint8_t light_state;
+
+  /* Shadow configuration, an enumerator of eCollectionLightLinkingState.
+   *
+   * - NONE: the shadow casted by this collection or object are not affected by the light linking
+   *   configuration.
+   *   This state is used when the object is only configured for the light reception.
+   *
+   * - INCLUDE: the collection or object casts shadows from the emitter. It does not cast shadow
+   *   from light sources which do not have INCLUDE on their light linking configuration for it.
+   *
+   * - EXCLUDE: the collection or object does not cast shadow when lit by this emitter, but does
+   *   for other light sources in the scene. */
+  uint8_t shadow_state;
+
+  uint8_t _pad[2];
+} CollectionLightLinking;
+
 typedef struct CollectionObject {
   struct CollectionObject *next, *prev;
   struct Object *ob;
+
+  CollectionLightLinking light_linking;
+  int _pad;
 } CollectionObject;
 
 typedef struct CollectionChild {
   struct CollectionChild *next, *prev;
   struct Collection *collection;
+
+  CollectionLightLinking light_linking;
+  int _pad;
 } CollectionChild;
+
+/* Light linking state of object or collection: defines how they react to the emitters in the
+ * scene. See the comments for light_state and shadow_state in the CollectionLightLinking for the
+ * details. */
+typedef enum eCollectionLightLinkingState {
+  COLLECTION_LIGHT_LINKING_STATE_NONE = 0,
+  COLLECTION_LIGHT_LINKING_STATE_INCLUDE = 1,
+  COLLECTION_LIGHT_LINKING_STATE_EXCLUDE = 2,
+} eCollectionLightLinkingState;
 
 enum eCollectionLineArt_Usage {
   COLLECTION_LRT_INCLUDE = 0,

@@ -93,7 +93,14 @@ class CollectionDropTarget : public AbstractViewItemDropTarget {
 
 class CollectionViewItem : public BasicTreeViewItem {
  public:
-  CollectionViewItem(ID &id, const BIFIconID icon) : BasicTreeViewItem(id.name + 2, icon), id_(&id)
+  CollectionViewItem(Collection &collection,
+                     ID &id,
+                     CollectionLightLinking &collection_light_linking,
+                     const BIFIconID icon)
+      : BasicTreeViewItem(id.name + 2, icon),
+        collection_(collection),
+        id_(&id),
+        collection_light_linking_(collection_light_linking)
   {
   }
 
@@ -101,18 +108,47 @@ class CollectionViewItem : public BasicTreeViewItem {
   {
     add_label(row);
 
-    if (!is_hovered()) {
-      return;
-    }
+    PointerRNA collection_light_linking_ptr;
+    RNA_pointer_create(&collection_.id,
+                       &RNA_CollectionLightLinking,
+                       &collection_light_linking_,
+                       &collection_light_linking_ptr);
 
-    PointerRNA id_ptr{id_, &RNA_ID, (ID *)id_};
+    uiLayout *sub = uiLayoutRow(&row, true);
+    uiLayoutSetPropDecorate(sub, false);
+
+    uiItemR(sub,
+            &collection_light_linking_ptr,
+            "light_state",
+            UI_ITEM_R_ICON_ONLY | UI_ITEM_R_COMPACT,
+            "",
+            ICON_NONE);
+
+    uiItemR(sub,
+            &collection_light_linking_ptr,
+            "shadow_state",
+            UI_ITEM_R_ICON_ONLY | UI_ITEM_R_COMPACT,
+            "",
+            ICON_NONE);
+
+    build_remove_button(*sub);
+  }
+
+ private:
+  void build_remove_button(uiLayout &row)
+  {
+    PointerRNA id_ptr;
+    RNA_id_pointer_create(id_, &id_ptr);
+
     uiLayoutSetContextPointer(&row, "id", &id_ptr);
 
     uiItemO(&row, "", ICON_X, "OBJECT_OT_light_linking_unlink_from_collection");
   }
 
- private:
+  Collection &collection_;
+
   ID *id_{nullptr};
+  CollectionLightLinking &collection_light_linking_;
 };
 
 class CollectionView : public AbstractTreeView {
@@ -125,12 +161,16 @@ class CollectionView : public AbstractTreeView {
   {
     LISTBASE_FOREACH (CollectionChild *, collection_child, &collection_.children) {
       Collection *child_collection = collection_child->collection;
-      add_tree_item<CollectionViewItem>(child_collection->id, ICON_OUTLINER_COLLECTION);
+      add_tree_item<CollectionViewItem>(collection_,
+                                        child_collection->id,
+                                        collection_child->light_linking,
+                                        ICON_OUTLINER_COLLECTION);
     }
 
     LISTBASE_FOREACH (CollectionObject *, collection_object, &collection_.gobject) {
       Object *child_object = collection_object->ob;
-      add_tree_item<CollectionViewItem>(child_object->id, ICON_OBJECT_DATA);
+      add_tree_item<CollectionViewItem>(
+          collection_, child_object->id, collection_object->light_linking, ICON_OBJECT_DATA);
     }
   }
 
