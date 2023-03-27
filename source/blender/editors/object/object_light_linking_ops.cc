@@ -27,7 +27,7 @@
 static int light_linking_receiver_collection_new_exec(bContext *C, wmOperator * /*op*/)
 {
   Main *bmain = CTX_data_main(C);
-  Object *object = CTX_data_active_object(C);
+  Object *object = ED_object_active_context(C);
 
   BKE_light_linking_receiver_collection_new(bmain, object);
 
@@ -118,7 +118,7 @@ static int light_linking_receivers_select_exec(bContext *C, wmOperator * /*op*/)
 {
   Scene *scene = CTX_data_scene(C);
   ViewLayer *view_layer = CTX_data_view_layer(C);
-  Object *emitter = CTX_data_active_object(C);
+  Object *emitter = ED_object_active_context(C);
 
   BKE_light_linking_select_receivers_of_emitter(scene, view_layer, emitter);
 
@@ -152,7 +152,7 @@ static int light_linking_receivers_link_exec(bContext *C, wmOperator * /*op*/)
 {
   Main *bmain = CTX_data_main(C);
   Scene *scene = CTX_data_scene(C);
-  Object *emitter = CTX_data_active_object(C);
+  Object *emitter = ED_object_active_context(C);
 
   CTX_DATA_BEGIN (C, Object *, receiver, selected_objects) {
     if (receiver == emitter) {
