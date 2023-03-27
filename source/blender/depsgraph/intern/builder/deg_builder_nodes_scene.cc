@@ -19,7 +19,7 @@ void DepsgraphNodeBuilder::build_scene_render(Scene *scene, ViewLayer *view_laye
   const bool build_sequencer = (scene->r.scemode & R_DOSEQ);
   IDNode *id_node = add_id_node(&scene->id);
   id_node->linked_state = DEG_ID_LINKED_DIRECTLY;
-  add_time_source();
+  add_time_source(eTimeSourceType::DEG_TIME_SOURCE_SCENE);
   build_animdata(&scene->id);
   build_scene_parameters(scene);
   build_scene_audio(scene);

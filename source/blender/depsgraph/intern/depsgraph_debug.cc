@@ -209,10 +209,9 @@ void DEG_stats_simple(const Depsgraph *graph,
       }
     }
 
-    deg::TimeSourceNode *time_source = deg_graph->find_time_source();
-    if (time_source != nullptr) {
+    deg_graph->time_sources.foreach_item([&tot_rels](eTimeSourceType, const deg::TimeSourceNode *time_source) {
       tot_rels += time_source->inlinks.size();
-    }
+    });
 
     if (r_relations) {
       *r_relations = tot_rels;

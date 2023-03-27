@@ -12,6 +12,7 @@
 #include "intern/node/deg_node_component.h"
 #include "intern/node/deg_node_id.h"
 #include "intern/node/deg_node_operation.h"
+#include "intern/node/deg_node_time.h"
 
 #include "DNA_ID.h"
 
@@ -26,7 +27,13 @@ namespace blender::deg {
 struct TimeSourceKey {
   TimeSourceKey() = default;
 
+  inline TimeSourceKey(eTimeSourceType source_type) : source_type(source_type)
+  {
+  }
+
   string identifier() const;
+
+  eTimeSourceType source_type = eTimeSourceType::DEG_TIME_SOURCE_SCENE;
 };
 
 struct ComponentKey {

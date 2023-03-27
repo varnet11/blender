@@ -1809,7 +1809,7 @@ void ED_screen_realtime_timer_update(bScreen *screen, int redraws)
 
 void ED_tag_for_newframe(Main *bmain, Scene *scene)
 {
-  DEG_time_tag_update(bmain);
+  DEG_time_tag_update(bmain, DEG_TIME_SOURCE_SCENE);
 
 #ifdef DURIAN_CAMERA_SWITCH
   void *camera = BKE_scene_camera_switch_find(scene);
@@ -1828,7 +1828,7 @@ void ED_tag_for_newframe(Main *bmain, Scene *scene)
 
 void ED_tag_for_realtime_clock(Main *bmain, Scene *scene)
 {
-  DEG_time_tag_update(bmain);
+  DEG_time_tag_update(bmain, DEG_TIME_SOURCE_REALTIME);
 }
 
 void ED_update_for_newframe(Main *bmain, Depsgraph *depsgraph)

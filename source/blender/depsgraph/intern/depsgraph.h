@@ -47,9 +47,10 @@ struct Depsgraph {
   Depsgraph(Main *bmain, Scene *scene, ViewLayer *view_layer, eEvaluationMode mode);
   ~Depsgraph();
 
-  TimeSourceNode *add_time_source();
-  TimeSourceNode *find_time_source() const;
-  void tag_time_source();
+  TimeSourceNode *add_time_source(eTimeSourceType source_type);
+  TimeSourceNode *find_time_source(eTimeSourceType source_type) const;
+  void clear_time_sources();
+  void tag_time_source(eTimeSourceType source_type);
 
   IDNode *find_id_node(const ID *id) const;
   IDNode *add_id_node(ID *id, ID *id_cow_hint = nullptr);
@@ -85,8 +86,8 @@ struct Depsgraph {
    * keep exact order of iteration. */
   IDDepsNodes id_nodes;
 
-  /* Top-level time source node. */
-  TimeSourceNode *time_source;
+  /* Top-level time source node by source type. */
+  Map<eTimeSourceType, TimeSourceNode *> time_sources;
 
   /* The graph contains data-blocks whose visibility depends on evaluation (driven or animated). */
   bool has_animated_visibility;

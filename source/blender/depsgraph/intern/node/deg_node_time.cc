@@ -14,6 +14,22 @@
 
 namespace blender::deg {
 
+const char *timeSourceTypeAsString(eTimeSourceType source_type)
+{
+  switch (source_type) {
+    case eTimeSourceType::DEG_TIME_SOURCE_SCENE:
+      return "SCENE_TIMELINE";
+    case eTimeSourceType::DEG_TIME_SOURCE_REALTIME:
+      return "REALTIME_CLOCK";
+  }
+  BLI_assert_msg(0, "Unhandled time source type, should never happen.");
+  return "UNKNOWN";
+}
+
+TimeSourceNode::TimeSourceNode() : source_type(eTimeSourceType::DEG_TIME_SOURCE_SCENE)
+{
+}
+
 void TimeSourceNode::tag_update(Depsgraph * /*graph*/, eUpdateSource /*source*/)
 {
   tagged_for_update = true;

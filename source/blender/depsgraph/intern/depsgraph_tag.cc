@@ -789,17 +789,17 @@ void DEG_graph_id_tag_update(struct Main *bmain,
   deg::graph_id_tag_update(bmain, graph, id, flags, deg::DEG_UPDATE_SOURCE_USER_EDIT);
 }
 
-void DEG_time_tag_update(struct Main *bmain)
+void DEG_time_tag_update(struct Main *bmain, eTimeSourceType time_source_type)
 {
   for (deg::Depsgraph *depsgraph : deg::get_all_registered_graphs(bmain)) {
-    DEG_graph_time_tag_update(reinterpret_cast<::Depsgraph *>(depsgraph));
+    DEG_graph_time_tag_update(reinterpret_cast<::Depsgraph *>(depsgraph), time_source_type);
   }
 }
 
-void DEG_graph_time_tag_update(struct Depsgraph *depsgraph)
+void DEG_graph_time_tag_update(struct Depsgraph *depsgraph, eTimeSourceType time_source_type)
 {
   deg::Depsgraph *deg_graph = reinterpret_cast<deg::Depsgraph *>(depsgraph);
-  deg_graph->tag_time_source();
+  deg_graph->tag_time_source(time_source_type);
 }
 
 void DEG_graph_id_type_tag(Depsgraph *depsgraph, short id_type)

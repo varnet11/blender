@@ -347,7 +347,10 @@ void deg_graph_flush_updates(Depsgraph *graph)
   BLI_assert(graph != nullptr);
   Main *bmain = graph->bmain;
 
-  graph->time_source->flush_update_tag(graph);
+  graph->time_sources.foreach_item(
+      [graph](eTimeSourceType, TimeSourceNode *time_source) {
+        time_source->flush_update_tag(graph);
+      });
 
   /* Nothing to update, early out. */
   if (graph->entry_tags.is_empty()) {
@@ -392,7 +395,9 @@ void deg_graph_clear_tags(Depsgraph *graph)
   /* Clear any entry tags which haven't been flushed. */
   graph->entry_tags.clear();
 
-  graph->time_source->tagged_for_update = false;
+  graph->time_sources.foreach_item([](eTimeSourceType, TimeSourceNode *time_source) {
+    time_source->tagged_for_update = false;
+  });
 }
 
 }  // namespace blender::deg

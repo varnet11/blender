@@ -470,10 +470,9 @@ static void deg_debug_graphviz_graph_nodes(DotExportContext &ctx, const Depsgrap
   for (Node *node : graph->id_nodes) {
     deg_debug_graphviz_node(ctx, node, nullptr);
   }
-  TimeSourceNode *time_source = graph->find_time_source();
-  if (time_source != nullptr) {
+  graph->time_sources.foreach_item([&ctx](eTimeSourceType, const TimeSourceNode *time_source) {
     deg_debug_graphviz_node(ctx, time_source, nullptr);
-  }
+  });
 }
 
 static void deg_debug_graphviz_graph_relations(DotExportContext &ctx, const Depsgraph *graph)
@@ -486,10 +485,9 @@ static void deg_debug_graphviz_graph_relations(DotExportContext &ctx, const Deps
     }
   }
 
-  TimeSourceNode *time_source = graph->find_time_source();
-  if (time_source != nullptr) {
+  graph->time_sources.foreach_item([&ctx](eTimeSourceType, const TimeSourceNode *time_source) {
     deg_debug_graphviz_node_relations(ctx, time_source);
-  }
+  });
 }
 
 }  // namespace blender::deg

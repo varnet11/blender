@@ -7,19 +7,28 @@
 
 #pragma once
 
+#include "DEG_depsgraph.h"
+
 #include "intern/node/deg_node.h"
 
 namespace blender::deg {
 
+const char *timeSourceTypeAsString(eTimeSourceType source_type);
+
 /* Time Source Node. */
 struct TimeSourceNode : public Node {
-  bool tagged_for_update = false;
+  TimeSourceNode();
 
   // TODO: evaluate() operation needed
 
   virtual void tag_update(Depsgraph *graph, eUpdateSource source) override;
 
   void flush_update_tag(Depsgraph *graph);
+
+  /* Type of time source. */
+  eTimeSourceType source_type;
+
+  bool tagged_for_update = false;
 
   DEG_DEPSNODE_DECLARE;
 };

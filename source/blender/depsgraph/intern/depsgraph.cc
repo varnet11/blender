@@ -44,8 +44,7 @@ namespace deg = blender::deg;
 namespace blender::deg {
 
 Depsgraph::Depsgraph(Main *bmain, Scene *scene, ViewLayer *view_layer, eEvaluationMode mode)
-    : time_source(nullptr),
-      has_animated_visibility(false),
+    : has_animated_visibility(false),
       need_update_relations(true),
       need_update_nodes_visibility(true),
       need_tag_id_on_graph_visibility_update(true),
@@ -68,35 +67,48 @@ Depsgraph::Depsgraph(Main *bmain, Scene *scene, ViewLayer *view_layer, eEvaluati
   memset(id_type_exist, 0, sizeof(id_type_exist));
   memset(physics_relations, 0, sizeof(physics_relations));
 
-  add_time_source();
+  add_time_source(eTimeSourceType::DEG_TIME_SOURCE_SCENE);
+  add_time_source(eTimeSourceType::DEG_TIME_SOURCE_REALTIME);
 }
 
 Depsgraph::~Depsgraph()
 {
   clear_id_nodes();
-  delete time_source;
+  clear_time_sources();
   BLI_spin_end(&lock);
 }
 
 /* Node Management ---------------------------- */
 
-TimeSourceNode *Depsgraph::add_time_source()
+TimeSourceNode *Depsgraph::add_time_source(eTimeSourceType source_type)
 {
-  if (time_source == nullptr) {
+  return time_sources.lookup_or_add_cb(source_type, [source_type]() {
     DepsNodeFactory *factory = type_get_factory(NodeType::TIMESOURCE);
-    time_source = (TimeSourceNode *)factory->create_node(nullptr, "", "Time Source");
+    TimeSourceNode *time_source = (TimeSourceNode *)factory->create_node(nullptr, "", "Time Source");
+    time_source->source_type = source_type;
+    return time_source;
+  });
+}
+
+TimeSourceNode *Depsgraph::find_time_source(eTimeSourceType source_type) const
+{
+  return time_sources.lookup_default(source_type, nullptr);
+}
+
+void Depsgraph::clear_time_sources()
+{
+  time_sources.foreach_item([](eTimeSourceType, TimeSourceNode *time_source) {
+    delete time_source;
+  });
+  time_sources.clear();
+}
+
+void Depsgraph::tag_time_source(eTimeSourceType source_type)
+{
+  TimeSourceNode *time_source = time_sources.lookup_default(source_type, nullptr);
+  if (time_source) {
+    time_source->tag_update(this, DEG_UPDATE_SOURCE_TIME);
   }
-  return time_source;
-}
-
-TimeSourceNode *Depsgraph::find_time_source() const
-{
-  return time_source;
-}
-
-void Depsgraph::tag_time_source()
-{
-  time_source->tag_update(this, DEG_UPDATE_SOURCE_TIME);
 }
 
 IDNode *Depsgraph::find_id_node(const ID *id) const
@@ -230,8 +242,7 @@ void Depsgraph::add_entry_tag(OperationNode *node)
 void Depsgraph::clear_all_nodes()
 {
   clear_id_nodes();
-  delete time_source;
-  time_source = nullptr;
+  clear_time_sources();
 }
 
 ID *Depsgraph::get_cow_id(const ID *id_orig) const

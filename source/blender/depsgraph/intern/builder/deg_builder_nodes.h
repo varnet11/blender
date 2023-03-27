@@ -95,7 +95,7 @@ class DepsgraphNodeBuilder : public DepsgraphBuilder {
 
   IDNode *add_id_node(ID *id);
   IDNode *find_id_node(const ID *id);
-  TimeSourceNode *add_time_source();
+  TimeSourceNode *add_time_source(eTimeSourceType source_type);
 
   ComponentNode *add_component_node(ID *id, NodeType comp_type, const char *comp_name = "");
   ComponentNode *find_component_node(const ID *id, NodeType comp_type, const char *comp_name = "");

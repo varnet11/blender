@@ -52,7 +52,8 @@ void DEG_evaluate_on_refresh(Depsgraph *graph)
   const float ctime = BKE_scene_ctime_get(scene);
 
   if (deg_graph->frame != frame || ctime != deg_graph->ctime) {
-    deg_graph->tag_time_source();
+    /* Scene frame changed. */
+    deg_graph->tag_time_source(eTimeSourceType::DEG_TIME_SOURCE_SCENE);
     deg_graph->frame = frame;
     deg_graph->ctime = ctime;
   }
@@ -62,7 +63,7 @@ void DEG_evaluate_on_refresh(Depsgraph *graph)
      * In this case reading back the undo state will behave as if no updates on frame change
      * is needed as the #Depsgraph.ctime & frame will match the values in the input scene.
      * Use #ID_RECALC_FRAME_CHANGE to detect that recalculation is necessary. see: #66913. */
-    deg_graph->tag_time_source();
+    deg_graph->tag_time_source(eTimeSourceType::DEG_TIME_SOURCE_SCENE);
   }
 
   deg_flush_updates_and_refresh(deg_graph);
@@ -73,7 +74,7 @@ void DEG_evaluate_on_framechange(Depsgraph *graph, float frame)
   deg::Depsgraph *deg_graph = reinterpret_cast<deg::Depsgraph *>(graph);
   const Scene *scene = DEG_get_input_scene(graph);
 
-  deg_graph->tag_time_source();
+  deg_graph->tag_time_source(eTimeSourceType::DEG_TIME_SOURCE_SCENE);
   deg_graph->frame = frame;
   deg_graph->ctime = BKE_scene_frame_to_ctime(scene, frame);
   deg_flush_updates_and_refresh(deg_graph);

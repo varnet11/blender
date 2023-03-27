@@ -19,7 +19,10 @@ namespace blender::deg {
 
 string TimeSourceKey::identifier() const
 {
-  return string("TimeSourceKey");
+  string result = string("TimeSourceKey(");
+  result += string(timeSourceTypeAsString(source_type));
+  result += ')';
+  return result;
 }
 
 /** \} */
