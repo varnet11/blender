@@ -19,6 +19,8 @@ const char *timeSourceTypeAsString(eTimeSourceType source_type);
 struct TimeSourceNode : public Node {
   TimeSourceNode();
 
+  virtual string identifier() const override;
+
   // TODO: evaluate() operation needed
 
   virtual void tag_update(Depsgraph *graph, eUpdateSource source) override;

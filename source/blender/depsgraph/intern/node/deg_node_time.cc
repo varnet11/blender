@@ -11,6 +11,7 @@
 
 #include "intern/depsgraph.h"
 #include "intern/depsgraph_relation.h"
+#include "intern/node/deg_node_factory.h"
 
 namespace blender::deg {
 
@@ -28,6 +29,15 @@ const char *timeSourceTypeAsString(eTimeSourceType source_type)
 
 TimeSourceNode::TimeSourceNode() : source_type(eTimeSourceType::DEG_TIME_SOURCE_SCENE)
 {
+}
+
+string TimeSourceNode::identifier() const
+{
+  const string type_name = type_get_factory(type)->type_name();
+  const string name_part = name[0] ? (string(" '") + name + "'") : "";
+
+  return "[" + type_name + "]" + name_part + " : " +
+         "(source_type: " + timeSourceTypeAsString(source_type) + ")";
 }
 
 void TimeSourceNode::tag_update(Depsgraph * /*graph*/, eUpdateSource /*source*/)
