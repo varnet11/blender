@@ -7382,6 +7382,12 @@ static void rna_def_space_node(BlenderRNA *brna)
       {0, NULL, 0, NULL, NULL},
   };
 
+  static const EnumPropertyItem geometry_nodes_type_items[] = {
+      {SNODE_GEOMETRY_MODIFIER, "MODIFIER", 0, "Modifier", ""},
+      {SNODE_GEOMETRY_OPERATOR, "OPERATOR", 0, "Operator", ""},
+      {0, NULL, 0, NULL, NULL},
+  };
+
   static const EnumPropertyItem backdrop_channels_items[] = {
       {SNODE_USE_ALPHA,
        "COLOR_ALPHA",
@@ -7433,6 +7439,13 @@ static void rna_def_space_node(BlenderRNA *brna)
   RNA_def_property_enum_sdna(prop, NULL, "shaderfrom");
   RNA_def_property_enum_items(prop, shader_type_items);
   RNA_def_property_ui_text(prop, "Shader Type", "Type of data to take shader from");
+  RNA_def_property_translation_context(prop, BLT_I18NCONTEXT_ID_ID);
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_NODE, NULL);
+
+  prop = RNA_def_property(srna, "geometry_nodes_type", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "geometry_nodes_type");
+  RNA_def_property_enum_items(prop, geometry_nodes_type_items);
+  RNA_def_property_ui_text(prop, "Geometry Nodes Type", "");
   RNA_def_property_translation_context(prop, BLT_I18NCONTEXT_ID_ID);
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_NODE, NULL);
 
