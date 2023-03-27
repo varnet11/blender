@@ -263,6 +263,7 @@ static void screen_blend_read_lib(BlendLibReader *reader, ID *id)
   BLO_read_id_address(reader, screen->id.lib, &screen->scene);
 
   screen->animtimer = NULL; /* saved in rare cases */
+  screen->active_clock = 0;
   screen->tool_tip = NULL;
   screen->scrubbing = false;
 

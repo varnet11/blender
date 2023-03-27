@@ -795,6 +795,7 @@ void ED_screen_exit(bContext *C, wmWindow *window, bScreen *screen)
     BKE_sound_stop_scene(scene_eval);
   }
   screen->animtimer = NULL;
+  screen->active_clock = 0;
   screen->scrubbing = false;
 
   screen->active_region = NULL;
@@ -1137,6 +1138,7 @@ void screen_change_prepare(
 
   if (screen_old != screen_new) {
     wmTimer *wt = screen_old->animtimer;
+    int active_clock = screen_old->active_clock;
 
     /* remove handlers referencing areas in old screen */
     LISTBASE_FOREACH (ScrArea *, area, &screen_old->areabase) {
@@ -1145,6 +1147,7 @@ void screen_change_prepare(
 
     /* we put timer to sleep, so screen_exit has to think there's no timer */
     screen_old->animtimer = NULL;
+    screen_old->active_clock = 0;
     if (wt) {
       WM_event_timer_sleep(CTX_wm_manager(C), win, wt, true);
     }
@@ -1153,6 +1156,7 @@ void screen_change_prepare(
     /* Same scene, "transfer" playback to new screen. */
     if (wt) {
       screen_new->animtimer = wt;
+      screen_new->active_clock = active_clock;
     }
   }
 }
@@ -1409,7 +1413,9 @@ static bScreen *screen_state_to_nonnormal(bContext *C,
 
   /* timer */
   screen->animtimer = oldscreen->animtimer;
+  screen->active_clock = oldscreen->active_clock;
   oldscreen->animtimer = NULL;
+  oldscreen->active_clock = 0;
 
   newa = (ScrArea *)screen->areabase.first;
 
@@ -1522,7 +1528,9 @@ ScrArea *ED_screen_state_toggle(bContext *C, wmWindow *win, ScrArea *area, const
 
     /* animtimer back */
     screen->animtimer = oldscreen->animtimer;
+    screen->active_clock = oldscreen->active_clock;
     oldscreen->animtimer = NULL;
+    oldscreen->active_clock = 0;
 
     ED_screen_change(C, screen);
 
