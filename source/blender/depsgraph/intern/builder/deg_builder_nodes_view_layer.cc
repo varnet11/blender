@@ -80,6 +80,7 @@ void DepsgraphNodeBuilder::build_view_layer(Scene *scene,
   id_node->linked_state = linked_state;
   /* Time source. */
   add_time_source(eTimeSourceType::DEG_TIME_SOURCE_SCENE);
+  add_time_source(eTimeSourceType::DEG_TIME_SOURCE_REALTIME);
   /* Setup currently building context. */
   scene_ = scene;
   view_layer_ = view_layer;
