@@ -36,7 +36,7 @@ class Cache {
   /* Add emitter to the cache.
    *
    * This call does nothing if the emitter does not have light configured linking (as in, if it
-   * has receiver_collection set to nullptr).
+   * has light linking collection set to nullptr).
    *
    * The emitter must be original. This is asserted, but in release builds passing evaluated
    * object leads to an undefined behavior. */

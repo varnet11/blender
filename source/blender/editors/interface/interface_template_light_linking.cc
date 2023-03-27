@@ -30,14 +30,14 @@
 
 #include "ED_undo.h"
 
-namespace blender {
+namespace blender::ui::light_linking {
 
 namespace {
 
-class ReceiverCollectionDropTarget : public ui::AbstractViewItemDropTarget {
+class CollectionDropTarget : public AbstractViewItemDropTarget {
  public:
-  ReceiverCollectionDropTarget(ui::AbstractView &view, Collection &collection)
-      : ui::AbstractViewItemDropTarget(view), collection_(collection)
+  CollectionDropTarget(AbstractView &view, Collection &collection)
+      : AbstractViewItemDropTarget(view), collection_(collection)
   {
   }
 
@@ -56,7 +56,7 @@ class ReceiverCollectionDropTarget : public ui::AbstractViewItemDropTarget {
      */
     const ID_Type id_type = GS(drag_id->id->name);
     if (!ELEM(id_type, ID_OB, ID_GR)) {
-      *r_disabled_hint = "Can only add objects and collections to the receiver collection";
+      *r_disabled_hint = "Can only add objects and collections to the light linking collection";
       return false;
     }
 
@@ -65,7 +65,7 @@ class ReceiverCollectionDropTarget : public ui::AbstractViewItemDropTarget {
 
   std::string drop_tooltip(const wmDrag & /*drag*/) const override
   {
-    return TIP_("Add to receiver collection");
+    return TIP_("Add to light linking collection");
   }
 
   bool on_drop(struct bContext *C, const wmDrag &drag) const override
@@ -77,12 +77,12 @@ class ReceiverCollectionDropTarget : public ui::AbstractViewItemDropTarget {
       BKE_light_linking_receiver_to_collection(bmain, &collection_, drag_id->id);
     }
 
-    /* It is possible that the receiver collection is also used by the view layer.
+    /* It is possible that the light linking collection is also used by the view layer.
      * For this case send a notifier so that the UI is updated for the changes in the collection
      * content. */
     WM_event_add_notifier(C, NC_SCENE | ND_LAYER_CONTENT, scene);
 
-    ED_undo_push(C, "Add to receiver collection");
+    ED_undo_push(C, "Add to light linking collection");
 
     return true;
   }
@@ -91,10 +91,9 @@ class ReceiverCollectionDropTarget : public ui::AbstractViewItemDropTarget {
   Collection &collection_;
 };
 
-class ReceiverCollectionViewItem : public ui::BasicTreeViewItem {
+class CollectionViewItem : public BasicTreeViewItem {
  public:
-  ReceiverCollectionViewItem(ID &id, const BIFIconID icon)
-      : ui::BasicTreeViewItem(id.name + 2, icon), id_(&id)
+  CollectionViewItem(ID &id, const BIFIconID icon) : BasicTreeViewItem(id.name + 2, icon), id_(&id)
   {
   }
 
@@ -109,16 +108,16 @@ class ReceiverCollectionViewItem : public ui::BasicTreeViewItem {
     PointerRNA id_ptr{id_, &RNA_ID, (ID *)id_};
     uiLayoutSetContextPointer(&row, "id", &id_ptr);
 
-    uiItemO(&row, "", ICON_X, "OBJECT_OT_light_linking_unlink_from_receiver_collection");
+    uiItemO(&row, "", ICON_X, "OBJECT_OT_light_linking_unlink_from_collection");
   }
 
  private:
   ID *id_{nullptr};
 };
 
-class ReceiverCollectionView : public ui::AbstractTreeView {
+class CollectionView : public AbstractTreeView {
  public:
-  explicit ReceiverCollectionView(Collection &collection) : collection_(collection)
+  explicit CollectionView(Collection &collection) : collection_(collection)
   {
   }
 
@@ -126,18 +125,18 @@ class ReceiverCollectionView : public ui::AbstractTreeView {
   {
     LISTBASE_FOREACH (CollectionChild *, collection_child, &collection_.children) {
       Collection *child_collection = collection_child->collection;
-      add_tree_item<ReceiverCollectionViewItem>(child_collection->id, ICON_OUTLINER_COLLECTION);
+      add_tree_item<CollectionViewItem>(child_collection->id, ICON_OUTLINER_COLLECTION);
     }
 
     LISTBASE_FOREACH (CollectionObject *, collection_object, &collection_.gobject) {
       Object *child_object = collection_object->ob;
-      add_tree_item<ReceiverCollectionViewItem>(child_object->id, ICON_OBJECT_DATA);
+      add_tree_item<CollectionViewItem>(child_object->id, ICON_OBJECT_DATA);
     }
   }
 
-  std::unique_ptr<ui::AbstractViewDropTarget> create_drop_target() override
+  std::unique_ptr<AbstractViewDropTarget> create_drop_target() override
   {
-    return std::make_unique<ReceiverCollectionDropTarget>(*this, collection_);
+    return std::make_unique<CollectionDropTarget>(*this, collection_);
   }
 
  private:
@@ -146,13 +145,13 @@ class ReceiverCollectionView : public ui::AbstractTreeView {
 
 }  // namespace
 
-}  // namespace blender
+}  // namespace blender::ui::light_linking
 
 namespace ui = blender::ui;
 
-void uiTemplateLightLinkingReceiverCollection(struct uiLayout *layout,
-                                              struct PointerRNA *ptr,
-                                              const char *propname)
+void uiTemplateLightLinkingCollection(struct uiLayout *layout,
+                                      struct PointerRNA *ptr,
+                                      const char *propname)
 {
   if (!ptr->data) {
     return;
@@ -191,8 +190,8 @@ void uiTemplateLightLinkingReceiverCollection(struct uiLayout *layout,
 
   ui::AbstractTreeView *tree_view = UI_block_add_view(
       *block,
-      "Receiver Collection Tree View",
-      std::make_unique<blender::ReceiverCollectionView>(*collection));
+      "Light Linking Collection Tree View",
+      std::make_unique<blender::ui::light_linking::CollectionView>(*collection));
   tree_view->set_min_rows(3);
 
   ui::TreeViewBuilder::build_tree_view(*tree_view, *layout);

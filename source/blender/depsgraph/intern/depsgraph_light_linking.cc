@@ -62,15 +62,15 @@ void Cache::add_emitter(const Scene *scene, const Object *emitter)
   BLI_assert(DEG_is_original_id(&emitter->id));
 
   const LightLinking &light_linking = emitter->light_linking;
-  Collection *receiver_collection = light_linking.receiver_collection;
+  Collection *collection = light_linking.collection;
 
-  if (!receiver_collection) {
+  if (!collection) {
     /* (Potential) emitter does not use light linking. */
     return;
   }
 
-  if (emitter_data_map_.contains(receiver_collection)) {
-    /* Receiver collection already handled. */
+  if (emitter_data_map_.contains(collection)) {
+    /* Light linking collection already handled. */
     return;
   }
 
@@ -87,15 +87,16 @@ void Cache::add_emitter(const Scene *scene, const Object *emitter)
 
   /* Create emitter data for receiver collection, with unique bit. */
   const uint64_t receiver_collection_bit = uint64_t(1) << receiver_collection_id;
-  emitter_data_map_.add_new(receiver_collection, EmitterData(receiver_collection_bit));
+  emitter_data_map_.add_new(collection, EmitterData(receiver_collection_bit));
 
   /* Add collection bit to all receivers affected by this emitter or any emitter with the same
    * receiver collection. */
   /* TODO: optimize by doing this non-recursively, and only going recursive in end_build()? */
-  FOREACH_COLLECTION_OBJECT_RECURSIVE_BEGIN (receiver_collection, receiver) {
+  FOREACH_COLLECTION_OBJECT_RECURSIVE_BEGIN (collection, receiver) {
     /* If the object has receiver collection configure do not consider it as a receiver, avoiding
      * dependency cycles. */
-    if (receiver->light_linking.receiver_collection == nullptr) {
+    /* TODO(sergey): Need more granular and correct check. */
+    if (receiver->light_linking.collection == nullptr) {
       receiver_light_sets_.add_or_modify(
           receiver,
           [&](uint64_t *value) { *value = receiver_collection_bit; },
@@ -164,12 +165,12 @@ void Cache::eval_runtime_data(Object *object_eval) const
 
   light_linking.runtime.receiver_set = receiver_light_sets_.lookup_default(object_orig, 0);
 
-  const Collection *receiver_collection_eval = light_linking.receiver_collection;
-  if (receiver_collection_eval) {
+  const Collection *collection_eval = light_linking.collection;
+  if (collection_eval) {
     /* TODO(sergey): Fix the const correctness of the depsgraph query API and avoid the const cast.
      */
     const Collection *receiver_collection_orig = reinterpret_cast<const Collection *>(
-        DEG_get_original_id(const_cast<ID *>(&receiver_collection_eval->id)));
+        DEG_get_original_id(const_cast<ID *>(&collection_eval->id)));
     light_linking.runtime.set_membership =
         emitter_data_map_.lookup(receiver_collection_orig).light_set_membership;
   }

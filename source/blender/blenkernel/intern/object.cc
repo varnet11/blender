@@ -456,8 +456,7 @@ static void object_foreach_id(ID *id, LibraryForeachIDData *data)
     }
   }
 
-  BKE_LIB_FOREACHID_PROCESS_IDSUPER(
-      data, object->light_linking.receiver_collection, IDWALK_CB_USER);
+  BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, object->light_linking.collection, IDWALK_CB_USER);
 }
 
 static void object_foreach_path_pointcache(ListBase *ptcache_list,
@@ -1013,7 +1012,7 @@ static void object_blend_read_lib(BlendLibReader *reader, ID *id)
     BLO_read_id_address(reader, ob->id.lib, &ob->rigidbody_constraint->ob2);
   }
 
-  BLO_read_id_address(reader, ob->id.lib, &ob->light_linking.receiver_collection);
+  BLO_read_id_address(reader, ob->id.lib, &ob->light_linking.collection);
 }
 
 /* XXX deprecated - old animation system */
@@ -1131,8 +1130,8 @@ static void object_blend_read_expand(BlendExpander *expander, ID *id)
     BLO_expand(expander, ob->rigidbody_constraint->ob2);
   }
 
-  if (ob->light_linking.receiver_collection) {
-    BLO_expand(expander, ob->light_linking.receiver_collection);
+  if (ob->light_linking.collection) {
+    BLO_expand(expander, ob->light_linking.collection);
   }
 }
 

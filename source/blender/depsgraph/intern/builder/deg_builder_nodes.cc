@@ -1118,12 +1118,12 @@ void DepsgraphNodeBuilder::build_object_light_linking(Object *object)
 
   graph_->light_linking_cache.add_emitter(graph_->scene, object);
 
-  build_light_linking_receiver_collection(object->light_linking.receiver_collection);
+  build_light_linking_collection(object->light_linking.collection);
 }
 
-void DepsgraphNodeBuilder::build_light_linking_receiver_collection(Collection *receiver_collection)
+void DepsgraphNodeBuilder::build_light_linking_collection(Collection *collection)
 {
-  if (receiver_collection == nullptr) {
+  if (collection == nullptr) {
     return;
   }
 
@@ -1136,7 +1136,7 @@ void DepsgraphNodeBuilder::build_light_linking_receiver_collection(Collection *r
   const bool is_current_parent_collection_visible = is_parent_collection_visible_;
   is_parent_collection_visible_ = false;
 
-  build_collection(nullptr, receiver_collection);
+  build_collection(nullptr, collection);
 
   is_parent_collection_visible_ = is_current_parent_collection_visible;
 
@@ -1148,9 +1148,8 @@ void DepsgraphNodeBuilder::build_light_linking_receiver_collection(Collection *r
    * needs to be done in all places where the collection is built (is not something that can be
    * easily solved from just adding the light linking functionality). */
   if (!has_operation_node(
-          &receiver_collection->id, NodeType::PARAMETERS, OperationCode::LIGHT_LINKING_UPDATE)) {
-    add_operation_node(
-        &receiver_collection->id, NodeType::PARAMETERS, OperationCode::LIGHT_LINKING_UPDATE);
+          &collection->id, NodeType::PARAMETERS, OperationCode::LIGHT_LINKING_UPDATE)) {
+    add_operation_node(&collection->id, NodeType::PARAMETERS, OperationCode::LIGHT_LINKING_UPDATE);
   }
 }
 

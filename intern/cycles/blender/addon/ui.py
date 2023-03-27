@@ -1343,16 +1343,16 @@ class CYCLES_OBJECT_PT_light_linking(CyclesButtonsPanel, Panel):
 
         col.template_ID(
             light_linking,
-            "receiver_collection",
-            new="object.light_linking_receiver_collection_new",
-            text="Receiver Collection")
+            "collection",
+            new="object.light_linking_collection_new",
+            text="Collection")
 
-        if not light_linking.receiver_collection:
+        if not light_linking.collection:
             return
 
         row = layout.row()
         col = row.column()
-        col.template_light_linking_receiver_collection(light_linking, "receiver_collection")
+        col.template_light_linking_collection(light_linking, "collection")
 
         col = row.column()
         sub = col.column(align=True)

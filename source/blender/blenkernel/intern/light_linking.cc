@@ -23,54 +23,61 @@ static LightLinking &light_linking_get(Object *object)
   return object->light_linking;
 }
 
-/* Assign receiver collection from the given light linking.
+/* Un-assign light linking collection.
+ *
  * Decreases the counter of the receiver collection.
- * If the light linking has no receiver collection nothing happens. */
-static void receiver_collection_unassign(LightLinking &light_linking)
+ * If the light linking has no collection nothing happens.
+ *
+ * NOTE: It is up to the caller to tag the dependency graph for relation update and object for the
+ * shading update. */
+static void collection_unassign(LightLinking &light_linking)
 {
-  if (!light_linking.receiver_collection) {
+  if (!light_linking.collection) {
     return;
   }
 
-  id_us_min(&light_linking.receiver_collection->id);
-  light_linking.receiver_collection = nullptr;
+  id_us_min(&light_linking.collection->id);
+  light_linking.collection = nullptr;
 }
 
-/* Unassign current receiver collection (if any) and assign the new one.
- * The user counter is decreased for the old receiver collection, and is increased for the new
- * receiver collection. */
-static void receiver_collection_assign(LightLinking &light_linking,
-                                       Collection *new_receiver_collection)
+/* Unassign current light linking collection (if any) and assign the new one.
+ *
+ * The user counter is decreased for the old collection, and is increased for the.
+ *
+ * NOTE: It is up to the caller to tag the dependency graph for relation update and object for the
+ * shading update. */
+static void collection_assign(LightLinking &light_linking, Collection *new_collection)
 {
-  receiver_collection_unassign(light_linking);
+  collection_unassign(light_linking);
 
-  id_us_plus(&new_receiver_collection->id);
-  light_linking.receiver_collection = new_receiver_collection;
+  id_us_plus(&new_collection->id);
+  light_linking.collection = new_collection;
 }
 
-Collection *BKE_light_linking_receiver_collection_new(struct Main *bmain, Object *object)
+Collection *BKE_light_linking_collection_new(struct Main *bmain, Object *object)
 {
   LightLinking &light_linking = light_linking_get(object);
 
-  Collection *new_receiver_collection = BKE_collection_add(
-      bmain, nullptr, DATA_("Receiver Collection"));
+  Collection *new_collection = BKE_collection_add(
+      bmain, nullptr, DATA_("Light Linking Collection"));
 
-  receiver_collection_assign(light_linking, new_receiver_collection);
+  collection_assign(light_linking, new_collection);
 
   DEG_id_tag_update(&object->id, ID_RECALC_COPY_ON_WRITE | ID_RECALC_SHADING);
+  DEG_relations_tag_update(bmain);
 
-  return new_receiver_collection;
+  return new_collection;
 }
 
-bool BKE_light_linking_unlink_id_from_receiver_collection(Main *bmain,
-                                                          Object *object,
-                                                          ID *id,
-                                                          ReportList *reports)
+bool BKE_light_linking_unlink_id_from_collection(Main *bmain,
+                                                 Object *object,
+                                                 ID *id,
+                                                 ReportList *reports)
 {
   LightLinking &light_linking = light_linking_get(object);
 
-  Collection *receiver_collection = light_linking.receiver_collection;
-  if (!receiver_collection) {
+  Collection *collection = light_linking.collection;
+  if (!collection) {
     if (reports) {
       BKE_reportf(
           reports, RPT_ERROR, "No light linking collection for object '%s'", object->id.name + 2);
@@ -78,12 +85,14 @@ bool BKE_light_linking_unlink_id_from_receiver_collection(Main *bmain,
     return false;
   }
 
-  if (ID_IS_LINKED(&receiver_collection->id) || ID_IS_OVERRIDE_LIBRARY(&receiver_collection->id)) {
-    BKE_reportf(reports,
-                RPT_ERROR,
-                "Cannot unlink '%s' from linked receiver collection '%s'",
-                id->name + 2,
-                receiver_collection->id.name + 2);
+  if (ID_IS_LINKED(&collection->id) || ID_IS_OVERRIDE_LIBRARY(&collection->id)) {
+    if (reports) {
+      BKE_reportf(reports,
+                  RPT_ERROR,
+                  "Cannot unlink '%s' from linked receiver collection '%s'",
+                  id->name + 2,
+                  collection->id.name + 2);
+    }
 
     return false;
   }
@@ -91,14 +100,23 @@ bool BKE_light_linking_unlink_id_from_receiver_collection(Main *bmain,
   const ID_Type id_type = GS(id->name);
 
   if (id_type == ID_OB) {
-    BKE_collection_object_remove(
-        bmain, receiver_collection, reinterpret_cast<Object *>(id), false);
+    BKE_collection_object_remove(bmain, collection, reinterpret_cast<Object *>(id), false);
   }
   else if (id_type == ID_GR) {
-    BKE_collection_child_remove(bmain, receiver_collection, reinterpret_cast<Collection *>(id));
+    BKE_collection_child_remove(bmain, collection, reinterpret_cast<Collection *>(id));
+  }
+  else {
+    if (reports) {
+      BKE_reportf(reports,
+                  RPT_ERROR,
+                  "Cannot unlink unsupported '%s' from light linking collection '%s'",
+                  id->name + 2,
+                  collection->id.name + 2);
+    }
+    return false;
   }
 
-  DEG_id_tag_update(&receiver_collection->id, ID_RECALC_HIERARCHY);
+  DEG_id_tag_update(&collection->id, ID_RECALC_HIERARCHY);
 
   DEG_relations_tag_update(bmain);
 
@@ -111,8 +129,8 @@ void BKE_light_linking_select_receivers_of_emitter(Scene *scene,
 {
   LightLinking &light_linking = light_linking_get(emitter);
 
-  Collection *receiver_collection = light_linking.receiver_collection;
-  if (!receiver_collection) {
+  Collection *collection = light_linking.collection;
+  if (!collection) {
     return;
   }
 
@@ -129,11 +147,13 @@ void BKE_light_linking_select_receivers_of_emitter(Scene *scene,
   }
 
   /* Select objects which are reachable via the receiver collection hierarchy. */
-  LISTBASE_FOREACH (CollectionObject *, cob, &receiver_collection->gobject) {
+  LISTBASE_FOREACH (CollectionObject *, cob, &collection->gobject) {
     Base *base = BKE_view_layer_base_find(view_layer, cob->ob);
     if (!base) {
       continue;
     }
+
+    /* TODO(sergey): Check whether the object is configured to receive light. */
 
     base->flag |= BASE_SELECTED;
   }
@@ -144,29 +164,32 @@ void BKE_light_linking_select_receivers_of_emitter(Scene *scene,
 void BKE_light_linking_receiver_to_emitter(Main *bmain, Object *emitter, Object *receiver)
 {
   LightLinking &light_linking = light_linking_get(emitter);
-  Collection *receiver_collection = light_linking.receiver_collection;
+  Collection *collection = light_linking.collection;
 
-  if (!receiver_collection) {
-    receiver_collection = BKE_light_linking_receiver_collection_new(bmain, emitter);
+  if (!collection) {
+    collection = BKE_light_linking_collection_new(bmain, emitter);
   }
 
-  BKE_light_linking_receiver_to_collection(bmain, receiver_collection, &receiver->id);
+  BKE_light_linking_receiver_to_collection(bmain, collection, &receiver->id);
 }
 
-void BKE_light_linking_receiver_to_collection(Main *bmain,
-                                              Collection *receiver_collection,
-                                              ID *receiver)
+void BKE_light_linking_receiver_to_collection(Main *bmain, Collection *collection, ID *receiver)
 {
   const ID_Type id_type = GS(receiver->name);
 
   if (id_type == ID_OB) {
-    BKE_collection_object_add(bmain, receiver_collection, reinterpret_cast<Object *>(receiver));
+    BKE_collection_object_add(bmain, collection, reinterpret_cast<Object *>(receiver));
+    /* TODO(sergey): Set the receiver flag on the collection object. */
   }
   else if (id_type == ID_GR) {
-    BKE_collection_child_add(bmain, receiver_collection, reinterpret_cast<Collection *>(receiver));
+    BKE_collection_child_add(bmain, collection, reinterpret_cast<Collection *>(receiver));
+    /* TODO(sergey): Set the receiver flag on the collection. */
+  }
+  else {
+    return;
   }
 
-  DEG_id_tag_update(&receiver_collection->id, ID_RECALC_HIERARCHY);
+  DEG_id_tag_update(&collection->id, ID_RECALC_HIERARCHY);
   DEG_id_tag_update(receiver, ID_RECALC_SHADING);
 
   DEG_relations_tag_update(bmain);

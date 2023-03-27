@@ -2617,9 +2617,9 @@ void uiTemplateAssetView(struct uiLayout *layout,
                          const char *drag_opname,
                          struct PointerRNA *r_drag_op_properties);
 
-void uiTemplateLightLinkingReceiverCollection(struct uiLayout *layout,
-                                              struct PointerRNA *ptr,
-                                              const char *propname);
+void uiTemplateLightLinkingCollection(struct uiLayout *layout,
+                                      struct PointerRNA *ptr,
+                                      const char *propname);
 
 /**
  * \return: A RNA pointer for the operator properties.

@@ -24,25 +24,25 @@
 /** \name Create New Light Linking Collection Operator
  * \{ */
 
-static int light_linking_receiver_collection_new_exec(bContext *C, wmOperator * /*op*/)
+static int light_linking_collection_new_exec(bContext *C, wmOperator * /*op*/)
 {
   Main *bmain = CTX_data_main(C);
   Object *object = ED_object_active_context(C);
 
-  BKE_light_linking_receiver_collection_new(bmain, object);
+  BKE_light_linking_collection_new(bmain, object);
 
   return OPERATOR_FINISHED;
 }
 
-void OBJECT_OT_light_linking_receiver_collection_new(wmOperatorType *ot)
+void OBJECT_OT_light_linking_collection_new(wmOperatorType *ot)
 {
   /* identifiers */
   ot->name = "New Light Linking Collection";
   ot->description = "Create new light linking collection used by the active emitter";
-  ot->idname = "OBJECT_OT_light_linking_receiver_collection_new";
+  ot->idname = "OBJECT_OT_light_linking_collection_new";
 
   /* api callbacks */
-  ot->exec = light_linking_receiver_collection_new_exec;
+  ot->exec = light_linking_collection_new_exec;
   ot->poll = ED_operator_object_active_editable;
 
   /* flags */
@@ -52,10 +52,10 @@ void OBJECT_OT_light_linking_receiver_collection_new(wmOperatorType *ot)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Remove from the Light Linking Receiver Collection  Operator
+/** \name Remove from the Light Linking Collection Operator
  * \{ */
 
-static bool light_linking_unlink_from_receiver_collection_poll(bContext *C)
+static bool light_linking_unlink_from_collection_poll(bContext *C)
 {
   if (!ED_operator_object_active_editable(C)) {
     return false;
@@ -68,20 +68,20 @@ static bool light_linking_unlink_from_receiver_collection_poll(bContext *C)
   return true;
 }
 
-static int light_linking_unlink_from_receiver_collection_exec(bContext *C, wmOperator *op)
+static int light_linking_unlink_from_collection_exec(bContext *C, wmOperator *op)
 {
   Main *bmain = CTX_data_main(C);
   Object *object = ED_object_active_context(C);
 
   ID *id = static_cast<ID *>(CTX_data_pointer_get_type(C, "id", &RNA_ID).data);
 
-  /* The operator is expected to be called from the tree view of the receiver collection which
+  /* The operator is expected to be called from the tree view of the light linking collection which
    * does special context setup.
    * The context is checked in the poll function of this operator, so this code is expected to
    * only be executed if the context is correct. */
   BLI_assert(id);
 
-  if (!BKE_light_linking_unlink_id_from_receiver_collection(bmain, object, id, op->reports)) {
+  if (!BKE_light_linking_unlink_id_from_collection(bmain, object, id, op->reports)) {
     return OPERATOR_CANCELLED;
   }
 
@@ -93,16 +93,16 @@ static int light_linking_unlink_from_receiver_collection_exec(bContext *C, wmOpe
   return OPERATOR_FINISHED;
 }
 
-void OBJECT_OT_light_linking_unlink_from_receiver_collection(struct wmOperatorType *ot)
+void OBJECT_OT_light_linking_unlink_from_collection(struct wmOperatorType *ot)
 {
   /* identifiers */
-  ot->name = "Remove From Receiver Collection";
-  ot->description = "Remove this object or collection from the receiver collection";
-  ot->idname = "OBJECT_OT_light_linking_unlink_from_receiver_collection";
+  ot->name = "Remove From Light Linking Collection";
+  ot->description = "Remove this object or collection from the light linking collection";
+  ot->idname = "OBJECT_OT_light_linking_unlink_from_collection";
 
   /* api callbacks */
-  ot->exec = light_linking_unlink_from_receiver_collection_exec;
-  ot->poll = light_linking_unlink_from_receiver_collection_poll;
+  ot->exec = light_linking_unlink_from_collection_exec;
+  ot->poll = light_linking_unlink_from_collection_poll;
 
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;

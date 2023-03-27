@@ -1254,18 +1254,18 @@ void DepsgraphRelationBuilder::build_object_light_linking(Object *object)
       &object->id, NodeType::SHADING, OperationCode::LIGHT_LINKING_UPDATE);
 
   LightLinking &light_linking = object->light_linking;
-  Collection *receiver_collection = light_linking.receiver_collection;
+  Collection *collection = light_linking.collection;
 
   add_relation(hierarchy_key, light_linking_key, "Light Linking From Layer");
 
-  build_light_linking_receiver_collection(receiver_collection);
+  build_light_linking_collection(collection);
 
-  if (!receiver_collection) {
+  if (!collection) {
     return;
   }
 
   const OperationKey collection_light_linking_key(
-      &receiver_collection->id, NodeType::PARAMETERS, OperationCode::LIGHT_LINKING_UPDATE);
+      &collection->id, NodeType::PARAMETERS, OperationCode::LIGHT_LINKING_UPDATE);
 
   /* Order to ensure the emitter's light linking is only evaluated after the receiver collection.
    * This is because light linking runtime data is "cached" om the emitter object for the
@@ -1276,10 +1276,10 @@ void DepsgraphRelationBuilder::build_object_light_linking(Object *object)
 
   /* Relation from the emitter to the receiving object.
    * This allows the receiver to access emitter's bit mask. */
-  FOREACH_COLLECTION_OBJECT_RECURSIVE_BEGIN (receiver_collection, receiver) {
+  FOREACH_COLLECTION_OBJECT_RECURSIVE_BEGIN (collection, receiver) {
     /* If the object has receiver collection configure do not consider it as a receiver, avoiding
      * dependency cycles. */
-    if (receiver->light_linking.receiver_collection == nullptr) {
+    if (receiver->light_linking.collection == nullptr) {
 
       const OperationKey receiver_light_linking_key(
           &receiver->id, NodeType::SHADING, OperationCode::LIGHT_LINKING_UPDATE);
@@ -1289,22 +1289,21 @@ void DepsgraphRelationBuilder::build_object_light_linking(Object *object)
   FOREACH_COLLECTION_OBJECT_RECURSIVE_END;
 }
 
-void DepsgraphRelationBuilder::build_light_linking_receiver_collection(
-    Collection *receiver_collection)
+void DepsgraphRelationBuilder::build_light_linking_collection(Collection *collection)
 {
-  if (receiver_collection == nullptr) {
+  if (collection == nullptr) {
     return;
   }
 
-  build_collection(nullptr, receiver_collection);
+  build_collection(nullptr, collection);
 
   const OperationKey parameters_entry_key(
-      &receiver_collection->id, NodeType::PARAMETERS, OperationCode::PARAMETERS_ENTRY);
+      &collection->id, NodeType::PARAMETERS, OperationCode::PARAMETERS_ENTRY);
   const OperationKey parameters_exit_key(
-      &receiver_collection->id, NodeType::PARAMETERS, OperationCode::PARAMETERS_EXIT);
+      &collection->id, NodeType::PARAMETERS, OperationCode::PARAMETERS_EXIT);
 
   const OperationKey light_linking_key(
-      &receiver_collection->id, NodeType::PARAMETERS, OperationCode::LIGHT_LINKING_UPDATE);
+      &collection->id, NodeType::PARAMETERS, OperationCode::LIGHT_LINKING_UPDATE);
 
   /* Order of parameters evaluation within the receiver collection. */
   /* TODO(sergey): Can optimize this out by explicitly separating the different built tags. This
