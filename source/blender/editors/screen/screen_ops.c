@@ -4774,7 +4774,7 @@ static int screen_animation_step_invoke(bContext *C, wmOperator *UNUSED(op), con
       ED_tag_for_realtime_clock(bmain, eval_scene);
     }
 
-    BKE_scene_graph_update_for_newframe(depsgraph);
+    BKE_scene_graph_update_for_timestep(depsgraph, screen->active_clock);
   }
 
   LISTBASE_FOREACH (wmWindow *, window, &wm->windows) {

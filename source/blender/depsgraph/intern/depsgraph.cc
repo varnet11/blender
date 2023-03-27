@@ -68,7 +68,6 @@ Depsgraph::Depsgraph(Main *bmain, Scene *scene, ViewLayer *view_layer, eEvaluati
   memset(physics_relations, 0, sizeof(physics_relations));
 
   add_time_source(eTimeSourceType::DEG_TIME_SOURCE_SCENE);
-  add_time_source(eTimeSourceType::DEG_TIME_SOURCE_REALTIME);
 }
 
 Depsgraph::~Depsgraph()

@@ -2817,6 +2817,103 @@ void BKE_scene_graph_update_for_newframe(Depsgraph *depsgraph)
   BKE_scene_graph_update_for_newframe_ex(depsgraph, true);
 }
 
+void BKE_scene_graph_update_for_timestep_ex(Depsgraph *depsgraph,
+                                            const int active_clock,
+                                            const bool clear_recalc)
+{
+  Scene *scene = DEG_get_input_scene(depsgraph);
+  Main *bmain = DEG_get_bmain(depsgraph);
+  bool used_multiple_passes = false;
+
+  /* Keep this first. */
+  switch (active_clock) {
+    case ANIMTIMER_ANIMATION:
+      BKE_callback_exec_id(bmain, &scene->id, BKE_CB_EVT_FRAME_CHANGE_PRE);
+      break;
+    case ANIMTIMER_REALTIME:
+      /* TODO callback for realtime clock updates */
+      break;
+  }
+
+  for (int pass = 0; pass < 2; pass++) {
+    switch (active_clock) {
+      case ANIMTIMER_ANIMATION:
+        /* Update animated image textures for particles, modifiers, gpu, etc,
+         * call this at the start so modifiers with textures don't lag 1 frame.
+         */
+        BKE_image_editors_update_frame(bmain, scene->r.cfra);
+        BKE_sound_set_cfra(scene->r.cfra);
+        break;
+      case ANIMTIMER_REALTIME:
+        break;
+    }
+
+    DEG_graph_relations_update(depsgraph);
+    /* Update all objects: drivers, matrices, etc. flags set
+     * by depsgraph or manual, no layer check here, gets correct flushed.
+     *
+     * NOTE: Only update for new frame on first iteration. Second iteration is for ensuring user
+     * edits from callback are properly taken into account. Doing a time update on those would
+     * lose any possible unkeyed changes made by the handler. */
+    if (pass == 0) {
+      DEG_evaluate_on_timestep(depsgraph, active_clock);
+    }
+    else {
+      DEG_evaluate_on_refresh(depsgraph);
+    }
+    /* Update sound system animation. */
+    BKE_scene_update_sound(depsgraph, bmain);
+
+    /* Notify editors and python about recalc. */
+    if (pass == 0) {
+      switch (active_clock) {
+        case ANIMTIMER_ANIMATION:
+          BKE_callback_exec_id_depsgraph(bmain, &scene->id, depsgraph, BKE_CB_EVT_FRAME_CHANGE_POST);
+          break;
+        case ANIMTIMER_REALTIME:
+          /* TODO callback for realtime clock updates */
+          break;
+      }
+
+      /* NOTE: Similar to this case in scene_graph_update_tagged(). Need to ensure that
+       * DEG_editors_update() doesn't access freed memory of possibly removed ID. */
+      DEG_graph_relations_update(depsgraph);
+    }
+
+    /* If user callback did not tag anything for update we can skip second iteration.
+     * Otherwise we update scene once again, but without running callbacks to bring
+     * scene to a fully evaluated state with user modifications taken into account. */
+    if (DEG_is_fully_evaluated(depsgraph)) {
+      break;
+    }
+
+    /* Clear recalc flags for second pass, but back them up for editors update. */
+    const bool backup = true;
+    DEG_ids_clear_recalc(depsgraph, backup);
+    used_multiple_passes = true;
+  }
+
+  /* Inform editors about changes, using recalc flags from both passes. */
+  if (used_multiple_passes) {
+    DEG_ids_restore_recalc(depsgraph);
+  }
+
+  const bool is_time_update = true;
+  DEG_editors_update(depsgraph, is_time_update);
+
+  /* Clear recalc flags, can be skipped for e.g. renderers that will read these
+   * and clear the flags later. */
+  if (clear_recalc) {
+    const bool backup = false;
+    DEG_ids_clear_recalc(depsgraph, backup);
+  }
+}
+
+void BKE_scene_graph_update_for_timestep(Depsgraph *depsgraph, const int active_clock)
+{
+  BKE_scene_graph_update_for_timestep_ex(depsgraph, active_clock, true);
+}
+
 void BKE_scene_view_layer_graph_evaluated_ensure(Main *bmain, Scene *scene, ViewLayer *view_layer)
 {
   Depsgraph *depsgraph = BKE_scene_ensure_depsgraph(bmain, scene, view_layer);

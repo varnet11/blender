@@ -206,6 +206,11 @@ void BKE_scene_graph_update_for_newframe(struct Depsgraph *depsgraph);
  */
 void BKE_scene_graph_update_for_newframe_ex(struct Depsgraph *depsgraph, bool clear_recalc);
 
+void BKE_scene_graph_update_for_timestep_ex(struct Depsgraph *depsgraph,
+                                            int active_clock,
+                                            bool clear_recalc);
+void BKE_scene_graph_update_for_timestep(struct Depsgraph *depsgraph, int active_clock);
+
 /**
  * Ensures given scene/view_layer pair has a valid, up-to-date depsgraph.
  *

@@ -195,6 +195,11 @@ void DEG_evaluate_on_framechange(Depsgraph *graph, float frame);
  */
 void DEG_evaluate_on_refresh(Depsgraph *graph);
 
+/**
+ * Generic time step update from frame change or realtime node.
+ */
+void DEG_evaluate_on_timestep(Depsgraph *graph, int active_clock);
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
