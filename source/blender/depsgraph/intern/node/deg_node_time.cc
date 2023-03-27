@@ -19,9 +19,9 @@ const char *timeSourceTypeAsString(eTimeSourceType source_type)
 {
   switch (source_type) {
     case eTimeSourceType::DEG_TIME_SOURCE_SCENE:
-      return "SCENE_TIMELINE";
+      return "SCENE";
     case eTimeSourceType::DEG_TIME_SOURCE_REALTIME:
-      return "REALTIME_CLOCK";
+      return "REALTIME";
   }
   BLI_assert_msg(0, "Unhandled time source type, should never happen.");
   return "UNKNOWN";
