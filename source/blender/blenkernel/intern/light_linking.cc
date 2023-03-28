@@ -173,21 +173,73 @@ void BKE_light_linking_receiver_to_emitter(Main *bmain, Object *emitter, Object 
   BKE_light_linking_receiver_to_collection(bmain, collection, &receiver->id);
 }
 
+/* Add object to the light linking collection and return corresponding CollectionLightLinking
+ * settings.
+ *
+ * If the object is already in the collection then the content of the collection is not modified,
+ * and the existing light linking settings are returned. */
+static CollectionLightLinking *light_linking_collection_add_object(Main *bmain,
+                                                                   Collection *collection,
+                                                                   Object *object)
+{
+  BKE_collection_object_add(bmain, collection, object);
+
+  LISTBASE_FOREACH (CollectionObject *, collection_object, &collection->gobject) {
+    if (collection_object->ob == object) {
+      return &collection_object->light_linking;
+    }
+  }
+
+  BLI_assert_msg(0, "Object was not found after added to the light linking collection");
+
+  return nullptr;
+}
+
+/* Add child collection to the light linking collection and return corresponding
+ * CollectionLightLinking settings.
+ *
+ * If the child collection is already in the collection then the content of the collection is not
+ * modified, and the existing light linking settings are returned. */
+static CollectionLightLinking *light_linking_collection_add_collection(Main *bmain,
+                                                                       Collection *collection,
+                                                                       Collection *child)
+{
+  BKE_collection_child_add(bmain, collection, child);
+
+  LISTBASE_FOREACH (CollectionChild *, collection_child, &collection->children) {
+    if (collection_child->collection == child) {
+      return &collection_child->light_linking;
+    }
+  }
+
+  BLI_assert_msg(0, "Collection was not found after added to the light linking collection");
+
+  return nullptr;
+}
+
 void BKE_light_linking_receiver_to_collection(Main *bmain, Collection *collection, ID *receiver)
 {
   const ID_Type id_type = GS(receiver->name);
 
+  CollectionLightLinking *collection_light_linking = nullptr;
+
   if (id_type == ID_OB) {
-    BKE_collection_object_add(bmain, collection, reinterpret_cast<Object *>(receiver));
-    /* TODO(sergey): Set the receiver flag on the collection object. */
+    collection_light_linking = light_linking_collection_add_object(
+        bmain, collection, reinterpret_cast<Object *>(receiver));
   }
   else if (id_type == ID_GR) {
-    BKE_collection_child_add(bmain, collection, reinterpret_cast<Collection *>(receiver));
-    /* TODO(sergey): Set the receiver flag on the collection. */
+    collection_light_linking = light_linking_collection_add_collection(
+        bmain, collection, reinterpret_cast<Collection *>(receiver));
   }
   else {
     return;
   }
+
+  if (!collection_light_linking) {
+    return;
+  }
+
+  collection_light_linking->light_state = COLLECTION_LIGHT_LINKING_STATE_INCLUDE;
 
   DEG_id_tag_update(&collection->id, ID_RECALC_HIERARCHY);
   DEG_id_tag_update(receiver, ID_RECALC_SHADING);
