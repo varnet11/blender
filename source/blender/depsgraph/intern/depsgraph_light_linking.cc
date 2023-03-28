@@ -50,6 +50,52 @@ void eval_runtime_data(const ::Depsgraph *depsgraph, Object *object_eval)
 
 namespace blender::deg::light_linking {
 
+namespace {
+
+/* Iterate over all objects of the collection and invoke the given callback with two arguments:
+ * the given collection light linking settings, and the object (passed as reference).
+ *
+ * Note that if an object is reachable from multiple children collection the callback is invoked
+ * for all of them. */
+template<class Proc>
+static void foreach_light_collection_object_inner(
+    const CollectionLightLinking &collection_light_linking,
+    const Collection &collection,
+    Proc &&callback)
+{
+  LISTBASE_FOREACH (const CollectionObject *, collection_object, &collection.gobject) {
+    callback(collection_light_linking, *collection_object->ob);
+  }
+
+  LISTBASE_FOREACH (const CollectionChild *, collection_child, &collection.children) {
+    foreach_light_collection_object_inner(
+        collection_light_linking, *collection_child->collection, callback);
+  }
+}
+
+/* Iterate over all objects of the collection and invoke the given callback with two arguments:
+ * CollectionLightLinking and the actual Object (passed as reference).
+ *
+ * The CollectionLightLinking denotes the effective light linking settings of the object. It comes
+ * from the first level of hierarchy from the given collection.
+ *
+ * Note that if an object is reachable from multiple children collection the callback is invoked
+ * for all of them. */
+template<class Proc>
+static void foreach_light_collection_object(const Collection &collection, Proc &&callback)
+{
+  LISTBASE_FOREACH (const CollectionObject *, collection_object, &collection.gobject) {
+    callback(collection_object->light_linking, *collection_object->ob);
+  }
+
+  LISTBASE_FOREACH (const CollectionChild *, collection_child, &collection.children) {
+    foreach_light_collection_object_inner(
+        collection_child->light_linking, *collection_child->collection, callback);
+  }
+}
+
+}  // namespace
+
 void Cache::clear()
 {
   receiver_light_sets_.clear();
@@ -92,18 +138,33 @@ void Cache::add_emitter(const Scene *scene, const Object *emitter)
   /* Add collection bit to all receivers affected by this emitter or any emitter with the same
    * receiver collection. */
   /* TODO: optimize by doing this non-recursively, and only going recursive in end_build()? */
-  FOREACH_COLLECTION_OBJECT_RECURSIVE_BEGIN (collection, receiver) {
+  foreach_light_collection_object(
+      *collection,
+      [&](const CollectionLightLinking &collection_light_linking, const Object &receiver) {
+        add_receiver_object(collection_light_linking, receiver, receiver_collection_bit);
+      });
+}
+
+void Cache::add_receiver_object(const CollectionLightLinking &collection_light_linking,
+                                const Object &receiver,
+                                const uint64_t receiver_collection_bit)
+{
+  if (receiver.light_linking.collection != nullptr) {
     /* If the object has receiver collection configure do not consider it as a receiver, avoiding
      * dependency cycles. */
-    /* TODO(sergey): Need more granular and correct check. */
-    if (receiver->light_linking.collection == nullptr) {
-      receiver_light_sets_.add_or_modify(
-          receiver,
-          [&](uint64_t *value) { *value = receiver_collection_bit; },
-          [&](uint64_t *value) { *value |= receiver_collection_bit; });
-    }
+    return;
   }
-  FOREACH_COLLECTION_OBJECT_RECURSIVE_END;
+
+  if (collection_light_linking.light_state == COLLECTION_LIGHT_LINKING_STATE_INCLUDE) {
+    receiver_light_sets_.add_or_modify(
+        &receiver,
+        [&](uint64_t *value) { *value = receiver_collection_bit; },
+        [&](uint64_t *value) { *value |= receiver_collection_bit; });
+  }
+
+  /* TODO(sergey): Handle exclusive light linking state. */
+
+  /* TODO(sergey): Handle shadow linking. */
 }
 
 void Cache::end_build(const Scene *scene)

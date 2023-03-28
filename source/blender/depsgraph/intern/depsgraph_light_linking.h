@@ -14,6 +14,7 @@
 #include "BLI_vector.hh"
 
 struct Collection;
+struct CollectionLightLinking;
 struct Object;
 struct Scene;
 
@@ -55,8 +56,13 @@ class Cache {
   /* Maximum number of bits available for light linking relations. */
   const int MAX_RELATION_BITS = 64;
 
+  /* Add receiver object with the given collection bit. */
+  void add_receiver_object(const CollectionLightLinking &collection_light_linking,
+                           const Object &receiver,
+                           uint64_t receiver_collection_bit);
+
   struct EmitterData {
-    EmitterData(const uint64_t receiver_collection_bit)
+    explicit EmitterData(const uint64_t receiver_collection_bit)
         : receiver_collection_bit(receiver_collection_bit)
     {
     }
