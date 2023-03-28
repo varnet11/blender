@@ -1,6 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 
-#include "BKE_compute_cache.hh"
 #include "BKE_compute_contexts.hh"
 #include "BKE_scene.h"
 
@@ -29,7 +28,7 @@ class LazyFunctionForSimulationInputNode final : public LazyFunction {
     const NodeGeometrySimulationOutput &storage = *static_cast<NodeGeometrySimulationOutput *>(
         output_node.storage);
     simulation_items_ = {storage.items, storage.items_num};
-    outputs_.append_as("Delta Time", CPPType::get<float>());
+    outputs_.append_as("Delta Time", CPPType::get<ValueOrField<float>>());
     for (const NodeSimulationItem &item : Span(storage.items, storage.items_num)) {
       const CPPType &type = get_simulation_item_cpp_type(item);
       inputs_.append_as(item.name, type, lf::ValueUsage::Maybe);
@@ -39,54 +38,49 @@ class LazyFunctionForSimulationInputNode final : public LazyFunction {
 
   void execute_impl(lf::Params &params, const lf::Context &context) const final
   {
-    const GeoNodesLFUserData &user_data = *dynamic_cast<const GeoNodesLFUserData *>(
-        context.user_data);
-    const Scene *scene = DEG_get_input_scene(user_data.modifier_data->depsgraph);
-    const float scene_ctime = BKE_scene_ctime_get(scene);
-    const bke::sim::TimePoint time{int(scene_ctime), scene_ctime};
+    GeoNodesLFUserData &user_data = *static_cast<GeoNodesLFUserData *>(context.user_data);
+    GeoNodesModifierData &modifier_data = *user_data.modifier_data;
 
-    bke::sim::ComputeCaches &all_caches = *user_data.modifier_data->cache_per_frame;
-    const bke::NodeGroupComputeContext cache_context(user_data.compute_context, output_node_id_);
-    bke::sim::SimulationCache *cache = all_caches.lookup_context(cache_context.hash());
-
-    if (!params.output_was_set(0) && params.get_output_usage(0) == lf::ValueUsage::Used) {
-      if (cache && !cache->is_empty()) {
-        const float time_diff = scene_ctime - cache->last_run_time()->time;
-        const double frame_rate = double(scene->r.frs_sec) / double(scene->r.frs_sec_base);
-        params.set_output<float>(0, float(std::max(0.0f, time_diff) / frame_rate));
-      }
-      else {
-        params.set_output<float>(0, 0.0f);
-      }
+    if (modifier_data.current_simulation_state == nullptr) {
+      params.set_default_remaining_outputs();
+      return;
     }
 
-    for (const int i : inputs_.index_range()) {
-      const int output_i = i + 1;
-      if (params.get_output_usage(output_i) != lf::ValueUsage::Used) {
-        continue;
-      }
-      if (params.output_was_set(output_i)) {
-        continue;
-      }
-      const StringRef name = simulation_items_[i].name;
-      const CPPType &type = *inputs_[i].type;
-      void *output = params.get_output_data_ptr(output_i);
-      if (cache) {
-        /* Try to retrieve a cached value for the previous evaluation. */
-        if (std::optional<GeometrySet> cached_value = cache->value_before_time(name, time)) {
-          type.move_construct(&*cached_value, output);
-          params.output_set(output_i);
+    if (!params.output_was_set(0)) {
+      const float delta_time = modifier_data.simulation_time_delta;
+      params.set_output(0, fn::ValueOrField<float>(delta_time));
+    }
+
+    const bke::sim::SimulationZoneID zone_id = get_simulation_zone_id(*user_data.compute_context,
+                                                                      output_node_id_);
+
+    const bke::sim::SimulationZoneState *prev_zone_state =
+        modifier_data.prev_simulation_state == nullptr ?
+            nullptr :
+            modifier_data.prev_simulation_state->get_zone_state(zone_id);
+    if (prev_zone_state == nullptr) {
+      for (const int i : simulation_items_.index_range()) {
+        if (params.output_was_set(i + 1)) {
           continue;
         }
+        GeometrySet *geometry = params.try_get_input_data_ptr_or_request<GeometrySet>(i);
+        if (geometry != nullptr) {
+          params.set_output(i + 1, std::move(*geometry));
+        }
       }
-
-      /* There was no cached value, so try to retrieve the input value. */
-      void *value = params.try_get_input_data_ptr_or_request(i);
-      if (!value) {
-        continue;
+    }
+    else {
+      for (const int i : simulation_items_.index_range()) {
+        if (i >= prev_zone_state->items.size()) {
+          params.set_output(i + 1, GeometrySet());
+          continue;
+        }
+        const bke::sim::SimulationStateItem *item = prev_zone_state->items[i].get();
+        if (auto *geometry_item = dynamic_cast<const bke::sim::GeometrySimulationStateItem *>(
+                item)) {
+          params.set_output(i + 1, geometry_item->geometry());
+        }
       }
-      type.move_construct(value, output);
-      params.output_set(output_i);
     }
   }
 };

@@ -348,7 +348,6 @@ set(SRC
   BKE_colorband.h
   BKE_colortools.h
   BKE_compute_contexts.hh
-  BKE_compute_cache.hh
   BKE_constraint.h
   BKE_context.h
   BKE_cpp_types.h
@@ -466,6 +465,7 @@ set(SRC
   BKE_shader_fx.h
   BKE_shrinkwrap.h
   BKE_simulation.h
+  BKE_simulation_state.hh
   BKE_softbody.h
   BKE_sound.h
   BKE_speaker.h

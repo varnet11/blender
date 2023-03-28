@@ -2,7 +2,6 @@
 
 #include "BLI_string_utils.h"
 
-#include "BKE_compute_cache.hh"
 #include "BKE_compute_contexts.hh"
 #include "BKE_scene.h"
 
@@ -111,6 +110,10 @@ namespace blender::nodes::node_geo_simulation_output_cc {
 
 NODE_STORAGE_FUNCS(NodeGeometrySimulationOutput);
 
+struct EvalData {
+  bool is_first_evaluation = true;
+};
+
 class LazyFunctionForSimulationOutputNode final : public LazyFunction {
   int32_t node_id_;
   Span<NodeSimulationItem> simulation_items_;
@@ -127,63 +130,80 @@ class LazyFunctionForSimulationOutputNode final : public LazyFunction {
     }
   }
 
+  void *init_storage(LinearAllocator<> &allocator) const
+  {
+    return allocator.construct<EvalData>().get();
+  }
+
+  void destruct_storage(void *storage) const
+  {
+    std::destroy_at(static_cast<EvalData *>(storage));
+  }
+
   void execute_impl(lf::Params &params, const lf::Context &context) const final
   {
-    const GeoNodesLFUserData &user_data = *dynamic_cast<const GeoNodesLFUserData *>(
-        context.user_data);
-    const Scene *scene = DEG_get_input_scene(user_data.modifier_data->depsgraph);
-    const float scene_ctime = BKE_scene_ctime_get(scene);
-    const bke::sim::TimePoint time{int(scene_ctime), scene_ctime};
+    GeoNodesLFUserData &user_data = *static_cast<GeoNodesLFUserData *>(context.user_data);
+    GeoNodesModifierData &modifier_data = *user_data.modifier_data;
+    EvalData &eval_data = *static_cast<EvalData *>(context.storage);
+    BLI_SCOPED_DEFER([&]() { eval_data.is_first_evaluation = false; });
 
-    bke::sim::ComputeCaches &all_caches = *user_data.modifier_data->cache_per_frame;
-    const bke::NodeGroupComputeContext cache_context(user_data.compute_context, node_id_);
-    bke::sim::SimulationCache &cache = all_caches.ensure_for_context(cache_context.hash());
-
-    /* Retrieve cached items for the current exact time. If all items are cached, the cache is
-     * considered valid and no more evaluation has to be done. Otherwise it must be recreated. */
-    bool all_items_cached = true;
-    for (const int i : inputs_.index_range()) {
-      const StringRef name = simulation_items_[i].name;
-      const CPPType &type = *inputs_[i].type;
-      std::optional<GeometrySet> value = cache.value_at_time(name, time);
-      if (!value) {
-        all_items_cached = false;
-        continue;
-      }
-      void *output = params.get_output_data_ptr(i);
-      type.move_construct(&*value, output);
-      params.set_input_unused(i);
-      params.output_set(i);
-    }
-    if (all_items_cached) {
+    if (modifier_data.current_simulation_state == nullptr) {
+      params.set_default_remaining_outputs();
       return;
     }
 
-    for (const int i : inputs_.index_range()) {
-      if (params.get_output_usage(i) != lf::ValueUsage::Used) {
-        continue;
-      }
-      if (params.output_was_set(i)) {
-        continue;
-      }
-      void *value = params.try_get_input_data_ptr_or_request(i);
-      if (!value) {
-        continue;
-      }
+    const bke::sim::SimulationZoneID zone_id = get_simulation_zone_id(*user_data.compute_context,
+                                                                      node_id_);
 
-      const StringRef name = simulation_items_[i].name;
-      const CPPType &type = *inputs_[i].type;
-
-      GeometrySet &geometry_set = *static_cast<GeometrySet *>(value);
-      geometry_set.ensure_owns_direct_data();
-
-      cache.remove(name);
-      cache.store_temporary(name, time, geometry_set);
-
-      void *output = params.get_output_data_ptr(i);
-      type.move_construct(&geometry_set, output);
-      params.output_set(i);
+    const bke::sim::SimulationZoneState *cached_zone_state =
+        modifier_data.current_simulation_state->get_zone_state(zone_id);
+    if (cached_zone_state != nullptr && eval_data.is_first_evaluation) {
+      this->output_cached_state(params, *cached_zone_state);
+      return;
     }
+
+    if (modifier_data.current_simulation_state_for_write == nullptr) {
+      params.set_default_remaining_outputs();
+      return;
+    }
+
+    bke::sim::SimulationZoneState &new_zone_state =
+        modifier_data.current_simulation_state_for_write->get_zone_state_for_write(zone_id);
+    new_zone_state.items.reinitialize(simulation_items_.size());
+
+    bool all_available = true;
+    for (const int i : simulation_items_.index_range()) {
+      GeometrySet *input_geometry = params.try_get_input_data_ptr_or_request<GeometrySet>(i);
+      if (input_geometry == nullptr) {
+        all_available = false;
+        continue;
+      }
+      input_geometry->ensure_owns_direct_data();
+      new_zone_state.items[i] = std::make_unique<bke::sim::GeometrySimulationStateItem>(
+          std::move(*input_geometry));
+    }
+
+    if (all_available) {
+      this->output_cached_state(params, new_zone_state);
+    }
+  }
+
+  void output_cached_state(lf::Params &params, const bke::sim::SimulationZoneState &state) const
+  {
+    for (const int i : simulation_items_.index_range()) {
+      if (i >= state.items.size()) {
+        continue;
+      }
+      const bke::sim::SimulationStateItem *item = state.items[i].get();
+      if (item == nullptr) {
+        continue;
+      }
+      if (auto *geometry_item = dynamic_cast<const bke::sim::GeometrySimulationStateItem *>(
+              item)) {
+        params.set_output(i, geometry_item->geometry());
+      }
+    }
+    params.set_default_remaining_outputs();
   }
 };
 
@@ -196,6 +216,21 @@ std::unique_ptr<LazyFunction> get_simulation_output_lazy_function(const bNode &n
   namespace file_ns = blender::nodes::node_geo_simulation_output_cc;
   BLI_assert(node.type == GEO_NODE_SIMULATION_OUTPUT);
   return std::make_unique<file_ns::LazyFunctionForSimulationOutputNode>(node);
+}
+
+bke::sim::SimulationZoneID get_simulation_zone_id(const ComputeContext &compute_context,
+                                                  const int output_node_id)
+{
+  bke::sim::SimulationZoneID zone_id;
+  for (const ComputeContext *context = &compute_context; context != nullptr;
+       context = context->parent()) {
+    if (const auto *node_context = dynamic_cast<const bke::NodeGroupComputeContext *>(context)) {
+      zone_id.node_ids.append(node_context->node_id());
+    }
+  }
+  std::reverse(zone_id.node_ids.begin(), zone_id.node_ids.end());
+  zone_id.node_ids.append(output_node_id);
+  return zone_id;
 }
 
 }  // namespace blender::nodes

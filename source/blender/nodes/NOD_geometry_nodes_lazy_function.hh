@@ -26,7 +26,7 @@
 
 #include "BLI_compute_context.hh"
 
-#include "BKE_compute_cache.hh"
+#include "BKE_simulation_state.hh"
 
 struct Object;
 struct Depsgraph;
@@ -47,7 +47,10 @@ struct GeoNodesModifierData {
   /** Optional logger. */
   geo_eval_log::GeoModifierLog *eval_log = nullptr;
 
-  bke::sim::ComputeCaches *cache_per_frame;
+  const bke::sim::ModifierSimulationState *prev_simulation_state = nullptr;
+  const bke::sim::ModifierSimulationState *current_simulation_state = nullptr;
+  bke::sim::ModifierSimulationState *current_simulation_state_for_write = nullptr;
+  float simulation_time_delta = 0.0f;
 
   /**
    * Some nodes should be executed even when their output is not used (e.g. active viewer nodes and
@@ -231,6 +234,9 @@ std::unique_ptr<LazyFunction> get_simulation_output_lazy_function(const bNode &n
 std::unique_ptr<LazyFunction> get_simulation_input_lazy_function(const bNodeTree &node_tree,
                                                                  const bNode &node);
 std::unique_ptr<LazyFunction> get_switch_node_lazy_function(const bNode &node);
+
+bke::sim::SimulationZoneID get_simulation_zone_id(const ComputeContext &context,
+                                                  const int output_node_id);
 
 /**
  * Tells the lazy-function graph evaluator which nodes have side effects based on the current

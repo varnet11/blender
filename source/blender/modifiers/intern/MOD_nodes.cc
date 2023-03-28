@@ -37,7 +37,6 @@
 #include "DNA_windowmanager_types.h"
 
 #include "BKE_attribute_math.hh"
-#include "BKE_compute_cache.hh"
 #include "BKE_compute_contexts.hh"
 #include "BKE_customdata.h"
 #include "BKE_geometry_fields.hh"
@@ -55,6 +54,7 @@
 #include "BKE_pointcloud.h"
 #include "BKE_screen.h"
 #include "BKE_simulation.h"
+#include "BKE_simulation_state.hh"
 #include "BKE_workspace.h"
 
 #include "BLO_read_write.h"
@@ -1177,10 +1177,12 @@ static GeometrySet compute_geometry(
     const blender::nodes::GeometryNodesLazyFunctionGraphInfo &lf_graph_info,
     const bNode &output_node,
     GeometrySet input_geometry_set,
-    blender::bke::sim::ComputeCaches &compute_caches,
     NodesModifierData *nmd,
     const ModifierEvalContext *ctx)
 {
+  NodesModifierData *nmd_orig = reinterpret_cast<NodesModifierData *>(
+      BKE_modifier_get_original(ctx->object, &nmd->modifier));
+
   const blender::nodes::GeometryNodeLazyFunctionGraphMapping &mapping = lf_graph_info.mapping;
 
   Vector<const lf::OutputSocket *> graph_inputs = mapping.group_input_sockets;
@@ -1204,8 +1206,41 @@ static GeometrySet compute_geometry(
   blender::nodes::GeoNodesModifierData geo_nodes_modifier_data;
   geo_nodes_modifier_data.depsgraph = ctx->depsgraph;
   geo_nodes_modifier_data.self_object = ctx->object;
-  geo_nodes_modifier_data.cache_per_frame = &compute_caches;
   auto eval_log = std::make_unique<GeoModifierLog>();
+
+  const float current_time = DEG_get_ctime(ctx->depsgraph);
+  if (DEG_is_active(ctx->depsgraph)) {
+    const Scene *scene = DEG_get_input_scene(ctx->depsgraph);
+    const int start_frame = scene->r.sfra;
+
+    if (nmd_orig->simulation_cache == nullptr) {
+      nmd_orig->simulation_cache = MEM_new<blender::bke::sim::ModifierSimulationCache>(__func__);
+    }
+    if (nmd_orig->simulation_cache->is_invalid() && current_time == start_frame) {
+      nmd_orig->simulation_cache->reset();
+    }
+    std::pair<float, const blender::bke::sim::ModifierSimulationState *> prev_sim_state =
+        nmd_orig->simulation_cache->try_get_last_state_before(current_time);
+    if (prev_sim_state.second != nullptr) {
+      geo_nodes_modifier_data.prev_simulation_state = prev_sim_state.second;
+      geo_nodes_modifier_data.simulation_time_delta = current_time - prev_sim_state.first;
+      if (geo_nodes_modifier_data.simulation_time_delta > 1.0f) {
+        nmd_orig->simulation_cache->invalidate();
+      }
+    }
+    geo_nodes_modifier_data.current_simulation_state_for_write =
+        &nmd_orig->simulation_cache->get_state_for_write(current_time);
+    geo_nodes_modifier_data.current_simulation_state =
+        geo_nodes_modifier_data.current_simulation_state_for_write;
+  }
+  else {
+    /* TODO: Should probably only access baked data that is not modified in the original data
+     * anymore. */
+    if (nmd_orig->simulation_cache != nullptr) {
+      geo_nodes_modifier_data.current_simulation_state =
+          nmd_orig->simulation_cache->get_state_at_time(current_time);
+    }
+  }
 
   Set<blender::ComputeContextHash> socket_log_contexts;
   if (logging_enabled(ctx)) {
@@ -1286,8 +1321,6 @@ static GeometrySet compute_geometry(
   }
 
   if (logging_enabled(ctx)) {
-    NodesModifierData *nmd_orig = reinterpret_cast<NodesModifierData *>(
-        BKE_modifier_get_original(ctx->object, &nmd->modifier));
     delete static_cast<GeoModifierLog *>(nmd_orig->runtime_eval_log);
     nmd_orig->runtime_eval_log = eval_log.release();
   }
@@ -1389,24 +1422,8 @@ static void modifyGeometry(ModifierData *md,
     use_orig_index_polys = CustomData_has_layer(&mesh->pdata, CD_ORIGINDEX);
   }
 
-  NodesModifierData *orig_nmd = reinterpret_cast<NodesModifierData *>(
-      BKE_modifier_get_original(ctx->object, md));
-  if (!orig_nmd->simulation_caches) {
-    orig_nmd->simulation_caches = new blender::bke::sim::ComputeCaches();
-  }
-
-  geometry_set = compute_geometry(tree,
-                                  *lf_graph_info,
-                                  *output_node,
-                                  std::move(geometry_set),
-                                  *orig_nmd->simulation_caches,
-                                  nmd,
-                                  ctx);
-
-  if (orig_nmd->simulation_caches->is_empty()) {
-    delete orig_nmd->simulation_caches;
-    orig_nmd->simulation_caches = nullptr;
-  }
+  geometry_set = compute_geometry(
+      tree, *lf_graph_info, *output_node, std::move(geometry_set), nmd, ctx);
 
   if (use_orig_index_verts || use_orig_index_edges || use_orig_index_polys) {
     if (Mesh *mesh = geometry_set.get_mesh_for_write()) {
@@ -1976,7 +1993,6 @@ static void blendWrite(BlendWriter *writer, const ID * /*id_owner*/, const Modif
       }
     }
   }
-  /* TODO: Write cached geometry. */
 }
 
 static void blendRead(BlendDataReader *reader, ModifierData *md)
@@ -1990,8 +2006,7 @@ static void blendRead(BlendDataReader *reader, ModifierData *md)
     IDP_BlendDataRead(reader, &nmd->settings.properties);
   }
   nmd->runtime_eval_log = nullptr;
-  /* TODO: Read cached geometry. */
-  nmd->simulation_caches = nullptr;
+  nmd->simulation_cache = nullptr;
 }
 
 static void copyData(const ModifierData *md, ModifierData *target, const int flag)
@@ -2002,15 +2017,12 @@ static void copyData(const ModifierData *md, ModifierData *target, const int fla
   BKE_modifier_copydata_generic(md, target, flag);
 
   tnmd->runtime_eval_log = nullptr;
-  if (nmd->simulation_caches) {
-    const blender::bke::sim::ComputeCaches &src_caches =
-        *static_cast<blender::bke::sim::ComputeCaches *>(nmd->simulation_caches);
-    tnmd->simulation_caches = new blender::bke::sim::ComputeCaches(src_caches);
-  }
 
   if (nmd->settings.properties != nullptr) {
     tnmd->settings.properties = IDP_CopyProperty_ex(nmd->settings.properties, flag);
   }
+
+  tnmd->simulation_cache = nullptr;
 }
 
 static void freeData(ModifierData *md)
@@ -2021,7 +2033,9 @@ static void freeData(ModifierData *md)
     nmd->settings.properties = nullptr;
   }
 
-  delete static_cast<blender::bke::sim::ComputeCaches *>(nmd->simulation_caches);
+  if (nmd->simulation_cache != nullptr) {
+    MEM_delete(nmd->simulation_cache);
+  }
 
   clear_runtime_data(nmd);
 }

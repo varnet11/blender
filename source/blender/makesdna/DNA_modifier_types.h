@@ -12,11 +12,11 @@
 
 #ifdef __cplusplus
 namespace blender::bke::sim {
-struct ComputeCaches;
+struct ModifierSimulationCache;
 }
-using ComputeCachesHandle = blender::bke::sim::ComputeCaches;
+using ModifierSimulationCacheHandle = blender::bke::sim::ModifierSimulationCache;
 #else
-typedef struct ComputeCachesHandle ComputeCachesHandle;
+typedef struct ModifierSimulationCacheHandle ModifierSimulationCacheHandle;
 #endif
 
 #ifdef __cplusplus
@@ -2326,8 +2326,7 @@ typedef struct NodesModifierData {
    */
   void *runtime_eval_log;
 
-  /** #ComputeCaches. */
-  ComputeCachesHandle *simulation_caches;
+  ModifierSimulationCacheHandle *simulation_cache;
 } NodesModifierData;
 
 typedef struct MeshToVolumeModifierData {
