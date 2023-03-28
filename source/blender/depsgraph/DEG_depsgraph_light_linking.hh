@@ -17,6 +17,6 @@ struct Depsgraph;
 namespace blender::deg::light_linking {
 
 /* Set runtime light linking data on evaluated object. */
-void eval_runtime_data(const ::Depsgraph *depsgraph, Object *object_eval);
+void eval_runtime_data(const ::Depsgraph *depsgraph, Object &object_eval);
 
 }  // namespace blender::deg::light_linking

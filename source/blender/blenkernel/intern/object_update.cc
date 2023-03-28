@@ -447,5 +447,5 @@ void BKE_object_eval_eval_base_flags(Depsgraph *depsgraph,
 void BKE_object_eval_light_linking(Depsgraph *depsgraph, Object *object)
 {
   DEG_debug_print_eval(depsgraph, __func__, object->id.name, object);
-  deg::light_linking::eval_runtime_data(depsgraph, object);
+  deg::light_linking::eval_runtime_data(depsgraph, *object);
 }
