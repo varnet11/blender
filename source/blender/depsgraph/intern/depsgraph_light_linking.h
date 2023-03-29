@@ -10,7 +10,6 @@
 #include <cstdint>
 
 #include "BLI_map.hh"
-#include "BLI_set.hh"
 
 struct Collection;
 struct CollectionLightLinking;
@@ -24,6 +23,10 @@ namespace internal {
 /* Set of light as seen from a receiver perspective. */
 class LightSet {
  public:
+  /* Maximum possible identifier of a light set. The identifier is 0-based.
+   * The limitation is imposed by the fact that its identifier is converted to a bitmask. */
+  static constexpr int MAX_ID = 63;
+
   /* Identifier of a light set which is not explicitly linked to anything. */
   static constexpr int DEFAULT_ID = 0;
 
@@ -35,26 +38,32 @@ class LightSet {
 
   uint64_t hash() const;
 
-  /* Lights which are explicitly included/excluded into the light set. */
-  Set<const Object *> include;
-  Set<const Object *> exclude;
+  /* Lights which are explicitly included/excluded into the light set.
+   *
+   * The light is denoted as a bit mask of a light linking collection. This mask is allocated for
+   * every unique light linking collection on an emitter. */
+  uint64_t include_collection_mask;
+  uint64_t exclude_collection_mask;
 };
 
-/* Packed information about emitter. */
+/* Packed information about emitter.
+ * Emitter is actually corresponding to a light linking collection on an object. */
 class EmitterData {
  public:
+  /* Maximum possible identifier of a light linking collection. The identifier is 0-based.
+   * The limitation is imposed by the fact that its identifier is converted to a bitmask. */
+  static constexpr int MAX_COLLECTION_ID = 63;
+
+  /* Bitmask which indicates the emitter belongs to all light sets. */
   static constexpr uint64_t SET_MEMBERSHIP_ALL = ~uint64_t(0);
-
-  EmitterData() = default;
-
-  EmitterData(EmitterData &&other) noexcept = default;
-  EmitterData &operator=(EmitterData &&other) = default;
-
-  EmitterData(const EmitterData &other) = delete;
-  EmitterData &operator=(const EmitterData &other) = delete;
 
   /* Get final emitter membership in the light sets, considering its inclusion and exclusion. */
   uint64_t get_set_membership() const;
+
+  /* Mask of a light linking collection this emitter uses in its configuration.
+   * A single bit is set in this bitfield which corresponds to an identifier of a light linking
+   * collection in the scene. */
+  uint64_t collection_mask = 0;
 
   /* Bit masks of the emitter membership in the light sets. */
   uint64_t included_sets_mask = 0;
@@ -99,11 +108,9 @@ class Cache {
   void eval_runtime_data(Object &object_eval) const;
 
  private:
-  /* Maximum number of bits available for light linking relations. */
-  const int MAX_RELATION_BITS = 64;
-
   /* Add receiver object with the given light linking configuration. */
-  void add_receiver_object(const Object &emitter,
+  void add_receiver_object(const Scene &scene,
+                           const Object &emitter,
                            const CollectionLightLinking &collection_light_linking,
                            const Object &receiver);
 
@@ -117,8 +124,11 @@ class Cache {
   bool can_skip_emitter(const Object &emitter) const;
 
   /* Ensure that the data exists for the given emitter.
-   * The emitter must be original and have light linking collection. */
-  EmitterData &ensure_emitter_data(const Object &emitter);
+   * The emitter must be original and have light linking collection.
+   *
+   * Note that there is limited number of emitters possible within a scene, When this number is
+   * exceeded an error is printed and a nullptr is returned. */
+  EmitterData *ensure_emitter_data_if_possible(const Scene &scene, const Object &emitter);
 
   /* Get emitter data for the given original or evaluated object.
    * If the light linking is not configured for this emitted nullptr is returned. */
@@ -127,13 +137,11 @@ class Cache {
   /* Returns true if there is light linking configuration in the scene. */
   bool has_light_linking() const
   {
-    /* Check both collections, as the former one is only non-empty during the build, and the latter
-     * one after the build. */
-    return !light_linked_sets_.is_empty() || !emitter_data_map_.is_empty();
+    return !emitter_data_map_.is_empty();
   }
 
   /* Receiver-centric view of light sets: indexed by an original receiver object, contains light
-   * set which defines from which emitters it receives light.
+   * set which defines from which emitters it receives light from.
    *
    * NOTE: Only available during build. */
   Map<const Object *, LightSet> light_linked_sets_;
@@ -144,6 +152,9 @@ class Cache {
 
   /* Map from an original receiver object: map to index of light set for this receiver. */
   Map<const Object *, uint64_t> receiver_light_sets_;
+
+  /* Next unique light linking collection ID. */
+  uint64_t next_collection_id_ = 0;
 };
 
 }  // namespace blender::deg::light_linking
