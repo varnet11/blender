@@ -79,6 +79,16 @@ class AssetLibraryService {
   /** Get the "All" asset library, which loads all others and merges them into one. */
   AssetLibrary *get_asset_library_all(const Main *bmain);
 
+  /**
+   * Return the start position of the last blendfile extension in given path, or std::string::npos
+   * if not found. Works with both kind of path separators. */
+  size_t rfind_blendfile_extension(StringRef path);
+  /**
+   * Return a normalized version of #AssetWeakReference.relative_asset_identifier.
+   * Special care is required here because slahes or backslashes should not be converted in the ID
+   * name itself. */
+  std::string normalize_asset_weak_reference_relative_asset_identifier(
+      const AssetWeakReference &asset_reference);
   /** Get a valid library path from the weak reference. Empty if e.g. the reference is to a local
    * asset. */
   std::string resolve_asset_weak_reference_to_library_path(
@@ -88,13 +98,16 @@ class AssetLibraryService {
   /** Struct to hold results from path explosion functions
    * (#resolve_asset_weak_reference_to_exploded_path()). */
   struct ExplodedPath {
-    /* The string buffer containing the fully resolved path, if resolving was successful. */
-    std::string full_path = "";
-    /* Reference into the part of #full_path that is the directory path. */
+    /** The string buffer containing the fully resolved path, if resolving was successful. Pointer
+     * so that the contained string address doesn't change when moving this object. */
+    std::unique_ptr<std::string> full_path;
+    /** Reference into the part of #full_path that is the library directory path. That is, it ends
+     * with the library .blend file ("directory" is misleading). */
     StringRef dir_component = "";
-    /* Reference into the part of #full_path that is the ID group name ("Object", "Brush", ...). */
+    /** Reference into the part of #full_path that is the ID group name ("Object", "Material",
+     * "Brush", ...). */
     StringRef group_component = "";
-    /* Reference into the part of #full_path that is the ID name. */
+    /** Reference into the part of #full_path that is the ID name. */
     StringRef name_component = "";
   };
   /** Similar to #BKE_blendfile_library_path_explode, returns the full path as
