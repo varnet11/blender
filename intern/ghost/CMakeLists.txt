@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-# Copyright 2006 Blender Foundation. All rights reserved.
+# Copyright 2006 Blender Foundation
 
 set(INC
   .
@@ -397,6 +397,10 @@ elseif(WITH_GHOST_X11 OR WITH_GHOST_WAYLAND)
     # `xdg-output`.
     generate_protocol_bindings(
       "${WAYLAND_PROTOCOLS_DIR}/unstable/xdg-output/xdg-output-unstable-v1.xml"
+    )
+    # `xdg-activation`.
+    generate_protocol_bindings(
+      "${WAYLAND_PROTOCOLS_DIR}/staging/xdg-activation/xdg-activation-v1.xml"
     )
     # Pointer-constraints.
     generate_protocol_bindings(
