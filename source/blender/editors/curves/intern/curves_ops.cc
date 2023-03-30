@@ -1175,6 +1175,44 @@ static void CURVES_OT_delete(wmOperatorType *ot)
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
 
+namespace node_group {
+
+static int run_node_group_exec(bContext *C, wmOperator *op)
+{
+  const uint32_t session_uuid = RNA_int_get(op->ptr, "session_uuid");
+  const ID *id = BKE_libblock_find_session_uuid(CTX_data_main(C), ID_NT, session_uuid);
+  if (!id) {
+    return OPERATOR_CANCELLED;
+  }
+  const bNodeTree &node_tree = reinterpret_cast<const bNodeTree &>(*id);
+  return OPERATOR_FINISHED;
+}
+
+}  // namespace node_group
+
+static void CURVES_OT_node_group(wmOperatorType *ot)
+{
+  ot->name = "Run Node Group";
+  ot->idname = __func__;
+  ot->description = "Dummy";  // TODO: Retrieve from node group.
+
+  ot->exec = node_group::run_node_group_exec;
+  ot->poll = editable_curves_poll;
+
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+  PropertyRNA *prop = RNA_def_int(ot->srna,
+                                  "session_uuid",
+                                  0,
+                                  INT32_MIN,
+                                  INT32_MAX,
+                                  "Session UUID",
+                                  "Session UUID of the node group",
+                                  INT32_MIN,
+                                  INT32_MAX);
+  RNA_def_property_flag(prop, PropertyFlag(PROP_SKIP_SAVE | PROP_HIDDEN));
+}
+
 }  // namespace blender::ed::curves
 
 void ED_operatortypes_curves()
@@ -1192,6 +1230,7 @@ void ED_operatortypes_curves()
   WM_operatortype_append(CURVES_OT_select_less);
   WM_operatortype_append(CURVES_OT_surface_set);
   WM_operatortype_append(CURVES_OT_delete);
+  WM_operatortype_append(CURVES_OT_node_group);
 }
 
 void ED_keymap_curves(wmKeyConfig *keyconf)
