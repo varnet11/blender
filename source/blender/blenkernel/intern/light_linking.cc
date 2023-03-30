@@ -78,22 +78,17 @@ bool BKE_light_linking_unlink_id_from_collection(Main *bmain,
 
   Collection *collection = light_linking.collection;
   if (!collection) {
-    if (reports) {
-      BKE_reportf(
-          reports, RPT_ERROR, "No light linking collection for object '%s'", object->id.name + 2);
-    }
+    BKE_reportf(
+        reports, RPT_ERROR, "No light linking collection for object '%s'", object->id.name + 2);
     return false;
   }
 
   if (ID_IS_LINKED(&collection->id) || ID_IS_OVERRIDE_LIBRARY(&collection->id)) {
-    if (reports) {
-      BKE_reportf(reports,
-                  RPT_ERROR,
-                  "Cannot unlink '%s' from linked receiver collection '%s'",
-                  id->name + 2,
-                  collection->id.name + 2);
-    }
-
+    BKE_reportf(reports,
+                RPT_ERROR,
+                "Cannot unlink '%s' from linked receiver collection '%s'",
+                id->name + 2,
+                collection->id.name + 2);
     return false;
   }
 
@@ -106,13 +101,11 @@ bool BKE_light_linking_unlink_id_from_collection(Main *bmain,
     BKE_collection_child_remove(bmain, collection, reinterpret_cast<Collection *>(id));
   }
   else {
-    if (reports) {
-      BKE_reportf(reports,
-                  RPT_ERROR,
-                  "Cannot unlink unsupported '%s' from light linking collection '%s'",
-                  id->name + 2,
-                  collection->id.name + 2);
-    }
+    BKE_reportf(reports,
+                RPT_ERROR,
+                "Cannot unlink unsupported '%s' from light linking collection '%s'",
+                id->name + 2,
+                collection->id.name + 2);
     return false;
   }
 

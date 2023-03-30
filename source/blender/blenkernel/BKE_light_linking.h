@@ -38,7 +38,7 @@ struct Collection *BKE_light_linking_collection_new(struct Main *bmain, struct O
  * will be unsuccessful if, for example, the receiver collection is a linked data-block.
  *
  * The optional reports argument is used to provide human-readable details about why unlinking was
- * not successful. */
+ * not successful. If it is nullptr then the report is printed to the console. */
 bool BKE_light_linking_unlink_id_from_collection(struct Main *bmain,
                                                  struct Object *object,
                                                  struct ID *id,
