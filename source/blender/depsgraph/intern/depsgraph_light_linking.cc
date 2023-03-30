@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright 2023 Blender Foundation. */
+ * Copyright 2023 Blender Foundation */
 
 /** \file
  * \ingroup depsgraph
@@ -134,9 +134,7 @@ class LightSetIDManager {
   using LightSet = internal::LightSet;
 
  public:
-  explicit LightSetIDManager(const Scene &scene) : scene_(scene)
-  {
-  }
+  explicit LightSetIDManager(const Scene &scene) : scene_(scene) {}
 
   bool get(const LightSet &light_set, uint64_t &id)
   {

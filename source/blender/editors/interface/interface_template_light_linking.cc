@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright 2023 Blender Foundation. */
+ * Copyright 2023 Blender Foundation */
 
 /** \file
  * \ingroup edinterface
@@ -153,9 +153,7 @@ class CollectionViewItem : public BasicTreeViewItem {
 
 class CollectionView : public AbstractTreeView {
  public:
-  explicit CollectionView(Collection &collection) : collection_(collection)
-  {
-  }
+  explicit CollectionView(Collection &collection) : collection_(collection) {}
 
   void build_tree() override
   {

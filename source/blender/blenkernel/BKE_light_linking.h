@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright 2001-2023 Blender Foundation. */
+ * Copyright 2001-2023 Blender Foundation */
 
 #pragma once
 
