@@ -115,9 +115,7 @@ Object::Object() : Node(get_node_type())
   intersects_volume = false;
 }
 
-Object::~Object()
-{
-}
+Object::~Object() {}
 
 void Object::update_motion()
 {
@@ -382,9 +380,7 @@ ObjectManager::ObjectManager()
   need_flags_update = true;
 }
 
-ObjectManager::~ObjectManager()
-{
-}
+ObjectManager::~ObjectManager() {}
 
 static float object_volume_density(const Transform &tfm, Geometry *geom)
 {
