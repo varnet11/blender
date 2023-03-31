@@ -97,13 +97,13 @@ static void foreach_light_collection_object_inner(
     const Collection &collection,
     Proc &&callback)
 {
-  LISTBASE_FOREACH (const CollectionObject *, collection_object, &collection.gobject) {
-    callback(collection_light_linking, *collection_object->ob);
-  }
-
   LISTBASE_FOREACH (const CollectionChild *, collection_child, &collection.children) {
     foreach_light_collection_object_inner(
         collection_light_linking, *collection_child->collection, callback);
+  }
+
+  LISTBASE_FOREACH (const CollectionObject *, collection_object, &collection.gobject) {
+    callback(collection_light_linking, *collection_object->ob);
   }
 }
 
@@ -118,13 +118,13 @@ static void foreach_light_collection_object_inner(
 template<class Proc>
 static void foreach_light_collection_object(const Collection &collection, Proc &&callback)
 {
-  LISTBASE_FOREACH (const CollectionObject *, collection_object, &collection.gobject) {
-    callback(collection_object->light_linking, *collection_object->ob);
-  }
-
   LISTBASE_FOREACH (const CollectionChild *, collection_child, &collection.children) {
     foreach_light_collection_object_inner(
         collection_child->light_linking, *collection_child->collection, callback);
+  }
+
+  LISTBASE_FOREACH (const CollectionObject *, collection_object, &collection.gobject) {
+    callback(collection_object->light_linking, *collection_object->ob);
   }
 }
 
@@ -229,10 +229,12 @@ void Cache::add_receiver_object(const Scene &scene,
 
         case COLLECTION_LIGHT_LINKING_STATE_INCLUDE:
           light_set.include_collection_mask |= emitter_data->collection_mask;
+          light_set.exclude_collection_mask &= ~emitter_data->collection_mask;
           break;
 
         case COLLECTION_LIGHT_LINKING_STATE_EXCLUDE:
           light_set.exclude_collection_mask |= emitter_data->collection_mask;
+          light_set.include_collection_mask &= ~emitter_data->collection_mask;
           break;
       }
     }
