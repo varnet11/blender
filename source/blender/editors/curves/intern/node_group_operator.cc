@@ -65,6 +65,12 @@ static int run_node_group_exec(bContext *C, wmOperator *op)
   Object **objects = BKE_view_layer_array_from_objects_in_mode_unique_data(
       scene, view_layer, CTX_wm_view3d(C), &objects_len, mode);
 
+  for (Object *object : Span(objects, objects_len)) {
+    Curves &curves = *static_cast<Curves *>(object->data);
+    GeometrySet geometry_set = GeometrySet::create_with_curves(&curves,
+                                                               GeometryOwnershipType::Editable);
+    }
+
   return OPERATOR_FINISHED;
 }
 

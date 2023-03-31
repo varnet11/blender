@@ -59,6 +59,11 @@ struct GeoNodesModifierData {
   const Set<ComputeContextHash> *socket_log_contexts = nullptr;
 };
 
+struct GeoNodesOperatorData {
+  /** The object currently effected by the operator. */
+  const Object *self_object = nullptr;
+};
+
 /**
  * Custom user data that is passed to every geometry nodes related lazy-function evaluation.
  */
@@ -67,6 +72,10 @@ struct GeoNodesLFUserData : public lf::UserData {
    * Data from the modifier that is being evaluated.
    */
   GeoNodesModifierData *modifier_data = nullptr;
+  /**
+   *
+   */
+  GeoNodesOperatorData *operator_data = nullptr;
   /**
    * Current compute context. This is different depending in the (nested) node group that is being
    * evaluated.
