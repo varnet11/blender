@@ -50,31 +50,6 @@ void eval_runtime_data(const ::Depsgraph *depsgraph, Object &object_eval)
 /** \name Internal builder API
  * \{ */
 
-namespace blender::deg::light_linking {
-
-namespace internal {
-
-bool LightSet::operator==(const LightSet &other) const
-{
-  return include_collection_mask == other.include_collection_mask &&
-         exclude_collection_mask == other.exclude_collection_mask;
-}
-
-uint64_t LightSet::hash() const
-{
-  return get_default_hash_2(get_default_hash(include_collection_mask),
-                            get_default_hash(exclude_collection_mask));
-}
-
-uint64_t EmitterData::get_set_membership() const
-{
-  const uint64_t effective_included_mask = included_sets_mask ? included_sets_mask :
-                                                                SET_MEMBERSHIP_ALL;
-  return effective_included_mask & ~excluded_sets_mask;
-}
-
-}  // namespace internal
-
 namespace {
 
 /* TODO(sergey): Move to a public API, solving the const-correctness. */
@@ -86,47 +61,19 @@ template<class T> static inline const T *get_original(const T *id)
   return reinterpret_cast<T *>(DEG_get_original_id(const_cast<ID *>(&id->id)));
 }
 
-/* Iterate over all objects of the collection and invoke the given callback with two arguments:
- * the given collection light linking settings, and the object (passed as reference).
- *
- * Note that if an object is reachable from multiple children collection the callback is invoked
- * for all of them. */
-template<class Proc>
-static void foreach_light_collection_object_inner(
-    const CollectionLightLinking &collection_light_linking,
-    const Collection &collection,
-    Proc &&callback)
-{
-  LISTBASE_FOREACH (const CollectionChild *, collection_child, &collection.children) {
-    foreach_light_collection_object_inner(
-        collection_light_linking, *collection_child->collection, callback);
-  }
+}  // namespace
 
-  LISTBASE_FOREACH (const CollectionObject *, collection_object, &collection.gobject) {
-    callback(collection_light_linking, *collection_object->ob);
-  }
-}
+namespace blender::deg::light_linking {
 
-/* Iterate over all objects of the collection and invoke the given callback with two arguments:
- * CollectionLightLinking and the actual Object (passed as reference).
- *
- * The CollectionLightLinking denotes the effective light linking settings of the object. It comes
- * from the first level of hierarchy from the given collection.
- *
- * Note that if an object is reachable from multiple children collection the callback is invoked
- * for all of them. */
-template<class Proc>
-static void foreach_light_collection_object(const Collection &collection, Proc &&callback)
-{
-  LISTBASE_FOREACH (const CollectionChild *, collection_child, &collection.children) {
-    foreach_light_collection_object_inner(
-        collection_child->light_linking, *collection_child->collection, callback);
-  }
+using LightSet = internal::LightSet;
+using EmitterData = internal::EmitterData;
+using EmitterDataMap = internal::EmitterDataMap;
+using EmitterSetMembership = internal::EmitterSetMembership;
+using LinkingData = internal::LinkingData;
 
-  LISTBASE_FOREACH (const CollectionObject *, collection_object, &collection.gobject) {
-    callback(collection_object->light_linking, *collection_object->ob);
-  }
-}
+namespace internal {
+
+namespace {
 
 /* Helper class which takes care of allocating an unique light set IDs, performing checks for
  * overflows. */
@@ -173,160 +120,38 @@ class LightSetIDManager {
 
 }  // namespace
 
-void Cache::clear()
+/* LightSet */
+
+bool LightSet::operator==(const LightSet &other) const
 {
-  light_linked_sets_.clear();
+  return include_collection_mask == other.include_collection_mask &&
+         exclude_collection_mask == other.exclude_collection_mask;
+}
+
+uint64_t LightSet::hash() const
+{
+  return get_default_hash_2(get_default_hash(include_collection_mask),
+                            get_default_hash(exclude_collection_mask));
+}
+
+/* EmitterSetMembership */
+
+uint64_t EmitterSetMembership::get_mask() const
+{
+  const uint64_t effective_included_mask = included_sets_mask ? included_sets_mask :
+                                                                SET_MEMBERSHIP_ALL;
+  return effective_included_mask & ~excluded_sets_mask;
+}
+
+/* EmitterDataMap. */
+
+void EmitterDataMap::clear()
+{
   emitter_data_map_.clear();
-  receiver_light_sets_.clear();
   next_collection_id_ = 0;
 }
 
-void Cache::add_emitter(const Scene &scene, const Object &emitter)
-{
-  BLI_assert(DEG_is_original_id(&emitter.id));
-
-  if (can_skip_emitter(emitter)) {
-    return;
-  }
-
-  const LightLinking &light_linking = emitter.light_linking;
-  Collection *collection = light_linking.collection;
-
-  /* Add collection bit to all receivers affected by this emitter or any emitter with the same
-   * receiver collection. */
-  /* TODO: optimize by doing this non-recursively, and only going recursive in end_build()? */
-  foreach_light_collection_object(
-      *collection,
-      [&](const CollectionLightLinking &collection_light_linking, const Object &receiver) {
-        add_receiver_object(scene, emitter, collection_light_linking, receiver);
-      });
-}
-
-void Cache::add_receiver_object(const Scene &scene,
-                                const Object &emitter,
-                                const CollectionLightLinking &collection_light_linking,
-                                const Object &receiver)
-{
-  BLI_assert(DEG_is_original_id(&emitter->id));
-  BLI_assert(DEG_is_original_id(&receiver->id));
-
-  if (receiver.light_linking.collection != nullptr) {
-    /* If the object has receiver collection configure do not consider it as a receiver, avoiding
-     * dependency cycles. */
-    return;
-  }
-
-  /* Light linking membership. */
-  if (collection_light_linking.light_state != COLLECTION_LIGHT_LINKING_STATE_NONE) {
-    const EmitterData *emitter_data = ensure_emitter_data_if_possible(scene, emitter);
-
-    if (emitter_data) {
-      LightSet &light_set = ensure_light_linked_set(receiver);
-
-      switch (collection_light_linking.light_state) {
-        case COLLECTION_LIGHT_LINKING_STATE_NONE:
-          break;
-
-        case COLLECTION_LIGHT_LINKING_STATE_INCLUDE:
-          light_set.include_collection_mask |= emitter_data->collection_mask;
-          light_set.exclude_collection_mask &= ~emitter_data->collection_mask;
-          break;
-
-        case COLLECTION_LIGHT_LINKING_STATE_EXCLUDE:
-          light_set.exclude_collection_mask |= emitter_data->collection_mask;
-          light_set.include_collection_mask &= ~emitter_data->collection_mask;
-          break;
-      }
-    }
-  }
-
-  /* TODO(sergey): Handle shadow linking. */
-}
-
-void Cache::end_build(const Scene &scene)
-{
-  if (!has_light_linking()) {
-    return;
-  }
-
-  LightSetIDManager light_set_id_manager(scene);
-
-  for (const auto it : light_linked_sets_.items()) {
-    const Object *receiver = it.key;
-    LightSet &light_set = it.value;
-
-    uint64_t light_set_id;
-    if (!light_set_id_manager.get(light_set, light_set_id)) {
-      continue;
-    }
-
-    const uint64_t light_set_mask = uint64_t(1) << light_set_id;
-
-    receiver_light_sets_.add(receiver, light_set_id);
-
-    for (EmitterData &emitter_data : emitter_data_map_.values()) {
-      if (emitter_data.collection_mask & light_set.include_collection_mask) {
-        emitter_data.included_sets_mask |= light_set_mask;
-      }
-      if (emitter_data.collection_mask & light_set.exclude_collection_mask) {
-        emitter_data.excluded_sets_mask |= light_set_mask;
-      }
-    }
-  }
-
-  light_linked_sets_.clear_and_shrink();
-}
-
-/* Set runtime data in light linking. */
-void Cache::eval_runtime_data(Object &object_eval) const
-{
-  LightLinking &light_linking = object_eval.light_linking;
-
-  if (!has_light_linking()) {
-    /* No light linking used in the scene. */
-    light_linking.runtime.receiver_set = 0;
-    light_linking.runtime.set_membership = 0;
-    return;
-  }
-
-  /* Receiver configuration. */
-  const Object *object_orig = get_original(&object_eval);
-  light_linking.runtime.receiver_set = receiver_light_sets_.lookup_default(object_orig,
-                                                                           LightSet::DEFAULT_ID);
-
-  /* Emitter configuration. */
-  const EmitterData *emitter_data = get_emitter_data(object_eval);
-  if (emitter_data) {
-    light_linking.runtime.set_membership = emitter_data->get_set_membership();
-  }
-  else {
-    light_linking.runtime.set_membership = EmitterData::SET_MEMBERSHIP_ALL;
-  }
-}
-
-internal::LightSet &Cache::ensure_light_linked_set(const Object &receiver)
-{
-  BLI_assert(DEG_is_original_id(&receiver.id));
-
-  return light_linked_sets_.lookup_or_add_as(&receiver);
-}
-
-bool Cache::can_skip_emitter(const Object &emitter) const
-{
-  BLI_assert(DEG_is_original_id(&emitter.id));
-
-  const LightLinking &light_linking = emitter.light_linking;
-  const Collection *collection = light_linking.collection;
-
-  if (!collection) {
-    return true;
-  }
-
-  return emitter_data_map_.contains(collection);
-}
-
-internal::EmitterData *Cache::ensure_emitter_data_if_possible(const Scene &scene,
-                                                              const Object &emitter)
+EmitterData *EmitterDataMap::ensure_data_if_possible(const Scene &scene, const Object &emitter)
 {
   BLI_assert(DEG_is_original_id(&emitter.id));
   BLI_assert(emitter.light_linking.collection);
@@ -370,7 +195,7 @@ internal::EmitterData *Cache::ensure_emitter_data_if_possible(const Scene &scene
   return &emitter_data;
 }
 
-const internal::EmitterData *Cache::get_emitter_data(const Object &emitter) const
+const EmitterData *EmitterDataMap::get_data(const Object &emitter) const
 {
   const LightLinking &light_linking = emitter.light_linking;
   const Collection *collection_eval = light_linking.collection;
@@ -382,6 +207,258 @@ const internal::EmitterData *Cache::get_emitter_data(const Object &emitter) cons
   const Collection *collection_orig = get_original(collection_eval);
 
   return emitter_data_map_.lookup_ptr(collection_orig);
+}
+
+bool EmitterDataMap::can_skip_emitter(const Object &emitter) const
+{
+  BLI_assert(DEG_is_original_id(&emitter.id));
+
+  const LightLinking &light_linking = emitter.light_linking;
+  const Collection *collection = light_linking.collection;
+
+  if (!collection) {
+    return true;
+  }
+
+  return emitter_data_map_.contains(collection);
+}
+
+/* LinkingData */
+
+void LinkingData::clear()
+{
+  light_linked_sets_.clear();
+  object_light_sets_.clear();
+}
+
+void LinkingData::link_object(const EmitterData &emitter_data,
+                              const eCollectionLightLinkingState link_state,
+                              const Object &object)
+{
+  if (link_state == COLLECTION_LIGHT_LINKING_STATE_NONE) {
+    return;
+  }
+
+  LightSet &light_set = ensure_light_set_for(object);
+
+  switch (link_state) {
+    case COLLECTION_LIGHT_LINKING_STATE_NONE:
+      BLI_assert_unreachable();
+      break;
+
+    case COLLECTION_LIGHT_LINKING_STATE_INCLUDE:
+      light_set.include_collection_mask |= emitter_data.collection_mask;
+      light_set.exclude_collection_mask &= ~emitter_data.collection_mask;
+      break;
+
+    case COLLECTION_LIGHT_LINKING_STATE_EXCLUDE:
+      light_set.exclude_collection_mask |= emitter_data.collection_mask;
+      light_set.include_collection_mask &= ~emitter_data.collection_mask;
+      break;
+  }
+}
+
+LightSet &LinkingData::ensure_light_set_for(const Object &object)
+{
+  BLI_assert(DEG_is_original_id(&object.id));
+
+  return light_linked_sets_.lookup_or_add_as(&object);
+}
+
+void LinkingData::clear_after_build()
+{
+  light_linked_sets_.clear_and_shrink();
+}
+
+void LinkingData::end_build(const Scene &scene, EmitterDataMap &emitter_data_map)
+{
+  LightSetIDManager light_set_id_manager(scene);
+
+  for (const auto it : light_linked_sets_.items()) {
+    const Object *receiver = it.key;
+    LightSet &light_set = it.value;
+
+    uint64_t light_set_id;
+    if (!light_set_id_manager.get(light_set, light_set_id)) {
+      continue;
+    }
+
+    const uint64_t light_set_mask = uint64_t(1) << light_set_id;
+
+    object_light_sets_.add(receiver, light_set_id);
+
+    update_emitters_membership(emitter_data_map, light_set, light_set_mask);
+  }
+
+  clear_after_build();
+}
+
+void LinkingData::update_emitters_membership(EmitterDataMap &emitter_data_map,
+                                             const LightSet &light_set,
+                                             const uint64_t light_set_mask)
+{
+  for (EmitterData &emitter_data : emitter_data_map.values()) {
+    EmitterSetMembership &set_membership = get_emitter_set_membership(emitter_data);
+
+    if (emitter_data.collection_mask & light_set.include_collection_mask) {
+      set_membership.included_sets_mask |= light_set_mask;
+    }
+    if (emitter_data.collection_mask & light_set.exclude_collection_mask) {
+      set_membership.excluded_sets_mask |= light_set_mask;
+    }
+  }
+}
+
+uint64_t LinkingData::get_light_set_for(const Object &object) const
+{
+  const Object *object_orig = get_original(&object);
+  return object_light_sets_.lookup_default(object_orig, LightSet::DEFAULT_ID);
+}
+
+}  // namespace internal
+
+namespace {
+
+/* Iterate over all objects of the collection and invoke the given callback with two arguments:
+ * the given collection light linking settings, and the object (passed as reference).
+ *
+ * Note that if an object is reachable from multiple children collection the callback is invoked
+ * for all of them. */
+template<class Proc>
+static void foreach_light_collection_object_inner(
+    const CollectionLightLinking &collection_light_linking,
+    const Collection &collection,
+    Proc &&callback)
+{
+  LISTBASE_FOREACH (const CollectionChild *, collection_child, &collection.children) {
+    foreach_light_collection_object_inner(
+        collection_light_linking, *collection_child->collection, callback);
+  }
+
+  LISTBASE_FOREACH (const CollectionObject *, collection_object, &collection.gobject) {
+    callback(collection_light_linking, *collection_object->ob);
+  }
+}
+
+/* Iterate over all objects of the collection and invoke the given callback with two arguments:
+ * CollectionLightLinking and the actual Object (passed as reference).
+ *
+ * The CollectionLightLinking denotes the effective light linking settings of the object. It comes
+ * from the first level of hierarchy from the given collection.
+ *
+ * Note that if an object is reachable from multiple children collection the callback is invoked
+ * for all of them. */
+template<class Proc>
+static void foreach_light_collection_object(const Collection &collection, Proc &&callback)
+{
+  LISTBASE_FOREACH (const CollectionChild *, collection_child, &collection.children) {
+    foreach_light_collection_object_inner(
+        collection_child->light_linking, *collection_child->collection, callback);
+  }
+
+  LISTBASE_FOREACH (const CollectionObject *, collection_object, &collection.gobject) {
+    callback(collection_object->light_linking, *collection_object->ob);
+  }
+}
+
+}  // namespace
+
+void Cache::clear()
+{
+  emitter_data_map_.clear();
+  light_linking_.clear();
+  shadow_linking_.clear();
+}
+
+void Cache::add_emitter(const Scene &scene, const Object &emitter)
+{
+  BLI_assert(DEG_is_original_id(&emitter.id));
+
+  if (emitter_data_map_.can_skip_emitter(emitter)) {
+    return;
+  }
+
+  const LightLinking &light_linking = emitter.light_linking;
+  Collection *collection = light_linking.collection;
+
+  const EmitterData *emitter_data = emitter_data_map_.ensure_data_if_possible(scene, emitter);
+  if (!emitter_data) {
+    /* The number of possible emitters exceeded in the scene. */
+    return;
+  }
+
+  /* Add collection bit to all receivers affected by this emitter or any emitter with the same
+   * receiver collection. */
+  foreach_light_collection_object(
+      *collection,
+      [&](const CollectionLightLinking &collection_light_linking, const Object &receiver) {
+        add_receiver_object(*emitter_data, collection_light_linking, receiver);
+      });
+}
+
+void Cache::add_receiver_object(const EmitterData &emitter_data,
+                                const CollectionLightLinking &collection_light_linking,
+                                const Object &receiver)
+{
+  BLI_assert(DEG_is_original_id(&emitter.id));
+  BLI_assert(DEG_is_original_id(&receiver.id));
+
+  if (receiver.light_linking.collection != nullptr) {
+    /* If the object has receiver collection configure do not consider it as a receiver, avoiding
+     * dependency cycles. */
+    return;
+  }
+
+  /* Light linking. */
+  light_linking_.link_object(
+      emitter_data, eCollectionLightLinkingState(collection_light_linking.light_state), receiver);
+
+  /* Shadow linking. */
+  shadow_linking_.link_object(
+      emitter_data, eCollectionLightLinkingState(collection_light_linking.shadow_state), receiver);
+}
+
+void Cache::end_build(const Scene &scene)
+{
+  if (!has_light_linking()) {
+    return;
+  }
+
+  light_linking_.end_build(scene, emitter_data_map_);
+  shadow_linking_.end_build(scene, emitter_data_map_);
+}
+
+/* Set runtime data in light linking. */
+void Cache::eval_runtime_data(Object &object_eval) const
+{
+  LightLinking &light_linking = object_eval.light_linking;
+
+  if (!has_light_linking()) {
+    /* No light linking used in the scene. */
+
+    light_linking.runtime.receiver_light_set = 0;
+    light_linking.runtime.light_set_membership = 0;
+
+    light_linking.runtime.blocker_shadow_set = 0;
+    light_linking.runtime.shadow_set_membership = 0;
+
+    return;
+  }
+
+  /* Receiver and blocker configuration. */
+  light_linking.runtime.receiver_light_set = light_linking_.get_light_set_for(object_eval);
+  light_linking.runtime.blocker_shadow_set = shadow_linking_.get_light_set_for(object_eval);
+
+  /* Emitter configuration. */
+  const EmitterData *emitter_data = emitter_data_map_.get_data(object_eval);
+  if (emitter_data) {
+    light_linking.runtime.light_set_membership = emitter_data->light_membership.get_mask();
+    light_linking.runtime.shadow_set_membership = emitter_data->shadow_membership.get_mask();
+  }
+  else {
+    light_linking.runtime.light_set_membership = EmitterSetMembership::SET_MEMBERSHIP_ALL;
+    light_linking.runtime.shadow_set_membership = EmitterSetMembership::SET_MEMBERSHIP_ALL;
+  }
 }
 
 }  // namespace blender::deg::light_linking

@@ -349,8 +349,8 @@ Object *BlenderSync::sync_object(BL::Depsgraph &b_depsgraph,
 
     /* Light group and linking. */
     object->set_lightgroup(ustring(b_ob.lightgroup()));
-    object->set_light_link_set_membership(light_linking_get_set_membership(b_ob));
-    object->set_light_link_receiver_set(light_linking_get_receiver_set(b_ob));
+    object->set_light_link_set_membership(light_linking_get_light_set_membership(b_ob));
+    object->set_light_link_receiver_set(light_linking_get_receiver_light_set(b_ob));
 
     object->tag_update(scene);
   }

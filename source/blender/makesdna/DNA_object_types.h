@@ -247,22 +247,40 @@ enum eObjectLineArt_Flags {
   OBJECT_LRT_OWN_INTERSECTION_PRIORITY = (1 << 1),
 };
 
+/* Evaluated light linking state needed for the render engines integration. */
 typedef struct LightLinkingRuntime {
-  /* For objects that emit light: a bitmask of light sets this emitter is part of.
+
+  /* For objects that emit light: a bitmask of light sets this emitter is part of for the light
+   * linking.
    * A light set is a combination of emitters used by one or more receiver objects.
    *
    * If there is no light linking in the scene, this is assigned zero. If the emitter does
    * not specify light linking, it is a member of all light sets.
    *
    * NOTE: There can only be 64 light sets in a scene. */
-  uint64_t set_membership;
+  uint64_t light_set_membership;
 
-  /* For receiver objects, the index of the light set from which this object receives light.
+  /* For objects that emit light: a bitmask of light sets this emitter is part of for the shadow
+   * linking.
+   * A light set is a combination of emitters from which a blocked object does not cast a shadow.
+   *
+   * If there is no shadow linking in the scene, this is assigned zero. If the emitter does
+   * not specify light linking, it is a member of all light sets.
+   *
+   * NOTE: There can only be 64 light sets in a scene. */
+  uint64_t shadow_set_membership;
+
+  /* For receiver objects: the index of the light set from which this object receives light.
    *
    * If there is no light linking in the scene, this is assigned zero. */
-  uint8_t receiver_set;
+  uint8_t receiver_light_set;
 
-  uint8_t _pad[7];
+  /* For blocker objects: the index of the light set from which this object casts shadow from.
+   *
+   * If there is no light shadow in the scene, this is assigned zero. */
+  uint8_t blocker_shadow_set;
+
+  uint8_t _pad[6];
 } LightLinkingRuntime;
 
 typedef struct LightLinking {
