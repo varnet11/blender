@@ -137,7 +137,8 @@ NODE_DEFINE(Light)
   SOCKET_NODE(shader, "Shader", Shader::get_node_type());
 
   SOCKET_STRING(lightgroup, "Light Group", ustring());
-  SOCKET_UINT64(light_link_set_membership, "Light Link Set Membership", 0);
+  SOCKET_UINT64(light_set_membership, "Light Set Membership", 0);
+  SOCKET_UINT64(shadow_set_membership, "Shadow Set Membership", 0);
 
   return type;
 }
@@ -1128,6 +1129,12 @@ void LightManager::device_update_lights(Device *device, DeviceScene *dscene, Sce
       klights[light_index].spot.spot_smooth = spot_smooth;
     }
 
+    /* Disable MIS if the light participates in the shadow linking, as it is not supported. */
+    /* TODO(sergey): Support MIS with shadow linking. */
+    if (light->shadow_set_membership) {
+      shader_id &= ~SHADER_USE_MIS;
+    }
+
     klights[light_index].shader_id = shader_id;
 
     klights[light_index].max_bounces = max_bounces;
@@ -1145,7 +1152,8 @@ void LightManager::device_update_lights(Device *device, DeviceScene *dscene, Sce
       klights[light_index].lightgroup = LIGHTGROUP_NONE;
     }
 
-    klights[light_index].light_link_set_membership = light->light_link_set_membership;
+    klights[light_index].light_set_membership = light->light_set_membership;
+    klights[light_index].shadow_set_membership = light->shadow_set_membership;
 
     light_index++;
   }

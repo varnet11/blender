@@ -265,6 +265,7 @@ ccl_device_forceinline void integrate_surface_direct_light(KernelGlobals kg,
   INTEGRATOR_STATE_ARRAY_WRITE(shadow_state, shadow_isect, 0, prim) = ray.self.prim;
   INTEGRATOR_STATE_ARRAY_WRITE(shadow_state, shadow_isect, 1, object) = ray.self.light_object;
   INTEGRATOR_STATE_ARRAY_WRITE(shadow_state, shadow_isect, 1, prim) = ray.self.light_prim;
+  INTEGRATOR_STATE_ARRAY_WRITE(shadow_state, shadow_isect, 2, object) = ray.self.light;
 
   /* Copy state from main path to shadow path. */
   uint32_t shadow_flag = INTEGRATOR_STATE(state, path, flag);
@@ -546,6 +547,7 @@ ccl_device_forceinline void integrate_surface_ao(KernelGlobals kg,
   ray.self.prim = (skip_self) ? sd->prim : PRIM_NONE;
   ray.self.light_object = OBJECT_NONE;
   ray.self.light_prim = PRIM_NONE;
+  ray.self.light = LAMP_NONE;
   ray.dP = differential_zero_compact();
   ray.dD = differential_zero_compact();
 
@@ -562,6 +564,7 @@ ccl_device_forceinline void integrate_surface_ao(KernelGlobals kg,
   INTEGRATOR_STATE_ARRAY_WRITE(shadow_state, shadow_isect, 0, prim) = ray.self.prim;
   INTEGRATOR_STATE_ARRAY_WRITE(shadow_state, shadow_isect, 1, object) = ray.self.light_object;
   INTEGRATOR_STATE_ARRAY_WRITE(shadow_state, shadow_isect, 1, prim) = ray.self.light_prim;
+  INTEGRATOR_STATE_ARRAY_WRITE(shadow_state, shadow_isect, 2, object) = ray.self.light;
 
   /* Copy state from main path to shadow path. */
   const uint16_t bounce = INTEGRATOR_STATE(state, path, bounce);

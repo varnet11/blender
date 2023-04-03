@@ -52,12 +52,11 @@ ccl_device_inline bool light_link_light_match(KernelGlobals kg,
     return true;
   }
 
-  const uint64_t set_membership =
-      kernel_data_fetch(lights, light_emitter).light_link_set_membership;
+  const uint64_t set_membership = kernel_data_fetch(lights, light_emitter).light_set_membership;
   if (set_membership == LIGHT_LINK_MASK_ALL) {
     return true;
   }
-  const uint receiver_set = kernel_data_fetch(objects, object_receiver).light_link_receiver_set;
+  const uint receiver_set = kernel_data_fetch(objects, object_receiver).receiver_light_set;
   return ((uint64_t(1) << uint64_t(receiver_set)) & set_membership) != 0;
 }
 
@@ -72,12 +71,11 @@ ccl_device_inline bool light_link_object_match(KernelGlobals kg,
     return true;
   }
 
-  const uint64_t set_membership =
-      kernel_data_fetch(objects, object_emitter).light_link_set_membership;
+  const uint64_t set_membership = kernel_data_fetch(objects, object_emitter).light_set_membership;
   if (set_membership == LIGHT_LINK_MASK_ALL) {
     return true;
   }
-  const uint receiver_set = kernel_data_fetch(objects, object_receiver).light_link_receiver_set;
+  const uint receiver_set = kernel_data_fetch(objects, object_receiver).receiver_light_set;
   return ((uint64_t(1) << uint64_t(receiver_set)) & set_membership) != 0;
 }
 

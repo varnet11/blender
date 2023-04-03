@@ -400,7 +400,6 @@ void Cache::add_receiver_object(const EmitterData &emitter_data,
                                 const CollectionLightLinking &collection_light_linking,
                                 const Object &receiver)
 {
-  BLI_assert(DEG_is_original_id(&emitter.id));
   BLI_assert(DEG_is_original_id(&receiver.id));
 
   if (receiver.light_linking.collection != nullptr) {

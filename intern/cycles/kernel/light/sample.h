@@ -250,6 +250,7 @@ ccl_device_inline void shadow_ray_setup(ccl_private const ShaderData *ccl_restri
   ray->self.prim = (skip_self) ? sd->prim : PRIM_NONE;
   ray->self.light_object = ls->object;
   ray->self.light_prim = ls->prim;
+  ray->self.light = ls->lamp;
 }
 
 /* Create shadow ray towards light sample. */

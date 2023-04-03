@@ -61,6 +61,7 @@ CCL_NAMESPACE_BEGIN
 #define __DENOISING_FEATURES__
 #define __DPDU__
 #define __HAIR__
+#define __LIGHT_LINKING__
 #define __LIGHT_TREE__
 #define __OBJECT_MOTION__
 #define __PASSES__
@@ -562,6 +563,7 @@ typedef struct RaySelfPrimitives {
   int object;       /* Instance prim is a part of */
   int light_prim;   /* Light primitive */
   int light_object; /* Light object */
+  int light;        /* Light ID (the light the shadow ray is traced towards to) */
 } RaySelfPrimitives;
 
 typedef struct Ray {
@@ -1278,9 +1280,10 @@ typedef struct KernelObject {
   float velocity_scale;
 
   /* TODO: separate array to avoid memory overhead when not used. */
-  uint64_t light_link_set_membership;
-  uint light_link_receiver_set;
-  uint pad;
+  uint64_t light_set_membership;
+  uint receiver_light_set;
+  uint64_t shadow_set_membership;
+  uint blocker_shadow_set;
 } KernelObject;
 static_assert_align(KernelObject, 16);
 
@@ -1346,8 +1349,8 @@ typedef struct KernelLight {
     KernelAreaLight area;
     KernelDistantLight distant;
   };
-  uint64_t light_link_set_membership;
-  uint64_t pad;
+  uint64_t light_set_membership;
+  uint64_t shadow_set_membership;
 } KernelLight;
 static_assert_align(KernelLight, 16);
 

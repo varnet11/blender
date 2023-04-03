@@ -73,7 +73,8 @@ class Light : public Node {
   NODE_SOCKET_API(uint, random_id)
 
   NODE_SOCKET_API(ustring, lightgroup)
-  NODE_SOCKET_API(uint64_t, light_link_set_membership);
+  NODE_SOCKET_API(uint64_t, light_set_membership);
+  NODE_SOCKET_API(uint64_t, shadow_set_membership);
 
   void tag_update(Scene *scene);
 
