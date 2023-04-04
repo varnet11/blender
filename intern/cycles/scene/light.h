@@ -21,7 +21,6 @@ CCL_NAMESPACE_BEGIN
 
 class Device;
 class DeviceScene;
-class Object;
 class Progress;
 class Scene;
 class Shader;
@@ -75,6 +74,8 @@ class Light : public Node {
   NODE_SOCKET_API(ustring, lightgroup)
   NODE_SOCKET_API(uint64_t, light_set_membership);
   NODE_SOCKET_API(uint64_t, shadow_set_membership);
+
+  NODE_SOCKET_API(bool, normalize)
 
   void tag_update(Scene *scene);
 
@@ -141,9 +142,6 @@ class LightManager {
                                 Scene *scene,
                                 Progress &progress);
   void device_update_ies(DeviceScene *dscene);
-
-  /* Check whether light manager can use the object as a light-emissive. */
-  bool object_usable_as_light(Object *object);
 
   struct IESSlot {
     IESFile ies;
