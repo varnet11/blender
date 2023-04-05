@@ -1583,6 +1583,11 @@ struct GeometryNodesLazyFunctionGraphBuilder {
 
   void handle_simulation_input_node(const bNodeTree &node_tree, const bNode &bnode)
   {
+    const NodeGeometrySimulationInput *storage = static_cast<const NodeGeometrySimulationInput *>(bnode.storage);
+    if (node_tree.node_by_id(storage->output_node_id) == nullptr) {
+      return;
+    }
+
     std::unique_ptr<LazyFunction> lazy_function = get_simulation_input_lazy_function(node_tree,
                                                                                      bnode);
     lf::FunctionNode &lf_node = lf_graph_->add_function(*lazy_function);
