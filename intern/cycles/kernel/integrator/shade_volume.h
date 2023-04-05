@@ -841,6 +841,7 @@ ccl_device_forceinline void integrate_volume_direct_light(
   INTEGRATOR_STATE_ARRAY_WRITE(shadow_state, shadow_isect, 0, prim) = ray.self.prim;
   INTEGRATOR_STATE_ARRAY_WRITE(shadow_state, shadow_isect, 1, object) = ray.self.light_object;
   INTEGRATOR_STATE_ARRAY_WRITE(shadow_state, shadow_isect, 1, prim) = ray.self.light_prim;
+  INTEGRATOR_STATE_ARRAY_WRITE(shadow_state, shadow_isect, 2, object) = ray.self.light;
 
   /* Copy state from main path to shadow path. */
   const uint16_t bounce = INTEGRATOR_STATE(state, path, bounce);
