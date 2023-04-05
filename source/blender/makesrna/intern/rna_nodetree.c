@@ -4089,6 +4089,27 @@ static void rna_NodeCryptomatte_update_remove(Main *bmain, Scene *scene, Pointer
   rna_Node_update(bmain, scene, ptr);
 }
 
+static bool rna_GeometryNodeSimulationInput_pair_with_output(
+    ID *id, bNode *node, bContext *C, ReportList *reports, bNode *output_node)
+{
+  bNodeTree *ntree = (bNodeTree *)id;
+
+  if (!node_geo_simulation_input_pair_with_output(ntree, node, output_node)) {
+    BKE_reportf(reports,
+                RPT_ERROR,
+                "Failed to pair simulation input node %s with output node %s",
+                node->name,
+                output_node->name);
+    return false;
+  }
+
+  BKE_ntree_update_tag_node_property(ntree, node);
+  ED_node_tree_propagate_change(C, CTX_data_main(C), ntree);
+  WM_main_add_notifier(NC_NODE | NA_EDITED, ntree);
+
+  return true;
+}
+
 /* ******** Node Socket Types ******** */
 
 static PointerRNA rna_NodeOutputFile_slot_layer_get(CollectionPropertyIterator *iter)
@@ -9742,8 +9763,19 @@ static void def_geo_set_curve_normal(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 }
 
-static void def_geo_simulation_input(StructRNA *UNUSED(srna))
+static void def_geo_simulation_input(StructRNA *srna)
 {
+  FunctionRNA *func;
+  PropertyRNA *parm;
+
+  func = RNA_def_function(srna, "pair_with_output", "rna_GeometryNodeSimulationInput_pair_with_output");
+  RNA_def_function_ui_description(func, "Pair a simulation input node with an output node.");
+  RNA_def_function_flag(func, FUNC_USE_SELF_ID | FUNC_USE_REPORTS | FUNC_USE_CONTEXT);
+  parm = RNA_def_pointer(func, "output_node", "GeometryNode", "Output Node", "Simulation output node to pair with");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  /* return value */
+  parm = RNA_def_boolean(func, "result", false, "Result", "True if pairing the node was successful");
+  RNA_def_function_return(func, parm);
 }
 
 static void rna_def_simulation_state_item(BlenderRNA *brna)

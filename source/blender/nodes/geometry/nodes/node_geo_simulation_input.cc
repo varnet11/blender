@@ -121,33 +121,11 @@ static void node_declare_dynamic(const bNodeTree &node_tree,
   socket_declarations_for_simulation_items({storage.items, storage.items_num}, r_declaration);
 }
 
-static void node_init(bNodeTree *tree, bNode *node)
+static void node_init(bNodeTree */*tree*/, bNode *node)
 {
   NodeGeometrySimulationInput *data = MEM_cnew<NodeGeometrySimulationInput>(__func__);
-
-  VectorSet<int32_t> sim_output_ids;
-  Set<int32_t> sim_input_output_ids;
-  for (bNode *other_node : tree->all_nodes()) {
-    if (other_node->type == GEO_NODE_SIMULATION_INPUT && other_node != node &&
-        other_node->storage) {
-      const NodeGeometrySimulationInput &storage = node_storage(*other_node);
-      sim_input_output_ids.add_new(storage.output_node_id);
-    }
-    else if (other_node->type == GEO_NODE_SIMULATION_OUTPUT) {
-      sim_output_ids.add_new(other_node->identifier);
-    }
-  }
-
-  sim_output_ids.remove_if(
-      [&](const int32_t identifier) { return sim_input_output_ids.contains(identifier); });
-
-  if (sim_output_ids.size() == 1) {
-    data->output_node_id = sim_output_ids[0];
-  }
-  else {
-    data->output_node_id = 0;
-  }
-
+  /* Needs to be initialized for the node to work. */
+  data->output_node_id = 0;
   node->storage = data;
 }
 
@@ -205,4 +183,30 @@ void register_node_type_geo_simulation_input()
                     node_free_standard_storage,
                     node_copy_standard_storage);
   nodeRegisterType(&ntype);
+}
+
+bool node_geo_simulation_input_pair_with_output(const bNodeTree *node_tree,
+                                                bNode *simulation_input_node,
+                                                const bNode *simulation_output_node)
+{
+  namespace file_ns = blender::nodes::node_geo_simulation_input_cc;
+
+  BLI_assert(simulation_input_node->type == GEO_NODE_SIMULATION_INPUT);
+  if (simulation_output_node->type != GEO_NODE_SIMULATION_OUTPUT) {
+    return false;
+  }
+
+  /* Allow only one input paired to an output. */
+  for (const bNode *other_input_node : node_tree->nodes_by_type("GeometryNodeSimulationInput")) {
+    if (other_input_node != simulation_input_node) {
+      const NodeGeometrySimulationInput &other_storage = file_ns::node_storage(*other_input_node);
+      if (other_storage.output_node_id == simulation_output_node->identifier) {
+        return false;
+      }
+    }
+  }
+
+  NodeGeometrySimulationInput &storage = file_ns::node_storage(*simulation_input_node);
+  storage.output_node_id = simulation_output_node->identifier;
+  return true;
 }
