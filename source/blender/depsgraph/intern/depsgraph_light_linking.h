@@ -44,8 +44,8 @@ class LightSet {
    *
    * The light is denoted as a bit mask of a light linking collection. This mask is allocated for
    * every unique light linking collection on an emitter. */
-  uint64_t include_collection_mask;
-  uint64_t exclude_collection_mask;
+  uint64_t include_collection_mask = 0;
+  uint64_t exclude_collection_mask = 0;
 };
 
 class EmitterSetMembership {
