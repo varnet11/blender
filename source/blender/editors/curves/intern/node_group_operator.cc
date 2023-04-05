@@ -57,8 +57,9 @@ static int run_node_group_exec(bContext *C, wmOperator *op)
   }
   eObjectMode mode = eObjectMode(object->mode);
 
-  const uint32_t session_uuid = RNA_int_get(op->ptr, "session_uuid");
-  const ID *id = BKE_libblock_find_session_uuid(CTX_data_main(C), ID_NT, session_uuid);
+  char name[MAX_ID_NAME];
+  RNA_string_get(op->ptr, "name", name);
+  const ID *id = BKE_libblock_find_name(CTX_data_main(C), ID_NT, name);
   if (!id) {
     return OPERATOR_CANCELLED;
   }
@@ -90,6 +91,7 @@ static int run_node_group_exec(bContext *C, wmOperator *op)
                                                  geometry_set,
                                                  [&](nodes::GeoNodesLFUserData &user_data) {
                                                    user_data.operator_data = &operator_eval_data;
+                                                   user_data.log_socket_values = false;
                                                  });
 
     if (Curves *new_curves_id = geometry_set.get_curves_for_write()) {
@@ -101,6 +103,8 @@ static int run_node_group_exec(bContext *C, wmOperator *op)
       curves.geometry.wrap() = {};
     }
   }
+
+  MEM_SAFE_FREE(objects);
 
   return OPERATOR_FINISHED;
 }
@@ -116,15 +120,12 @@ void CURVES_OT_node_group(wmOperatorType *ot)
 
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
-  PropertyRNA *prop = RNA_def_int(ot->srna,
-                                  "session_uuid",
-                                  0,
-                                  INT32_MIN,
-                                  INT32_MAX,
-                                  "Session UUID",
-                                  "Session UUID of the node group",
-                                  INT32_MIN,
-                                  INT32_MAX);
+  PropertyRNA *prop = RNA_def_string(ot->srna,
+                                     "name",
+                                     nullptr,
+                                     MAX_ID_NAME - 2,
+                                     "Name",
+                                     "Name of the data-block to use by the operator");
   RNA_def_property_flag(prop, PropertyFlag(PROP_SKIP_SAVE | PROP_HIDDEN));
 }
 
