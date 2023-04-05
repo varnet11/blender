@@ -28,6 +28,7 @@
 
 #include "BKE_compute_contexts.hh"
 #include "BKE_geometry_set.hh"
+#include "BKE_idprop.hh"
 #include "BKE_type_conversions.hh"
 
 #include "FN_field_cpp_type.hh"

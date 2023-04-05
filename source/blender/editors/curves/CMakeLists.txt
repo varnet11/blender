@@ -11,6 +11,7 @@ set(INC
   ../../gpu
   ../../makesdna
   ../../makesrna
+  ../../nodes
   ../../windowmanager
   ../../../../intern/clog
   ../../../../intern/guardedalloc

@@ -62,6 +62,8 @@ struct GeoNodesModifierData {
 struct GeoNodesOperatorData {
   /** The object currently effected by the operator. */
   const Object *self_object = nullptr;
+  /** Current evaluated depsgraph. */
+  Depsgraph *depsgraph = nullptr;
 };
 
 /**
