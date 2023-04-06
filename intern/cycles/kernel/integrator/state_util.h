@@ -61,8 +61,12 @@ ccl_device_forceinline void integrator_state_read_shadow_ray(ConstIntegratorShad
 }
 
 ccl_device_forceinline void integrator_state_write_shadow_ray_self(
-    IntegratorShadowState state, ccl_private const Ray *ccl_restrict ray)
+    KernelGlobals kg, IntegratorShadowState state, ccl_private const Ray *ccl_restrict ray)
 {
+  if (kernel_data.kernel_features & KERNEL_FEATURE_LIGHT_LINKING) {
+    INTEGRATOR_STATE_WRITE(state, shadow_ray, self_light) = ray->self.light;
+  }
+
   /* Save memory by storing the light and object indices in the shadow_isect. */
   /* TODO(sergey): This optimization does not work on GPU where multiple iterations of intersection
    * is needed if there are more than 4 transparent intersections. The indices starts to conflict
@@ -71,17 +75,19 @@ ccl_device_forceinline void integrator_state_write_shadow_ray_self(
   INTEGRATOR_STATE_ARRAY_WRITE(state, shadow_isect, 0, prim) = ray->self.prim;
   INTEGRATOR_STATE_ARRAY_WRITE(state, shadow_isect, 1, object) = ray->self.light_object;
   INTEGRATOR_STATE_ARRAY_WRITE(state, shadow_isect, 1, prim) = ray->self.light_prim;
-  INTEGRATOR_STATE_ARRAY_WRITE(state, shadow_isect, 2, object) = ray->self.light;
 }
 
 ccl_device_forceinline void integrator_state_read_shadow_ray_self(
-    ConstIntegratorShadowState state, ccl_private Ray *ccl_restrict ray)
+    KernelGlobals kg, ConstIntegratorShadowState state, ccl_private Ray *ccl_restrict ray)
 {
+  if (kernel_data.kernel_features & KERNEL_FEATURE_LIGHT_LINKING) {
+    ray->self.light = INTEGRATOR_STATE(state, shadow_ray, self_light);
+  }
+
   ray->self.object = INTEGRATOR_STATE_ARRAY(state, shadow_isect, 0, object);
   ray->self.prim = INTEGRATOR_STATE_ARRAY(state, shadow_isect, 0, prim);
   ray->self.light_object = INTEGRATOR_STATE_ARRAY(state, shadow_isect, 1, object);
   ray->self.light_prim = INTEGRATOR_STATE_ARRAY(state, shadow_isect, 1, prim);
-  ray->self.light = INTEGRATOR_STATE_ARRAY(state, shadow_isect, 2, object);
 }
 
 /* Intersection */
