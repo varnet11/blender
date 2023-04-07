@@ -57,15 +57,11 @@ ccl_device_inline bool light_link_light_match(KernelGlobals kg,
   if (!(kernel_data.kernel_features & KERNEL_FEATURE_LIGHT_LINKING)) {
     return true;
   }
-  if (object_receiver == OBJECT_NONE) {
-    return true;
-  }
 
   const uint64_t set_membership = kernel_data_fetch(lights, light_emitter).light_set_membership;
-  if (set_membership == LIGHT_LINK_MASK_ALL) {
-    return true;
-  }
-  const uint receiver_set = kernel_data_fetch(objects, object_receiver).receiver_light_set;
+  const uint receiver_set = (object_receiver != OBJECT_NONE) ?
+                                kernel_data_fetch(objects, object_receiver).receiver_light_set :
+                                0;
   return ((uint64_t(1) << uint64_t(receiver_set)) & set_membership) != 0;
 #else
   return true;
@@ -80,15 +76,11 @@ ccl_device_inline bool light_link_object_match(KernelGlobals kg,
   if (!(kernel_data.kernel_features & KERNEL_FEATURE_LIGHT_LINKING)) {
     return true;
   }
-  if (object_receiver == OBJECT_NONE) {
-    return true;
-  }
 
   const uint64_t set_membership = kernel_data_fetch(objects, object_emitter).light_set_membership;
-  if (set_membership == LIGHT_LINK_MASK_ALL) {
-    return true;
-  }
-  const uint receiver_set = kernel_data_fetch(objects, object_receiver).receiver_light_set;
+  const uint receiver_set = (object_receiver != OBJECT_NONE) ?
+                                kernel_data_fetch(objects, object_receiver).receiver_light_set :
+                                0;
   return ((uint64_t(1) << uint64_t(receiver_set)) & set_membership) != 0;
 #else
   return true;
