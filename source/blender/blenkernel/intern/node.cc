@@ -925,7 +925,7 @@ void ntreeBlendReadLib(BlendLibReader *reader, bNodeTree *ntree)
     LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
       /* Don't update node groups here because they may depend on other node groups which are not
        * fully versioned yet and don't have `typeinfo` pointers set. */
-      if (node->type != NODE_GROUP) {
+      if (!node->is_group()) {
         node_verify_sockets(ntree, node, false);
       }
     }
@@ -2477,9 +2477,19 @@ void node_socket_move_default_value(Main &bmain,
       }
       break;
     }
+    case SOCK_CUSTOM:
+    case SOCK_SHADER:
+    case SOCK_GEOMETRY: {
+      /* Unmovable types. */
+      return;
+    }
     default: {
       break;
     }
+  }
+
+  if (dst_values.is_empty() || src_socket_value == nullptr) {
+    return;
   }
 
   for (ID **dst_value : dst_values) {
