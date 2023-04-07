@@ -183,7 +183,7 @@ extern "C" __global__ void __anyhit__kernel_optix_shadow_all_hit()
     return optixIgnoreIntersection();
   }
 
-#  ifdef __LIGHT_LINKING__
+#  ifdef __SHADOW_LINKING__
   if (intersection_skip_shadow_link(nullptr, ray, object)) {
     return optixIgnoreIntersection();
   }
@@ -331,7 +331,7 @@ extern "C" __global__ void __anyhit__kernel_optix_visibility_test()
   ccl_private Ray *const ray = get_payload_ptr_6<Ray>();
 
   if (visibility & PATH_RAY_SHADOW_OPAQUE) {
-#ifdef __LIGHT_LINKING__
+#ifdef __SHADOW_LINKING__
     if (intersection_skip_shadow_link(nullptr, ray, object)) {
       return optixIgnoreIntersection();
     }

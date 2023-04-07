@@ -542,8 +542,11 @@ void Scene::update_kernel_features()
     else if (geom->is_pointcloud()) {
       kernel_features |= KERNEL_FEATURE_POINTCLOUD;
     }
-    if (object->get_light_set_membership() || object->get_shadow_set_membership()) {
+    if (object->get_light_set_membership()) {
       kernel_features |= KERNEL_FEATURE_LIGHT_LINKING;
+    }
+    if (object->get_shadow_set_membership()) {
+      kernel_features |= KERNEL_FEATURE_SHADOW_LINKING;
     }
   }
 
@@ -551,8 +554,11 @@ void Scene::update_kernel_features()
     if (light->get_use_caustics()) {
       has_caustics_light = true;
     }
-    if (light->get_light_set_membership() || light->get_shadow_set_membership()) {
+    if (light->get_light_set_membership()) {
       kernel_features |= KERNEL_FEATURE_LIGHT_LINKING;
+    }
+    if (light->get_shadow_set_membership()) {
+      kernel_features |= KERNEL_FEATURE_SHADOW_LINKING;
     }
   }
 

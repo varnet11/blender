@@ -67,6 +67,7 @@ CCL_NAMESPACE_BEGIN
 #define __DPDU__
 #define __HAIR__
 #define __LIGHT_LINKING__
+#define __SHADOW_LINKING__
 #define __LIGHT_TREE__
 #define __OBJECT_MOTION__
 #define __PASSES__
@@ -1642,6 +1643,9 @@ enum KernelFeatureFlag : uint32_t {
 
   /* Light linking. */
   KERNEL_FEATURE_LIGHT_LINKING = (1U << 27U),
+
+  /* Shadow linking. */
+  KERNEL_FEATURE_SHADOW_LINKING = (1U << 28U),
 };
 
 /* Shader node feature mask, to specialize shader evaluation for kernels. */

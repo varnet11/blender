@@ -25,26 +25,35 @@ ccl_device_inline bool light_select_reached_max_bounces(KernelGlobals kg, int in
 
 ccl_device_inline int light_link_receiver_nee(KernelGlobals kg, const ccl_private ShaderData *sd)
 {
+#ifdef __LIGHT_LINKING__
   if (!(kernel_data.kernel_features & KERNEL_FEATURE_LIGHT_LINKING)) {
     return OBJECT_NONE;
   }
 
   return sd->object;
+#else
+  return OBJECT_NONE;
+#endif
 }
 
 ccl_device_inline int light_link_receiver_forward(KernelGlobals kg, IntegratorState state)
 {
+#ifdef __LIGHT_LINKING__
   if (!(kernel_data.kernel_features & KERNEL_FEATURE_LIGHT_LINKING)) {
     return OBJECT_NONE;
   }
 
   return INTEGRATOR_STATE(state, path, mis_ray_object);
+#else
+  return OBJECT_NONE;
+#endif
 }
 
 ccl_device_inline bool light_link_light_match(KernelGlobals kg,
                                               const int object_receiver,
                                               const int light_emitter)
 {
+#ifdef __LIGHT_LINKING__
   if (!(kernel_data.kernel_features & KERNEL_FEATURE_LIGHT_LINKING)) {
     return true;
   }
@@ -58,12 +67,16 @@ ccl_device_inline bool light_link_light_match(KernelGlobals kg,
   }
   const uint receiver_set = kernel_data_fetch(objects, object_receiver).receiver_light_set;
   return ((uint64_t(1) << uint64_t(receiver_set)) & set_membership) != 0;
+#else
+  return true;
+#endif
 }
 
 ccl_device_inline bool light_link_object_match(KernelGlobals kg,
                                                const int object_receiver,
                                                const int object_emitter)
 {
+#ifdef __LIGHT_LINKING__
   if (!(kernel_data.kernel_features & KERNEL_FEATURE_LIGHT_LINKING)) {
     return true;
   }
@@ -77,6 +90,9 @@ ccl_device_inline bool light_link_object_match(KernelGlobals kg,
   }
   const uint receiver_set = kernel_data_fetch(objects, object_receiver).receiver_light_set;
   return ((uint64_t(1) << uint64_t(receiver_set)) & set_membership) != 0;
+#else
+  return true;
+#endif
 }
 
 /* Sample point on an individual light. */

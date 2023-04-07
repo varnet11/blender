@@ -232,7 +232,7 @@ ccl_device_inline bool intersection_skip_self_local(ccl_private const RaySelfPri
   return (self.prim == prim);
 }
 
-#ifdef __LIGHT_LINKING__
+#ifdef __SHADOW_LINKING__
 ccl_device_inline uint64_t ray_get_shadow_set_membership(KernelGlobals kg,
                                                          ccl_private const Ray *ray)
 {
@@ -252,8 +252,8 @@ ccl_device_inline bool intersection_skip_shadow_link(KernelGlobals kg,
                                                      ccl_private const Ray *ray,
                                                      const int isect_object)
 {
-#ifdef __LIGHT_LINKING__
-  if (!(kernel_data.kernel_features & KERNEL_FEATURE_LIGHT_LINKING)) {
+#ifdef __SHADOW_LINKING__
+  if (!(kernel_data.kernel_features & KERNEL_FEATURE_SHADOW_LINKING)) {
     return false;
   }
 

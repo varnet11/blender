@@ -144,7 +144,7 @@ ccl_device_inline
               continue;
             }
 
-#ifdef __LIGHT_LINKING__
+#ifdef __SHADOW_LINKING__
             if (intersection_skip_shadow_link(kg, ray, prim_object)) {
               continue;
             }

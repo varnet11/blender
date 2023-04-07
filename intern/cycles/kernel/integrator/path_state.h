@@ -90,9 +90,11 @@ ccl_device_inline void path_state_init_integrator(KernelGlobals kg,
   }
 #endif
 
+#ifdef __LIGHT_LINKING__
   if (kernel_data.kernel_features & KERNEL_FEATURE_LIGHT_LINKING) {
     INTEGRATOR_STATE_WRITE(state, path, mis_ray_object) = OBJECT_NONE;
   }
+#endif
 }
 
 ccl_device_inline void path_state_next(KernelGlobals kg,
