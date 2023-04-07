@@ -153,10 +153,7 @@ const uchar *UI_ThemeGetColorPtr(bTheme *btheme, int spacetype, int colorid)
           else if (g_theme_state.regionid == RGN_TYPE_CHANNELS) {
             cp = ts->list;
           }
-          else if (ELEM(g_theme_state.regionid,
-                        RGN_TYPE_HEADER,
-                        RGN_TYPE_FOOTER,
-                        RGN_TYPE_ASSET_SHELF_FOOTER)) {
+          else if (ELEM(g_theme_state.regionid, RGN_TYPE_HEADER, RGN_TYPE_FOOTER)) {
             cp = ts->header;
           }
           else if (g_theme_state.regionid == RGN_TYPE_NAV_BAR) {
@@ -164,6 +161,12 @@ const uchar *UI_ThemeGetColorPtr(bTheme *btheme, int spacetype, int colorid)
           }
           else if (g_theme_state.regionid == RGN_TYPE_EXECUTE) {
             cp = ts->execution_buts;
+          }
+          else if (g_theme_state.regionid == RGN_TYPE_ASSET_SHELF) {
+            cp = ts->asset_shelf.back;
+          }
+          else if (g_theme_state.regionid == RGN_TYPE_ASSET_SHELF_FOOTER) {
+            cp = ts->asset_shelf.header_back;
           }
           else {
             cp = ts->button;
