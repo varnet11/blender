@@ -105,8 +105,8 @@ static void do_versions_theme(const UserDef *userdef, bTheme *btheme)
   {
     /* Keep this block, even when empty. */
 
-    if (btheme->space_node.node_region_simulation[3] == 0) {
-      btheme->space_node.node_region_simulation[3] = 0x11;
+    if (btheme->space_node.node_zone_simulation[3] == 0) {
+      btheme->space_node.node_zone_simulation[3] = 0x11;
     }
   }
 

@@ -641,8 +641,8 @@ const uchar *UI_ThemeGetColorPtr(bTheme *btheme, int spacetype, int colorid)
         case TH_NODE_GRID_LEVELS:
           cp = &ts->grid_levels;
           break;
-        case TH_NODE_REGION_SIMULATION:
-          cp = ts->node_region_simulation;
+        case TH_NODE_ZONE_SIMULATION:
+          cp = ts->node_zone_simulation;
           break;
 
         case TH_SEQ_MOVIE:

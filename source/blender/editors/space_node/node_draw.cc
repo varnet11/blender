@@ -2424,7 +2424,7 @@ static void node_draw_basis(const bContext &C,
       UI_GetThemeColor4fv(TH_REDALERT, color_outline);
     }
     else if (ELEM(node.type, GEO_NODE_SIMULATION_INPUT, GEO_NODE_SIMULATION_OUTPUT)) {
-      UI_GetThemeColor4fv(TH_NODE_REGION_SIMULATION, color_outline);
+      UI_GetThemeColor4fv(TH_NODE_ZONE_SIMULATION, color_outline);
       color_outline[3] = 1.0f;
     }
     else {
@@ -3165,14 +3165,14 @@ static void node_draw_zones(TreeDrawContext & /*tree_draw_ctx*/,
     immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
 
     GPU_blend(GPU_BLEND_ALPHA);
-    immUniformThemeColor(TH_NODE_REGION_SIMULATION);
+    immUniformThemeColor(TH_NODE_ZONE_SIMULATION);
     immBegin(GPU_PRIM_TRI_FAN, fillet_boundary_positions.size() + 1);
     for (const float3 &p : fillet_boundary_positions) {
       immVertex3fv(pos, p);
     }
     immVertex3fv(pos, fillet_boundary_positions[0]);
     immEnd();
-    immUniformThemeColorAlpha(TH_NODE_REGION_SIMULATION, 1.0f);
+    immUniformThemeColorAlpha(TH_NODE_ZONE_SIMULATION, 1.0f);
     immBegin(GPU_PRIM_LINE_STRIP, fillet_boundary_positions.size() + 1);
     for (const float3 &p : fillet_boundary_positions) {
       immVertex3fv(pos, p);
