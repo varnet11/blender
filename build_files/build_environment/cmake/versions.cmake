@@ -208,11 +208,11 @@ set(OSL_FILE OpenShadingLanguage-${OSL_VERSION}.tar.gz)
 # BZIP2, FFI, SQLITE and change the versions in this file as well. For compliance
 # reasons there can be no exceptions to this.
 
-set(PYTHON_VERSION 3.10.9)
+set(PYTHON_VERSION 3.10.11)
 set(PYTHON_SHORT_VERSION 3.10)
 set(PYTHON_SHORT_VERSION_NO_DOTS 310)
 set(PYTHON_URI https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz)
-set(PYTHON_HASH dc8c0f274b28ee9e95923d20cfc364c9)
+set(PYTHON_HASH 1bf8481a683e0881e14d52e0f23633a6)
 set(PYTHON_HASH_TYPE MD5)
 set(PYTHON_FILE Python-${PYTHON_VERSION}.tar.xz)
 set(PYTHON_CPE "cpe:2.3:a:python:python:${PYTHON_VERSION}:-:*:*:*:*:*:*")
@@ -459,9 +459,9 @@ set(LZMA_HASH_TYPE SHA256)
 set(LZMA_FILE xz-${LZMA_VERSION}.tar.bz2)
 
 # NOTE: Python's build has been modified to use our ssl version.
-set(SSL_VERSION 1.1.1q)
+set(SSL_VERSION 1.1.1t)
 set(SSL_URI https://www.openssl.org/source/openssl-${SSL_VERSION}.tar.gz)
-set(SSL_HASH d7939ce614029cdff0b6c20f0e2e5703158a489a72b2507b8bd51bf8c8fd10ca)
+set(SSL_HASH 8dee9b24bdb1dcbf0c3d1e9b02fb8f6bf22165e807f45adeb7c9677536859d3b)
 set(SSL_HASH_TYPE SHA256)
 set(SSL_FILE openssl-${SSL_VERSION}.tar.gz)
 set(SSL_CPE "cpe:2.3:a:openssl:openssl:${SSL_VERSION}:*:*:*:*:*:*:*")
@@ -469,10 +469,10 @@ set(SSL_CPE "cpe:2.3:a:openssl:openssl:${SSL_VERSION}:*:*:*:*:*:*:*")
 # Note: This will *HAVE* to match the version python ships on windows which
 # is hardcoded in pythons PCbuild/get_externals.bat for compliance reasons there
 # can be no exceptions to this.
-set(SQLITE_VERSION 3.39.4)
-set(SQLLITE_LONG_VERSION 3390400)
+set(SQLITE_VERSION 3.40.1)
+set(SQLLITE_LONG_VERSION 3400100)
 set(SQLITE_URI https://www.sqlite.org/2022/sqlite-autoconf-${SQLLITE_LONG_VERSION}.tar.gz)
-set(SQLITE_HASH c4c5c39269d1b9bb1487cff580c1f583608229b2)
+set(SQLITE_HASH b8c2d4bc0094f5c0ce985dc0e237dfcbaa1f6275)
 set(SQLITE_HASH_TYPE SHA1)
 set(SQLITE_FILE sqlite-autoconf-${SQLLITE_LONG_VERSION}.tar.gz)
 set(SQLITE_CPE "cpe:2.3:a:sqlite:sqlite:${SQLITE_VERSION}:*:*:*:*:*:*:*")
