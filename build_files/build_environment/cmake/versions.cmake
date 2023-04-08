@@ -170,11 +170,11 @@ set(OPENIMAGEIO_HASH 7da92a7d6029921a8599a977ff1efa2a)
 set(OPENIMAGEIO_HASH_TYPE MD5)
 set(OPENIMAGEIO_FILE OpenImageIO-${OPENIMAGEIO_VERSION}.tar.gz)
 
-# 8.0.0 is currently oiio's preferred version although never versions may be available.
+# 9.1.0 is currently oiio's preferred version although never versions may be available.
 # the preferred version can be found in oiio's externalpackages.cmake
-set(FMT_VERSION 8.0.0)
+set(FMT_VERSION 9.1.0)
 set(FMT_URI https://github.com/fmtlib/fmt/archive/refs/tags/${FMT_VERSION}.tar.gz)
-set(FMT_HASH 7bce0e9e022e586b178b150002e7c2339994e3c2bbe44027e9abb0d60f9cce83)
+set(FMT_HASH 5dea48d1fcddc3ec571ce2058e13910a0d4a6bab4cc09a809d8b1dd1c88ae6f2)
 set(FMT_HASH_TYPE SHA256)
 set(FMT_FILE fmt-${FMT_VERSION}.tar.gz)
 set(FMT_CPE "cpe:2.3:a:fmt:fmt:${FMT_VERSION}:*:*:*:*:*:*:*")
