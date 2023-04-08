@@ -295,9 +295,9 @@ set(THEORA_HASH b6ae1ee2fa3d42ac489287d3ec34c5885730b1296f0801ae577a35193d3affbc
 set(THEORA_HASH_TYPE SHA256)
 set(THEORA_FILE libtheora-${THEORA_VERSION}.tar.bz2)
 
-set(FLAC_VERSION 1.3.4)
+set(FLAC_VERSION 1.4.2)
 set(FLAC_URI http://downloads.xiph.org/releases/flac/flac-${FLAC_VERSION}.tar.xz)
-set(FLAC_HASH 8ff0607e75a322dd7cd6ec48f4f225471404ae2730d0ea945127b1355155e737 )
+set(FLAC_HASH e322d58a1f48d23d9dd38f432672865f6f79e73a6f9cc5a5f57fcaa83eb5a8e4 )
 set(FLAC_HASH_TYPE SHA256)
 set(FLAC_FILE flac-${FLAC_VERSION}.tar.xz)
 set(FLAC_CPE "cpe:2.3:a:flac_project:flac:${FLAC_VERSION}:*:*:*:*:*:*:*")
