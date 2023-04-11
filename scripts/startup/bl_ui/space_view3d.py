@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 import bpy
+from bl_ui_utils.layout import operator_context
 from bpy.types import (
     Header,
     Menu,
@@ -2011,6 +2012,9 @@ class VIEW3D_MT_select_paint_mask(Menu):
         layout.operator("paint.face_select_all", text="None").action = 'DESELECT'
         layout.operator("paint.face_select_all", text="Invert").action = 'INVERT'
 
+        layout.operator("paint.face_select_more")
+        layout.operator("paint.face_select_less")
+
         layout.separator()
 
         layout.operator("view3d.select_box")
@@ -2031,6 +2035,9 @@ class VIEW3D_MT_select_paint_mask_vertex(Menu):
         layout.operator("paint.vert_select_all", text="All").action = 'SELECT'
         layout.operator("paint.vert_select_all", text="None").action = 'DESELECT'
         layout.operator("paint.vert_select_all", text="Invert").action = 'INVERT'
+
+        layout.operator("paint.vert_select_more"),
+        layout.operator("paint.vert_select_less"),
 
         layout.separator()
 
@@ -2825,17 +2832,15 @@ class VIEW3D_MT_object_parent(Menu):
 
     def draw(self, _context):
         layout = self.layout
-        operator_context_default = layout.operator_context
 
         layout.operator_enum("object.parent_set", "type")
 
         layout.separator()
 
-        layout.operator_context = 'EXEC_REGION_WIN'
-        layout.operator("object.parent_no_inverse_set").keep_transform = False
-        props = layout.operator("object.parent_no_inverse_set", text="Make Parent without Inverse (Keep Transform)")
-        props.keep_transform = True
-        layout.operator_context = operator_context_default
+        with operator_context(layout, 'EXEC_REGION_WIN'):
+            layout.operator("object.parent_no_inverse_set").keep_transform = False
+            props = layout.operator("object.parent_no_inverse_set", text="Make Parent without Inverse (Keep Transform)")
+            props.keep_transform = True
 
         layout.separator()
 
@@ -7047,13 +7052,16 @@ class VIEW3D_PT_snapping(Panel):
 
             col.prop(tool_settings, "use_snap_backface_culling")
 
-            if 'FACE' in snap_elements:
-                col.prop(tool_settings, "use_snap_project")
+            is_face_nearest_enabled = 'FACE_NEAREST' in snap_elements
+            if is_face_nearest_enabled or 'FACE' in snap_elements:
+                sub = col.column()
+                sub.active = not is_face_nearest_enabled
+                sub.prop(tool_settings, "use_snap_project")
 
-            if 'FACE_NEAREST' in snap_elements:
-                col.prop(tool_settings, "use_snap_to_same_target")
-                if object_mode == 'EDIT':
-                    col.prop(tool_settings, "snap_face_nearest_steps")
+                if is_face_nearest_enabled:
+                    col.prop(tool_settings, "use_snap_to_same_target")
+                    if object_mode == 'EDIT':
+                        col.prop(tool_settings, "snap_face_nearest_steps")
 
             if 'VOLUME' in snap_elements:
                 col.prop(tool_settings, "use_snap_peel_object")

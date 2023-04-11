@@ -36,9 +36,7 @@ class BitIteratorBase {
 /** Allows iterating over the bits in a memory buffer. */
 class BitIterator : public BitIteratorBase {
  public:
-  BitIterator(const BitInt *data, const int64_t bit_index) : BitIteratorBase(data, bit_index)
-  {
-  }
+  BitIterator(const BitInt *data, const int64_t bit_index) : BitIteratorBase(data, bit_index) {}
 
   BitRef operator*() const
   {
@@ -49,9 +47,7 @@ class BitIterator : public BitIteratorBase {
 /** Allows iterating over the bits in a memory buffer. */
 class MutableBitIterator : public BitIteratorBase {
  public:
-  MutableBitIterator(BitInt *data, const int64_t bit_index) : BitIteratorBase(data, bit_index)
-  {
-  }
+  MutableBitIterator(BitInt *data, const int64_t bit_index) : BitIteratorBase(data, bit_index) {}
 
   MutableBitRef operator*() const
   {
@@ -82,9 +78,7 @@ class BitSpan {
   {
   }
 
-  BitSpan(const BitInt *data, const IndexRange bit_range) : data_(data), bit_range_(bit_range)
-  {
-  }
+  BitSpan(const BitInt *data, const IndexRange bit_range) : data_(data), bit_range_(bit_range) {}
 
   /** Number of bits referenced by the span. */
   int64_t size() const
@@ -144,13 +138,9 @@ class MutableBitSpan {
  public:
   MutableBitSpan() = default;
 
-  MutableBitSpan(BitInt *data, const int64_t size) : data_(data), bit_range_(size)
-  {
-  }
+  MutableBitSpan(BitInt *data, const int64_t size) : data_(data), bit_range_(size) {}
 
-  MutableBitSpan(BitInt *data, const IndexRange bit_range) : data_(data), bit_range_(bit_range)
-  {
-  }
+  MutableBitSpan(BitInt *data, const IndexRange bit_range) : data_(data), bit_range_(bit_range) {}
 
   int64_t size() const
   {

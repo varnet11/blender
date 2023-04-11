@@ -1763,13 +1763,8 @@ static void sculpt_update_object(
   sculpt_update_persistent_base(ob);
 
   if (need_pmap && ob->type == OB_MESH && !ss->pmap) {
-    BKE_mesh_vert_poly_map_create(&ss->pmap,
-                                  &ss->pmap_mem,
-                                  me->polys().data(),
-                                  me->corner_verts().data(),
-                                  me->totvert,
-                                  me->totpoly,
-                                  me->totloop);
+    BKE_mesh_vert_poly_map_create(
+        &ss->pmap, &ss->pmap_mem, me->polys(), me->corner_verts().data(), me->totvert);
 
     if (ss->pbvh) {
       BKE_pbvh_pmap_set(ss->pbvh, ss->pmap);
@@ -1992,7 +1987,7 @@ int BKE_sculpt_mask_layers_ensure(Depsgraph *depsgraph,
                                   MultiresModifierData *mmd)
 {
   Mesh *me = static_cast<Mesh *>(ob->data);
-  const Span<MPoly> polys = me->polys();
+  const blender::OffsetIndices polys = me->polys();
   const Span<int> corner_verts = me->corner_verts();
   int ret = 0;
 
@@ -2021,17 +2016,17 @@ int BKE_sculpt_mask_layers_ensure(Depsgraph *depsgraph,
     /* If vertices already have mask, copy into multires data. */
     if (paint_mask) {
       for (const int i : polys.index_range()) {
-        const MPoly &poly = polys[i];
+        const blender::IndexRange poly = polys[i];
 
         /* Mask center. */
         float avg = 0.0f;
-        for (const int vert : corner_verts.slice(poly.loopstart, poly.totloop)) {
+        for (const int vert : corner_verts.slice(poly)) {
           avg += paint_mask[vert];
         }
-        avg /= float(poly.totloop);
+        avg /= float(poly.size());
 
         /* Fill in multires mask corner. */
-        for (const int corner : blender::IndexRange(poly.loopstart, poly.totloop)) {
+        for (const int corner : poly) {
           GridPaintMask *gpm = &gmask[corner];
           const int vert = corner_verts[corner];
           const int prev = corner_verts[blender::bke::mesh::poly_corner_prev(poly, vert)];
@@ -2182,30 +2177,10 @@ static PBVH *build_pbvh_for_dynamic_topology(Object *ob)
 static PBVH *build_pbvh_from_regular_mesh(Object *ob, Mesh *me_eval_deform, bool respect_hide)
 {
   Mesh *me = BKE_object_get_original_mesh(ob);
-  const int looptris_num = poly_to_tri_count(me->totpoly, me->totloop);
   PBVH *pbvh = BKE_pbvh_new(PBVH_FACES);
   BKE_pbvh_respect_hide_set(pbvh, respect_hide);
 
-  MutableSpan<float3> positions = me->vert_positions_for_write();
-  const Span<MPoly> polys = me->polys();
-  const Span<int> corner_verts = me->corner_verts();
-
-  MLoopTri *looptri = static_cast<MLoopTri *>(
-      MEM_malloc_arrayN(looptris_num, sizeof(*looptri), __func__));
-
-  blender::bke::mesh::looptris_calc(positions, polys, corner_verts, {looptri, looptris_num});
-
-  BKE_pbvh_build_mesh(pbvh,
-                      me,
-                      polys.data(),
-                      corner_verts.data(),
-                      reinterpret_cast<float(*)[3]>(positions.data()),
-                      me->totvert,
-                      &me->vdata,
-                      &me->ldata,
-                      &me->pdata,
-                      looptri,
-                      looptris_num);
+  BKE_pbvh_build_mesh(pbvh, me);
 
   const bool is_deformed = check_sculpt_object_deformed(ob, true);
   if (is_deformed && me_eval_deform != nullptr) {
@@ -2248,14 +2223,25 @@ PBVH *BKE_sculpt_object_pbvh_ensure(Depsgraph *depsgraph, Object *ob)
 
   PBVH *pbvh = ob->sculpt->pbvh;
   if (pbvh != nullptr) {
-    /* NOTE: It is possible that grids were re-allocated due to modifier
-     * stack. Need to update those pointers. */
-    if (BKE_pbvh_type(pbvh) == PBVH_GRIDS) {
-      Object *object_eval = DEG_get_evaluated_object(depsgraph, ob);
-      Mesh *mesh_eval = static_cast<Mesh *>(object_eval->data);
-      SubdivCCG *subdiv_ccg = mesh_eval->runtime->subdiv_ccg;
-      if (subdiv_ccg != nullptr) {
-        BKE_sculpt_bvh_update_from_ccg(pbvh, subdiv_ccg);
+    /* NOTE: It is possible that pointers to grids or other geometry data changed. Need to update
+     * those pointers. */
+    const PBVHType pbvh_type = BKE_pbvh_type(pbvh);
+    switch (pbvh_type) {
+      case PBVH_FACES: {
+        BKE_pbvh_update_mesh_pointers(pbvh, BKE_object_get_original_mesh(ob));
+        break;
+      }
+      case PBVH_GRIDS: {
+        Object *object_eval = DEG_get_evaluated_object(depsgraph, ob);
+        Mesh *mesh_eval = static_cast<Mesh *>(object_eval->data);
+        SubdivCCG *subdiv_ccg = mesh_eval->runtime->subdiv_ccg;
+        if (subdiv_ccg != nullptr) {
+          BKE_sculpt_bvh_update_from_ccg(pbvh, subdiv_ccg);
+        }
+        break;
+      }
+      case PBVH_BMESH: {
+        break;
       }
     }
 

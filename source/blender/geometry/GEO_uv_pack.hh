@@ -66,14 +66,15 @@ class UVPackIsland_Params {
   eUVPackIsland_MarginMethod margin_method;
   /** Additional translation for bottom left corner. */
   float udim_base_offset[2];
+  /** Target aspect ratio. */
+  float target_aspect_y;
   /** Which shape to use when packing. */
   eUVPackIsland_ShapeMethod shape_method;
 };
 
+class uv_phi;
 class PackIsland {
  public:
-  /** Bounding rectangle of input. Will be calculated automatically in a future update. */
-  rctf bounds_rect;
   /** Aspect ratio, required for rotation. */
   float aspect_y;
   /** Output pre-translation. */
@@ -87,7 +88,25 @@ class PackIsland {
   void add_polygon(const blender::Span<float2> uvs, MemArena *arena, Heap *heap);
   void finalize_geometry(const UVPackIsland_Params &params, MemArena *arena, Heap *heap);
 
+  void build_transformation(const float scale, const float rotation, float r_matrix[2][2]) const;
+  void build_inverse_transformation(const float scale,
+                                    const float rotation,
+                                    float r_matrix[2][2]) const;
+
+  float2 get_diagonal_support(const float scale, const float rotation, const float margin) const;
+  float2 get_diagonal_support_d4(const float scale,
+                                 const float rotation,
+                                 const float margin) const;
+
+  /** Center of AABB and inside-or-touching the convex hull. */
+  float2 pivot_;
+  /** Half of the diagonal of the AABB. */
+  float2 half_diagonal_;
+
+  void place_(const float scale, const uv_phi phi);
+
  private:
+  void calculate_pivot(); /* Calculate `pivot_` and `half_diagonal_` based on added triangles. */
   blender::Vector<float2> triangle_vertices_;
   friend class Occupancy;
 };
