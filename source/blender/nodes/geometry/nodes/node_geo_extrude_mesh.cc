@@ -775,8 +775,10 @@ static void extrude_mesh_face_regions(Mesh &mesh,
   MutableSpan<int> new_corner_edges = corner_edges.slice(side_loop_range);
 
   /* Initialize the new side polygons. */
-  new_poly_offsets.fill(4);
-  offset_indices::accumulate_counts_to_offsets(new_poly_offsets, orig_loop_size);
+  if (!new_poly_offsets.is_empty()) {
+    new_poly_offsets.fill(4);
+    offset_indices::accumulate_counts_to_offsets(new_poly_offsets, orig_loop_size);
+  }
   const OffsetIndices polys = mesh.polys();
 
   /* Initialize the edges that form the sides of the extrusion. */
@@ -1060,6 +1062,9 @@ static void extrude_individual_mesh_faces(Mesh &mesh,
   poly_evaluator.add_with_destination(offset_field, poly_offset.as_mutable_span());
   poly_evaluator.evaluate();
   const IndexMask poly_selection = poly_evaluator.get_evaluated_selection_as_mask();
+  if (poly_selection.is_empty()) {
+    return;
+  }
 
   /* Build an array of offsets into the new data for each polygon. This is used to facilitate
    * parallelism later on by avoiding the need to keep track of an offset when iterating through
