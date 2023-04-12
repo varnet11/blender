@@ -76,32 +76,36 @@ static int run_node_group_exec(bContext *C, wmOperator *op)
       scene, view_layer, CTX_wm_view3d(C), &objects_len, mode);
 
   for (Object *object : Span(objects, objects_len)) {
-    Curves &curves = *static_cast<Curves *>(object->data);
-    GeometrySet geometry_set = GeometrySet::create_with_curves(&curves,
-                                                               GeometryOwnershipType::Editable);
+    Curves &curves_id = *static_cast<Curves *>(object->data);
+    GeometrySet original_geometry = GeometrySet::create_with_curves(
+        &curves_id, GeometryOwnershipType::Editable);
 
     nodes::GeoNodesOperatorData operator_eval_data{};
     operator_eval_data.depsgraph = depsgraph;
     operator_eval_data.self_object = object;
 
     bke::ModifierComputeContext compute_context{nullptr, "actually not a modifier"};
-    geometry_set = nodes::execute_geometry_nodes(node_tree,
-                                                 nullptr,
-                                                 compute_context,
-                                                 geometry_set,
-                                                 [&](nodes::GeoNodesLFUserData &user_data) {
-                                                   user_data.operator_data = &operator_eval_data;
-                                                   user_data.log_socket_values = false;
-                                                 });
+    GeometrySet new_geometry = nodes::execute_geometry_nodes(
+        node_tree,
+        nullptr,
+        compute_context,
+        original_geometry,
+        [&](nodes::GeoNodesLFUserData &user_data) {
+          user_data.operator_data = &operator_eval_data;
+          user_data.log_socket_values = false;
+        });
 
-    if (Curves *new_curves_id = geometry_set.get_curves_for_write()) {
-      if (new_curves_id != &curves) {
-        curves.geometry.wrap() = std::move(new_curves_id->geometry.wrap());
+    if (Curves *new_curves_id = new_geometry.get_curves_for_write()) {
+      if (new_curves_id != &curves_id) {
+        curves_id.geometry.wrap() = std::move(new_curves_id->geometry.wrap());
       }
     }
     else {
-      curves.geometry.wrap() = {};
+      curves_id.geometry.wrap() = {};
     }
+
+    DEG_id_tag_update(&curves_id.id, ID_RECALC_GEOMETRY);
+    WM_event_add_notifier(C, NC_GEOM | ND_DATA, &curves_id);
   }
 
   MEM_SAFE_FREE(objects);
