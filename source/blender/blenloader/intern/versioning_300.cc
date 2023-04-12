@@ -4249,7 +4249,41 @@ void blo_do_versions_300(FileData *fd, Library * /*lib*/, Main *bmain)
         version_geometry_nodes_extrude_smooth_propagation(*ntree);
       }
     }
+  }
 
+  if (!MAIN_VERSION_ATLEAST(bmain, 306, 5)) {
+    /* Some regions used to be added/removed dynamically. Ensure they are always there, there is a
+     * `ARegionType.poll()` now. */
+    LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
+      LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+        LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
+          version_ensure_missing_regions(area, sl);
+
+          /* Ensure expected region state. Previously this was modified to hide/unhide regions. */
+
+          const ListBase *regionbase = (sl == area->spacedata.first) ? &area->regionbase :
+                                                                       &sl->regionbase;
+          if (sl->spacetype == SPACE_SEQ) {
+            ARegion *region_main = BKE_region_find_in_listbase_by_type(regionbase,
+                                                                       RGN_TYPE_WINDOW);
+            region_main->flag &= ~RGN_FLAG_HIDDEN;
+            region_main->alignment = RGN_ALIGN_NONE;
+
+            ARegion *region_preview = BKE_region_find_in_listbase_by_type(regionbase,
+                                                                          RGN_TYPE_PREVIEW);
+            region_preview->flag &= ~RGN_FLAG_HIDDEN;
+            region_preview->alignment = RGN_ALIGN_NONE;
+
+            ARegion *region_channels = BKE_region_find_in_listbase_by_type(regionbase,
+                                                                           RGN_TYPE_CHANNELS);
+            region_channels->alignment = RGN_ALIGN_LEFT;
+          }
+        }
+      }
+    }
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 306, 6)) {
     LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
       LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
         LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
@@ -4302,35 +4336,5 @@ void blo_do_versions_300(FileData *fd, Library * /*lib*/, Main *bmain)
    */
   {
     /* Keep this block, even when empty. */
-
-    /* Some regions used to be added/removed dynamically. Ensure they are always there, there is a
-     * `ARegionType.poll()` now. */
-    LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
-      LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
-        LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
-          version_ensure_missing_regions(area, sl);
-
-          /* Ensure expected region state. Previously this was modified to hide/unhide regions. */
-
-          const ListBase *regionbase = (sl == area->spacedata.first) ? &area->regionbase :
-                                                                       &sl->regionbase;
-          if (sl->spacetype == SPACE_SEQ) {
-            ARegion *region_main = BKE_region_find_in_listbase_by_type(regionbase,
-                                                                       RGN_TYPE_WINDOW);
-            region_main->flag &= ~RGN_FLAG_HIDDEN;
-            region_main->alignment = RGN_ALIGN_NONE;
-
-            ARegion *region_preview = BKE_region_find_in_listbase_by_type(regionbase,
-                                                                          RGN_TYPE_PREVIEW);
-            region_preview->flag &= ~RGN_FLAG_HIDDEN;
-            region_preview->alignment = RGN_ALIGN_NONE;
-
-            ARegion *region_channels = BKE_region_find_in_listbase_by_type(regionbase,
-                                                                           RGN_TYPE_CHANNELS);
-            region_channels->alignment = RGN_ALIGN_LEFT;
-          }
-        }
-      }
-    }
   }
 }
