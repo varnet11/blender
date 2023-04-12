@@ -63,4 +63,12 @@ GeometrySet execute_geometry_nodes(const bNodeTree &btree,
                                    GeometrySet input_geometry,
                                    FunctionRef<void(nodes::GeoNodesLFUserData &)> fill_user_data);
 
+void update_input_properties_from_node_tree(const bNodeTree &tree,
+                                            const IDProperty *old_properties,
+                                            IDProperty &properties);
+
+void update_output_properties_from_node_tree(const bNodeTree &tree,
+                                             const IDProperty *old_properties,
+                                             IDProperty &properties);
+
 }  // namespace blender::nodes

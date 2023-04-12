@@ -87,7 +87,7 @@ static int run_node_group_exec(bContext *C, wmOperator *op)
     bke::ModifierComputeContext compute_context{nullptr, "actually not a modifier"};
     GeometrySet new_geometry = nodes::execute_geometry_nodes(
         node_tree,
-        nullptr,
+        op->properties,
         compute_context,
         original_geometry,
         [&](nodes::GeoNodesLFUserData &user_data) {
@@ -113,12 +113,29 @@ static int run_node_group_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
+static int run_node_group_invoke(bContext *C, wmOperator *op, const wmEvent *event)
+{
+  char name[MAX_ID_NAME];
+  RNA_string_get(op->ptr, "name", name);
+  const ID *id = BKE_libblock_find_name(CTX_data_main(C), ID_NT, name);
+  if (!id) {
+    return OPERATOR_CANCELLED;
+  }
+  const bNodeTree &node_tree = reinterpret_cast<const bNodeTree &>(*id);
+
+  nodes::update_input_properties_from_node_tree(node_tree, op->properties, *op->properties);
+  nodes::update_output_properties_from_node_tree(node_tree, op->properties, *op->properties);
+
+  return run_node_group_exec(C, op);
+}
+
 void CURVES_OT_node_group(wmOperatorType *ot)
 {
   ot->name = "Run Node Group";
   ot->idname = __func__;
   ot->description = "Execute a node group on curves";  // TODO: Retrieve from node group.
 
+  ot->invoke = run_node_group_invoke;
   ot->exec = run_node_group_exec;
   ot->poll = editable_curves_poll;
 

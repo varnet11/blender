@@ -378,127 +378,6 @@ static bool logging_enabled(const ModifierEvalContext *ctx)
 static const std::string use_attribute_suffix = "_use_attribute";
 static const std::string attribute_name_suffix = "_attribute_name";
 
-static void update_input_properties_from_node_tree(const bNodeTree &tree,
-                                                   const IDProperty *old_properties,
-                                                   IDProperty &properties)
-{
-  tree.ensure_topology_cache();
-  const Span<const bNodeSocket *> tree_inputs = tree.interface_inputs();
-  for (const int i : tree_inputs.index_range()) {
-    const bNodeSocket &socket = *tree_inputs[i];
-    IDProperty *new_prop = nodes::id_property_create_from_socket(socket).release();
-    if (new_prop == nullptr) {
-      /* Out of the set of supported input sockets, only
-       * geometry sockets aren't added to the modifier. */
-      BLI_assert(socket.type == SOCK_GEOMETRY);
-      continue;
-    }
-
-    new_prop->flag |= IDP_FLAG_OVERRIDABLE_LIBRARY;
-    if (socket.description[0] != '\0') {
-      IDPropertyUIData *ui_data = IDP_ui_data_ensure(new_prop);
-      ui_data->description = BLI_strdup(socket.description);
-    }
-    IDP_AddToGroup(&properties, new_prop);
-
-    if (old_properties != nullptr) {
-      const IDProperty *old_prop = IDP_GetPropertyFromGroup(old_properties, socket.identifier);
-      if (old_prop != nullptr) {
-        if (nodes::id_property_type_matches_socket(socket, *old_prop)) {
-          /* #IDP_CopyPropertyContent replaces the UI data as well, which we don't (we only
-           * want to replace the values). So release it temporarily and replace it after. */
-          IDPropertyUIData *ui_data = new_prop->ui_data;
-          new_prop->ui_data = nullptr;
-          IDP_CopyPropertyContent(new_prop, old_prop);
-          if (new_prop->ui_data != nullptr) {
-            IDP_ui_data_free(new_prop);
-          }
-          new_prop->ui_data = ui_data;
-        }
-        else if (old_prop->type == IDP_INT && new_prop->type == IDP_BOOLEAN) {
-          /* Support versioning from integer to boolean property values. The actual value is stored
-           * in the same variable for both types. */
-          new_prop->data.val = old_prop->data.val != 0;
-        }
-      }
-    }
-
-    if (nodes::socket_type_has_attribute_toggle(socket)) {
-      const std::string use_attribute_id = socket.identifier + use_attribute_suffix;
-      const std::string attribute_name_id = socket.identifier + attribute_name_suffix;
-
-      IDPropertyTemplate idprop = {0};
-      IDProperty *use_attribute_prop = IDP_New(IDP_INT, &idprop, use_attribute_id.c_str());
-      IDP_AddToGroup(&properties, use_attribute_prop);
-
-      IDProperty *attribute_prop = IDP_New(IDP_STRING, &idprop, attribute_name_id.c_str());
-      IDP_AddToGroup(&properties, attribute_prop);
-
-      if (old_properties == nullptr) {
-        if (socket.default_attribute_name && socket.default_attribute_name[0] != '\0') {
-          IDP_AssignString(attribute_prop, socket.default_attribute_name, MAX_NAME);
-          IDP_Int(use_attribute_prop) = 1;
-        }
-      }
-      else {
-        IDProperty *old_prop_use_attribute = IDP_GetPropertyFromGroup(old_properties,
-                                                                      use_attribute_id.c_str());
-        if (old_prop_use_attribute != nullptr) {
-          IDP_CopyPropertyContent(use_attribute_prop, old_prop_use_attribute);
-        }
-
-        IDProperty *old_attribute_name_prop = IDP_GetPropertyFromGroup(old_properties,
-                                                                       attribute_name_id.c_str());
-        if (old_attribute_name_prop != nullptr) {
-          IDP_CopyPropertyContent(attribute_prop, old_attribute_name_prop);
-        }
-      }
-    }
-  }
-}
-
-static void update_output_properties_from_node_tree(const bNodeTree &tree,
-                                                    const IDProperty *old_properties,
-                                                    IDProperty &properties)
-{
-  tree.ensure_topology_cache();
-  const Span<const bNodeSocket *> tree_outputs = tree.interface_outputs();
-  for (const int i : tree_outputs.index_range()) {
-    const bNodeSocket &socket = *tree_outputs[i];
-    if (!nodes::socket_type_has_attribute_toggle(socket)) {
-      continue;
-    }
-
-    const std::string idprop_name = socket.identifier + attribute_name_suffix;
-    IDProperty *new_prop = IDP_NewString("", idprop_name.c_str(), MAX_NAME);
-    if (socket.description[0] != '\0') {
-      IDPropertyUIData *ui_data = IDP_ui_data_ensure(new_prop);
-      ui_data->description = BLI_strdup(socket.description);
-    }
-    IDP_AddToGroup(&properties, new_prop);
-
-    if (old_properties == nullptr) {
-      if (socket.default_attribute_name && socket.default_attribute_name[0] != '\0') {
-        IDP_AssignString(new_prop, socket.default_attribute_name, MAX_NAME);
-      }
-    }
-    else {
-      IDProperty *old_prop = IDP_GetPropertyFromGroup(old_properties, idprop_name.c_str());
-      if (old_prop != nullptr) {
-        /* #IDP_CopyPropertyContent replaces the UI data as well, which we don't (we only
-         * want to replace the values). So release it temporarily and replace it after. */
-        IDPropertyUIData *ui_data = new_prop->ui_data;
-        new_prop->ui_data = nullptr;
-        IDP_CopyPropertyContent(new_prop, old_prop);
-        if (new_prop->ui_data != nullptr) {
-          IDP_ui_data_free(new_prop);
-        }
-        new_prop->ui_data = ui_data;
-      }
-    }
-  }
-}
-
 }  // namespace blender
 
 void MOD_nodes_update_interface(Object *object, NodesModifierData *nmd)
@@ -519,8 +398,9 @@ void MOD_nodes_update_interface(Object *object, NodesModifierData *nmd)
   }
   IDProperty *new_properties = nmd->settings.properties;
 
-  update_input_properties_from_node_tree(*nmd->node_group, old_properties, *new_properties);
-  update_output_properties_from_node_tree(*nmd->node_group, old_properties, *new_properties);
+  nodes::update_input_properties_from_node_tree(*nmd->node_group, old_properties, *new_properties);
+  nodes::update_output_properties_from_node_tree(
+      *nmd->node_group, old_properties, *new_properties);
 
   if (old_properties != nullptr) {
     IDP_FreeProperty(old_properties);
