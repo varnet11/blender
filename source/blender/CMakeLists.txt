@@ -29,8 +29,8 @@ set(SRC_DNA_INC
   ${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_fluid_types.h
   ${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_freestyle_types.h
   ${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_genfile.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_gpencil_modifier_types.h
   ${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_gpencil_legacy_types.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_gpencil_modifier_types.h
   ${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_gpu_types.h
   ${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_image_types.h
   ${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_ipo_types.h
@@ -163,10 +163,6 @@ endif()
 
 if(WITH_IMAGE_OPENEXR)
   add_subdirectory(imbuf/intern/openexr)
-endif()
-
-if(WITH_IMAGE_DDS)
-  add_subdirectory(imbuf/intern/dds)
 endif()
 
 if(WITH_IMAGE_CINEON)

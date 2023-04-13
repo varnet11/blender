@@ -9,9 +9,7 @@ from bpy.types import (
 from bpy.props import (
     BoolProperty,
     CollectionProperty,
-    EnumProperty,
     FloatVectorProperty,
-    IntProperty,
     StringProperty,
 )
 from mathutils import (
@@ -179,7 +177,7 @@ class NODE_OT_add_simulation_zone(NodeAddOperator, Operator):
         output_node = self.create_node(context, self.output_node_type)
         if input_node is None or output_node is None:
             return {'CANCELLED'}
-    
+
         # Simulation input must be paired with the output.
         input_node.pair_with_output(output_node)
 
