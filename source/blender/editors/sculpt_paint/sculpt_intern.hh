@@ -1910,8 +1910,3 @@ void SCULPT_topology_islands_invalidate(SculptSession *ss);
 int SCULPT_vertex_island_get(SculptSession *ss, PBVHVertRef vertex);
 
 /** \} */
-
-/* Make SCULPT_ alias to a few blenkernel sculpt methods. */
-
-#define SCULPT_vertex_attr_get BKE_sculpt_vertex_attr_get
-#define SCULPT_face_attr_get BKE_sculpt_face_attr_get

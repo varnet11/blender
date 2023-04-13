@@ -799,48 +799,6 @@ void BKE_sculpt_attribute_destroy_temporary_all(struct Object *ob);
 /* Destroy attributes that were marked as stroke only in SculptAttributeParams. */
 void BKE_sculpt_attributes_destroy_temporary_stroke(struct Object *ob);
 
-BLI_INLINE void *BKE_sculpt_vertex_attr_get(const PBVHVertRef vertex, const SculptAttribute *attr)
-{
-  if (attr->data) {
-    char *p = (char *)attr->data;
-    int idx = (int)vertex.i;
-
-    if (attr->data_for_bmesh) {
-      BMElem *v = (BMElem *)vertex.i;
-      idx = v->head.index;
-    }
-
-    return p + attr->elem_size * (int)idx;
-  }
-  else {
-    BMElem *v = (BMElem *)vertex.i;
-    return BM_ELEM_CD_GET_VOID_P(v, attr->bmesh_cd_offset);
-  }
-
-  return NULL;
-}
-
-BLI_INLINE void *BKE_sculpt_face_attr_get(const PBVHFaceRef vertex, const SculptAttribute *attr)
-{
-  if (attr->data) {
-    char *p = (char *)attr->data;
-    int idx = (int)vertex.i;
-
-    if (attr->data_for_bmesh) {
-      BMElem *v = (BMElem *)vertex.i;
-      idx = v->head.index;
-    }
-
-    return p + attr->elem_size * (int)idx;
-  }
-  else {
-    BMElem *v = (BMElem *)vertex.i;
-    return BM_ELEM_CD_GET_VOID_P(v, attr->bmesh_cd_offset);
-  }
-
-  return NULL;
-}
-
 /**
  * Create new color layer on object if it doesn't have one and if experimental feature set has
  * sculpt vertex color enabled. Returns truth if new layer has been added, false otherwise.
@@ -943,4 +901,84 @@ struct CurveMapping *BKE_sculpt_default_cavity_curve(void);
 
 #ifdef __cplusplus
 }
+
+namespace blender::bke::paint {
+
+/* Base implementation for vertex_attr_*** and face_attr_*** methods.
+ * Returns a pointer to the attribute data (as defined by attr) for elem.
+ */
+template<typename Tptr, typename ElemRef = PBVHVertRef>
+static Tptr elem_attr_ptr(const ElemRef elem, const SculptAttribute *attr)
+{
+  void *ptr = nullptr;
+
+  if (attr->data) {
+    char *p = (char *)attr->data;
+    int idx = (int)elem.i;
+
+    if (attr->data_for_bmesh) {
+      BMElem *e = (BMElem *)elem.i;
+      idx = e->head.index;
+    }
+
+    ptr = p + attr->elem_size * (int)idx;
+  }
+  else {
+    BMElem *v = (BMElem *)elem.i;
+    ptr = BM_ELEM_CD_GET_VOID_P(v, attr->bmesh_cd_offset);
+  }
+
+  return static_cast<Tptr>(ptr);
+}
+
+/*
+ * Get a pointer to attribute data at vertex.
+ *
+ * Example: float *persistent_co = vertex_attr_ptr<float*>(vertex, ss->attrs.persistent_co);
+ */
+template<typename Tptr>
+static Tptr vertex_attr_ptr(const PBVHVertRef vertex, const SculptAttribute *attr)
+{
+  return elem_attr_ptr<Tptr, PBVHVertRef>(vertex, attr);
+}
+
+/*
+ * Get attribute data at vertex.
+ *
+ * Example: float weight = vertex_attr_get<float>(vertex, ss->attrs.automasking_factor);
+ */
+template<typename T>
+static T vertex_attr_get(const PBVHVertRef vertex, const SculptAttribute *attr)
+{
+  return *vertex_attr_ptr<T *>(vertex, attr);
+}
+
+/*
+ * Set attribute data at vertex.
+ *
+ * vertex_attr_set<float>(vertex, ss->attrs.automasking_factor, 1.0f);
+ */
+template<typename T>
+static void vertex_attr_set(const PBVHVertRef vertex, const SculptAttribute *attr, T data)
+{
+  *vertex_attr_ptr<T *>(vertex, attr) = data;
+}
+
+template<typename Tptr>
+static Tptr face_attr_ptr(const PBVHVertRef face, const SculptAttribute *attr)
+{
+  return elem_attr_ptr<Tptr, PBVHFaceRef>(face, attr);
+}
+
+template<typename T> static T face_attr_get(const PBVHFaceRef face, const SculptAttribute *attr)
+{
+  return *face_attr_ptr<T *>(face, attr);
+}
+
+template<typename T>
+static void face_attr_set(const PBVHFaceRef face, const SculptAttribute *attr, T data)
+{
+  *face_attr_ptr<T *>(face, attr) = data;
+}
+}  // namespace blender::bke::paint
 #endif

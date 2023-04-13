@@ -39,6 +39,8 @@
 #include <cstdlib>
 #include <cstring>
 
+using namespace blender::bke::paint;
+
 /* -------------------------------------------------------------------- */
 /** \name SculptProjectVector
  *
@@ -1543,7 +1545,7 @@ static void do_layer_brush_task_cb_ex(void *__restrict userdata,
     const int vi = vd.index;
     float *disp_factor;
     if (use_persistent_base) {
-      disp_factor = (float *)SCULPT_vertex_attr_get(vd.vertex, ss->attrs.persistent_disp);
+      disp_factor = vertex_attr_ptr<float *>(vd.vertex, ss->attrs.persistent_disp);
     }
     else {
       disp_factor = &ss->cache->layer_displacement_factor[vi];

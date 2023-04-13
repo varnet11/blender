@@ -13,6 +13,7 @@
 #include "BLI_math.h"
 #include "BLI_task.h"
 #include "BLI_utildefines.h"
+#include "BLI_math_vector_types.hh"
 
 #include "BLT_translation.h"
 
@@ -71,6 +72,9 @@
 #include <cstdlib>
 #include <cstring>
 
+using namespace blender::bke::paint;
+using blender::float3;
+
 /* Reset the copy of the mesh that is being sculpted on (currently just for the layer brush). */
 
 static int sculpt_set_persistent_base_exec(bContext *C, wmOperator * /*op*/)
@@ -101,11 +105,10 @@ static int sculpt_set_persistent_base_exec(bContext *C, wmOperator * /*op*/)
   for (int i = 0; i < totvert; i++) {
     PBVHVertRef vertex = BKE_pbvh_index_to_vertex(ss->pbvh, i);
 
-    copy_v3_v3((float *)SCULPT_vertex_attr_get(vertex, ss->attrs.persistent_co),
-               SCULPT_vertex_co_get(ss, vertex));
+    vertex_attr_set<float3>(vertex, ss->attrs.persistent_co, SCULPT_vertex_co_get(ss, vertex));
     SCULPT_vertex_normal_get(
-        ss, vertex, (float *)SCULPT_vertex_attr_get(vertex, ss->attrs.persistent_no));
-    (*(float *)SCULPT_vertex_attr_get(vertex, ss->attrs.persistent_disp)) = 0.0f;
+        ss, vertex, vertex_attr_ptr<float *>(vertex, ss->attrs.persistent_no));
+    vertex_attr_set<float>(vertex, ss->attrs.persistent_disp, 0.0f);
   }
 
   return OPERATOR_FINISHED;

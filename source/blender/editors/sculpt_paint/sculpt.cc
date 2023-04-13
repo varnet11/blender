@@ -81,6 +81,8 @@ using blender::MutableSpan;
 using blender::Set;
 using blender::Vector;
 
+using namespace blender::bke::paint;
+
 static float sculpt_calc_radius(ViewContext *vc,
                                 const Brush *brush,
                                 const Scene *scene,
@@ -209,7 +211,7 @@ void SCULPT_vertex_normal_get(SculptSession *ss, PBVHVertRef vertex, float no[3]
 const float *SCULPT_vertex_persistent_co_get(SculptSession *ss, PBVHVertRef vertex)
 {
   if (ss->attrs.persistent_co) {
-    return (const float *)SCULPT_vertex_attr_get(vertex, ss->attrs.persistent_co);
+    return vertex_attr_ptr<const float *>(vertex, ss->attrs.persistent_co);
   }
 
   return SCULPT_vertex_co_get(ss, vertex);
@@ -257,7 +259,7 @@ void SCULPT_vertex_limit_surface_get(SculptSession *ss, PBVHVertRef vertex, floa
 void SCULPT_vertex_persistent_normal_get(SculptSession *ss, PBVHVertRef vertex, float no[3])
 {
   if (ss->attrs.persistent_no) {
-    copy_v3_v3(no, (float *)SCULPT_vertex_attr_get(vertex, ss->attrs.persistent_no));
+    copy_v3_v3(no, vertex_attr_ptr<float *>(vertex, ss->attrs.persistent_no));
     return;
   }
   SCULPT_vertex_normal_get(ss, vertex, no);
@@ -6385,7 +6387,7 @@ void SCULPT_face_set_set(SculptSession *ss, PBVHFaceRef face, int fset)
 int SCULPT_vertex_island_get(SculptSession *ss, PBVHVertRef vertex)
 {
   if (ss->attrs.topology_island_key) {
-    return *static_cast<uint8_t *>(SCULPT_vertex_attr_get(vertex, ss->attrs.topology_island_key));
+    return vertex_attr_get<uint8_t>(vertex, ss->attrs.topology_island_key);
   }
 
   return -1;
@@ -6432,8 +6434,7 @@ void SCULPT_topology_islands_ensure(Object *ob)
       PBVHVertRef vertex2 = stack.pop_last();
       SculptVertexNeighborIter ni;
 
-      *static_cast<uint8_t *>(
-          SCULPT_vertex_attr_get(vertex2, ss->attrs.topology_island_key)) = island_nr;
+      vertex_attr_set<uint8_t>(vertex2, ss->attrs.topology_island_key, island_nr);
 
       SCULPT_VERTEX_NEIGHBORS_ITER_BEGIN (ss, vertex2, ni) {
         if (visit.add(ni.vertex) && SCULPT_vertex_any_face_visible_get(ss, ni.vertex)) {
