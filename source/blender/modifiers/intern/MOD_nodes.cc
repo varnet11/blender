@@ -2011,12 +2011,11 @@ static void copyData(const ModifierData *md, ModifierData *target, const int fla
   BKE_modifier_copydata_generic(md, target, flag);
 
   tnmd->runtime_eval_log = nullptr;
+  tnmd->simulation_cache = nullptr;
 
   if (nmd->settings.properties != nullptr) {
     tnmd->settings.properties = IDP_CopyProperty_ex(nmd->settings.properties, flag);
   }
-
-  tnmd->simulation_cache = nullptr;
 }
 
 static void freeData(ModifierData *md)
@@ -2027,7 +2026,7 @@ static void freeData(ModifierData *md)
     nmd->settings.properties = nullptr;
   }
 
-    MEM_delete(nmd->simulation_cache);
+  MEM_delete(nmd->simulation_cache);
 
   clear_runtime_data(nmd);
 }
