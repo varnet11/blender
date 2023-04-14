@@ -3122,8 +3122,8 @@ static void find_bounds_by_zone_recursive(const SpaceNode &snode,
 }
 
 static void node_draw_zones(TreeDrawContext & /*tree_draw_ctx*/,
-                            SpaceNode &snode,
-                            bNodeTree &ntree)
+                            const SpaceNode &snode,
+                            const bNodeTree &ntree)
 {
   const TreeZones *zones = bke::node_tree_zones::get_tree_zones(ntree);
   if (zones == nullptr) {
