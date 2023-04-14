@@ -2027,9 +2027,7 @@ static void freeData(ModifierData *md)
     nmd->settings.properties = nullptr;
   }
 
-  if (nmd->simulation_cache != nullptr) {
     MEM_delete(nmd->simulation_cache);
-  }
 
   clear_runtime_data(nmd);
 }
