@@ -677,7 +677,7 @@ static void timeline_cache_draw_single(PTCacheID *pid, float y_offset, float hei
 }
 
 static void timeline_cache_draw_simulation_nodes(
-    const Scene *scene,
+    const Scene &scene,
     const blender::bke::sim::ModifierSimulationCache &cache,
     const float y_offset,
     const float height,
@@ -694,8 +694,8 @@ static void timeline_cache_draw_simulation_nodes(
   }
   immUniformColor4fv(color);
 
-  const int start_frame = scene->r.sfra;
-  const int end_frame = scene->r.efra;
+  const int start_frame = scene.r.sfra;
+  const int end_frame = scene.r.efra;
   const int frames_num = end_frame - start_frame + 1;
   const blender::IndexRange frames_range(start_frame, frames_num);
 
@@ -746,7 +746,7 @@ void timeline_draw_cache(const SpaceAction *saction, const Object *ob, const Sce
       const NodesModifierData *nmd = reinterpret_cast<NodesModifierData *>(md);
       if (nmd->simulation_cache != nullptr) {
         timeline_cache_draw_simulation_nodes(
-            scene, *nmd->simulation_cache, y_offset, cache_draw_height, pos_id);
+            *scene, *nmd->simulation_cache, y_offset, cache_draw_height, pos_id);
         y_offset += cache_draw_height;
       }
     }
