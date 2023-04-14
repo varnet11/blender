@@ -16,7 +16,7 @@ void register_node_type_geo_custom_group(bNodeType *ntype);
 
 /**
  * Pair a simulation input node with an output node.
- * @return True if pairing the node was successful.
+ * \return True if pairing the node was successful.
  */
 bool node_geo_simulation_input_pair_with_output(const bNodeTree *node_tree,
                                                 bNode *simulation_input_node,
