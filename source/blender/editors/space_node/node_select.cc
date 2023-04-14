@@ -311,8 +311,7 @@ void node_deselect_all_output_sockets(bNodeTree &node_tree, const bool deselect_
 void node_select_paired(bNodeTree &node_tree)
 {
   for (bNode *input_node : node_tree.nodes_by_type("GeometryNodeSimulationInput")) {
-    const NodeGeometrySimulationInput *storage = static_cast<NodeGeometrySimulationInput *>(
-        input_node->storage);
+    const auto *storage = static_cast<const NodeGeometrySimulationInput *>(input_node->storage);
     if (bNode *output_node = node_tree.node_by_id(storage->output_node_id)) {
       if (input_node->flag & NODE_SELECT) {
         output_node->flag |= NODE_SELECT;
