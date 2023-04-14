@@ -33,6 +33,8 @@
 #include "BKE_report.h"
 #include "BKE_vfont.h"
 
+#include "BLI_string_utf8.h"
+
 #include "BLT_translation.h"
 
 #include "DEG_depsgraph.h"
@@ -379,7 +381,7 @@ static int insert_into_textbuf(Object *obedit, uintptr_t c)
     }
     ef->textbuf[ef->pos] = c;
     ef->textbufinfo[ef->pos] = cu->curinfo;
-    ef->textbufinfo[ef->pos].kern = 0;
+    ef->textbufinfo[ef->pos].kern = 0.0f;
     ef->textbufinfo[ef->pos].mat_nr = obedit->actcol;
 
     ef->pos++;
@@ -1344,7 +1346,7 @@ static int change_spacing_exec(bContext *C, wmOperator *op)
   Object *obedit = CTX_data_edit_object(C);
   Curve *cu = obedit->data;
   EditFont *ef = cu->editfont;
-  int kern, delta = RNA_int_get(op->ptr, "delta");
+  float kern, delta = RNA_float_get(op->ptr, "delta");
   int selstart, selend;
   bool changed = false;
 
@@ -1359,7 +1361,6 @@ static int change_spacing_exec(bContext *C, wmOperator *op)
 
   for (int i = selstart; i <= selend; i++) {
     kern = ef->textbufinfo[i].kern + delta;
-    CLAMP(kern, -20, 20);
 
     if (ef->textbufinfo[i].kern != kern) {
       ef->textbufinfo[i].kern = kern;
@@ -1390,15 +1391,15 @@ void FONT_OT_change_spacing(wmOperatorType *ot)
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
   /* properties */
-  RNA_def_int(ot->srna,
-              "delta",
-              1,
-              -20,
-              20,
-              "Delta",
-              "Amount to decrease or increase character spacing with",
-              -20,
-              20);
+  RNA_def_float(ot->srna,
+                "delta",
+                1.0,
+                0.0,
+                0.0,
+                "Delta",
+                "Amount to decrease or increase character spacing with",
+                0.0,
+                0.0);
 }
 
 /** \} */
@@ -1972,33 +1973,16 @@ static const EnumPropertyItem case_items[] = {
 static int set_case(bContext *C, int ccase)
 {
   Object *obedit = CTX_data_edit_object(C);
-  Curve *cu = obedit->data;
-  EditFont *ef = cu->editfont;
-  char32_t *str;
-  int len;
   int selstart, selend;
 
   if (BKE_vfont_select_get(obedit, &selstart, &selend)) {
-    len = (selend - selstart) + 1;
-    str = &ef->textbuf[selstart];
-    while (len) {
-      if (*str >= 'a' && *str <= 'z') {
-        *str -= 32;
-      }
-      len--;
-      str++;
-    }
+    Curve *cu = (Curve *)obedit->data;
+    EditFont *ef = cu->editfont;
+    char32_t *str = &ef->textbuf[selstart];
 
-    if (ccase == CASE_LOWER) {
-      len = (selend - selstart) + 1;
-      str = &ef->textbuf[selstart];
-      while (len) {
-        if (*str >= 'A' && *str <= 'Z') {
-          *str += 32;
-        }
-        len--;
-        str++;
-      }
+    for (int len = (selend - selstart) + 1; len; len--, str++) {
+      *str = (ccase == CASE_LOWER) ? BLI_str_utf32_char_to_lower(*str) :
+                                     BLI_str_utf32_char_to_upper(*str);
     }
 
     text_update_edited(C, obedit, FO_EDIT);
