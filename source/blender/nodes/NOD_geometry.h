@@ -12,7 +12,9 @@ extern struct bNodeTreeType *ntreeType_Geometry;
 
 void register_node_type_geo_custom_group(bNodeType *ntype);
 
-/* Simulation Input Node API */
+/* -------------------------------------------------------------------- */
+/** \name Simulation Node API
+ * \{ */
 
 /**
  * Pair a simulation input node with an output node.
@@ -21,6 +23,8 @@ void register_node_type_geo_custom_group(bNodeType *ntype);
 bool NOD_geometry_simulation_input_pair_with_output(const struct bNodeTree *node_tree,
                                                     struct bNode *sim_input_node,
                                                     const struct bNode *sim_output_node);
+
+/** \} */
 
 #ifdef __cplusplus
 }
