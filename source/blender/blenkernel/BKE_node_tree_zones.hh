@@ -29,7 +29,7 @@ struct TreeZone {
   /** Direct children nodes. Does not contain recursively nested nodes. */
   Vector<const bNode *> child_nodes;
 
-  bool constains_node_recursively(const bNode &node) const;
+  bool contains_node_recursively(const bNode &node) const;
 };
 
 class TreeZones {

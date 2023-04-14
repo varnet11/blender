@@ -236,7 +236,7 @@ const TreeZones *get_tree_zones(const bNodeTree &tree)
   return tree.runtime->tree_zones.get();
 }
 
-bool TreeZone::constains_node_recursively(const bNode &node) const
+bool TreeZone::contains_node_recursively(const bNode &node) const
 {
   const TreeZones *zones = this->owner;
   const int parent_zone_i = zones->parent_zone_by_node[node.index()];
