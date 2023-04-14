@@ -56,7 +56,7 @@ class NodeAddOperator:
         else:
             space.cursor_location = tree.view_center
 
-    # Deselect all nodes in the tree
+    # Deselect all nodes in the tree.
     @staticmethod
     def deselect_nodes(context):
         space = context.space_data
@@ -120,7 +120,7 @@ class NodeAddOperator:
         return result
 
 
-# Simple basic operator for adding a node
+# Simple basic operator for adding a node.
 class NODE_OT_add_node(NodeAddOperator, Operator):
     '''Add a node to the active tree'''
     bl_idname = "node.add_node"
@@ -132,7 +132,7 @@ class NODE_OT_add_node(NodeAddOperator, Operator):
         description="Node type",
     )
 
-    # Default execute simply adds a node
+    # Default execute simply adds a node.
     def execute(self, context):
         if self.properties.is_property_set("type"):
             self.deselect_nodes(context)
