@@ -436,6 +436,30 @@ void NODE_OT_group_ungroup(wmOperatorType *ot)
 /** \name Separate Operator
  * \{ */
 
+static void remap_pairing(bNodeTree &dst_tree, const Set<bNode *> &nodes)
+{
+  for (bNode *dst_node : nodes) {
+    if (dst_node->type == GEO_NODE_SIMULATION_INPUT) {
+      NodeGeometrySimulationInput *data = static_cast<NodeGeometrySimulationInput *>(
+          dst_node->storage);
+      /* XXX Technically this is not correct because the output_node_id is only valid
+       * in the original node group tree and we'd have map old IDs to new nodes first.
+       * The ungroup operator does not build a node map, it just expects node IDs to
+       * remain unchanged, which is probably true most of the time because they are
+       * mostly random numbers out of the uint32_t range.
+       */
+      const bNode *dst_output_node = dst_tree.node_by_id(data->output_node_id);
+      if (dst_output_node != nullptr) {
+        data->output_node_id = dst_output_node->identifier;
+      }
+      else {
+        data->output_node_id = 0;
+        blender::nodes::update_node_declaration_and_sockets(dst_tree, *dst_node);
+      }
+    }
+  }
+}
+
 /**
  * \return True if successful.
  */
@@ -497,10 +521,6 @@ static bool node_group_separate_selected(
     nodeRebuildIDVector(&ngroup);
   }
 
-  for (bNode *node : new_nodes) {
-    nodeDeclarationEnsure(&ntree, node);
-  }
-
   /* add internal links to the ntree */
   LISTBASE_FOREACH_MUTABLE (bNodeLink *, link, &ngroup.links) {
     const bool fromselect = (link->fromnode && (link->fromnode->flag & NODE_SELECT));
@@ -528,6 +548,10 @@ static bool node_group_separate_selected(
     }
   }
 
+  for (bNode *node : new_nodes) {
+    nodeDeclarationEnsure(&ntree, node);
+  }
+
   /* and copy across the animation,
    * note that the animation data's action can be nullptr here */
   if (ngroup.adt) {
@@ -539,6 +563,8 @@ static bool node_group_separate_selected(
       animation_basepath_change_free(basepath_change);
     }
   }
+
+  remap_pairing(ntree, new_nodes);
 
   BKE_ntree_update_tag_all(&ntree);
   if (!make_copy) {

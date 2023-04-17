@@ -3830,8 +3830,7 @@ bool nodeDeclarationEnsureOnOutdatedNode(bNodeTree *ntree, bNode *node)
   if (node->typeinfo->declare_dynamic) {
     BLI_assert(ntree != nullptr);
     BLI_assert(node != nullptr);
-    node->runtime->declaration = new blender::nodes::NodeDeclaration();
-    blender::nodes::build_node_declaration_dynamic(*ntree, *node, *node->runtime->declaration);
+    blender::nodes::update_node_declaration_and_sockets(*ntree, *node);
     return true;
   }
   if (node->typeinfo->declare) {
