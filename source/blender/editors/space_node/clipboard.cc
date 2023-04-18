@@ -199,7 +199,8 @@ static void remap_pairing(bNodeTree &dst_tree, const Map<const bNode *, bNode *>
     if (dst_node->type == GEO_NODE_SIMULATION_INPUT) {
       NodeGeometrySimulationInput *data = static_cast<NodeGeometrySimulationInput *>(
           dst_node->storage);
-      const bNode *dst_output_node = dst_output_node_map.lookup_default(data->output_node_id, nullptr);
+      const bNode *dst_output_node = dst_output_node_map.lookup_default(data->output_node_id,
+                                                                        nullptr);
       if (dst_output_node != nullptr) {
         data->output_node_id = dst_output_node->identifier;
       }

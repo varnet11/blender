@@ -1588,7 +1588,8 @@ struct GeometryNodesLazyFunctionGraphBuilder {
 
   void handle_simulation_input_node(const bNodeTree &node_tree, const bNode &bnode)
   {
-    const NodeGeometrySimulationInput *storage = static_cast<const NodeGeometrySimulationInput *>(bnode.storage);
+    const NodeGeometrySimulationInput *storage = static_cast<const NodeGeometrySimulationInput *>(
+        bnode.storage);
     if (node_tree.node_by_id(storage->output_node_id) == nullptr) {
       return;
     }

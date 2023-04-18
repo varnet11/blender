@@ -18,9 +18,7 @@ class GeometrySimulationStateItem : public SimulationStateItem {
   GeometrySet geometry_;
 
  public:
-  GeometrySimulationStateItem(GeometrySet geometry) : geometry_(std::move(geometry))
-  {
-  }
+  GeometrySimulationStateItem(GeometrySet geometry) : geometry_(std::move(geometry)) {}
 
   const GeometrySet &geometry() const
   {
