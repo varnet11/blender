@@ -1244,50 +1244,23 @@ void DepsgraphRelationBuilder::build_object_instance_collection(Object *object)
   FOREACH_COLLECTION_VISIBLE_OBJECT_RECURSIVE_END;
 }
 
-void DepsgraphRelationBuilder::build_object_light_linking(Object *object)
+void DepsgraphRelationBuilder::build_object_light_linking(Object *emitter)
 {
-  const ComponentKey hierarchy_key(&object->id, NodeType::HIERARCHY);
+  const ComponentKey hierarchy_key(&emitter->id, NodeType::HIERARCHY);
 
   const OperationKey light_linking_key(
-      &object->id, NodeType::SHADING, OperationCode::LIGHT_LINKING_UPDATE);
+      &emitter->id, NodeType::SHADING, OperationCode::LIGHT_LINKING_UPDATE);
 
-  LightLinking &light_linking = object->light_linking;
-  Collection *collection = light_linking.collection;
+  LightLinking &light_linking = emitter->light_linking;
 
   add_relation(hierarchy_key, light_linking_key, "Light Linking From Layer");
 
-  build_light_linking_collection(collection);
-
-  if (!collection) {
-    return;
-  }
-
-  const OperationKey collection_light_linking_key(
-      &collection->id, NodeType::PARAMETERS, OperationCode::LIGHT_LINKING_UPDATE);
-
-  /* Order to ensure the emitter's light linking is only evaluated after the receiver collection.
-   * This is because light linking runtime data is "cached" om the emitter object for the
-   * simplicity of access, but the mask is allocated per collection bases (so that if two emitters
-   * share the same receiving collection they share the same runtime data). */
-  add_relation(
-      collection_light_linking_key, light_linking_key, "Collection -> Object Light Linking");
-
-  /* Relation from the emitter to the receiving object.
-   * This allows the receiver to access emitter's bit mask. */
-  FOREACH_COLLECTION_OBJECT_RECURSIVE_BEGIN (collection, receiver) {
-    /* If the object has receiver collection configure do not consider it as a receiver, avoiding
-     * dependency cycles. */
-    if (receiver->light_linking.collection == nullptr) {
-
-      const OperationKey receiver_light_linking_key(
-          &receiver->id, NodeType::SHADING, OperationCode::LIGHT_LINKING_UPDATE);
-      add_relation(light_linking_key, receiver_light_linking_key, "Collection -> Light Linking");
-    }
-  }
-  FOREACH_COLLECTION_OBJECT_RECURSIVE_END;
+  build_light_linking_collection(emitter, light_linking.receiver_collection);
+  build_light_linking_collection(emitter, light_linking.blocker_collection);
 }
 
-void DepsgraphRelationBuilder::build_light_linking_collection(Collection *collection)
+void DepsgraphRelationBuilder::build_light_linking_collection(Object *emitter,
+                                                              Collection *collection)
 {
   if (collection == nullptr) {
     return;
@@ -1295,26 +1268,53 @@ void DepsgraphRelationBuilder::build_light_linking_collection(Collection *collec
 
   build_collection(nullptr, collection);
 
-  const OperationKey parameters_entry_key(
+  /* TODO(sergey): Avoid duplicate dependencies if multiple emitters are using the same collection.
+   */
+
+  const OperationKey emitter_light_linking_key(
+      &emitter->id, NodeType::SHADING, OperationCode::LIGHT_LINKING_UPDATE);
+
+  const OperationKey collection_parameters_entry_key(
       &collection->id, NodeType::PARAMETERS, OperationCode::PARAMETERS_ENTRY);
-  const OperationKey parameters_exit_key(
+  const OperationKey collection_parameters_exit_key(
       &collection->id, NodeType::PARAMETERS, OperationCode::PARAMETERS_EXIT);
 
-  const OperationKey light_linking_key(
+  const OperationKey collection_light_linking_key(
       &collection->id, NodeType::PARAMETERS, OperationCode::LIGHT_LINKING_UPDATE);
 
   /* Order of parameters evaluation within the receiver collection. */
   /* TODO(sergey): Can optimize this out by explicitly separating the different built tags. This
    * needs to be done in all places where the collection is built (is not something that can be
    * easily solved from just adding the light linking functionality). */
-  add_relation(parameters_entry_key,
-               light_linking_key,
+  add_relation(collection_parameters_entry_key,
+               collection_light_linking_key,
                "Entry -> Collection Light Linking",
                RELATION_CHECK_BEFORE_ADD);
-  add_relation(light_linking_key,
-               parameters_exit_key,
+  add_relation(collection_light_linking_key,
+               collection_parameters_exit_key,
                "Collection Light Linking -> Exit",
                RELATION_CHECK_BEFORE_ADD);
+
+  /* Order to ensure the emitter's light linking is only evaluated after the receiver collection.
+   * This is because light linking runtime data is "cached" om the emitter object for the
+   * simplicity of access, but the mask is allocated per collection bases (so that if two emitters
+   * share the same receiving collection they share the same runtime data). */
+  add_relation(collection_light_linking_key,
+               emitter_light_linking_key,
+               "Collection -> Object Light Linking");
+
+  /* Relation from the emitter to the receiving object.
+   * This allows the receiver to access emitter's bit mask. */
+  FOREACH_COLLECTION_OBJECT_RECURSIVE_BEGIN (collection, receiver) {
+    if (light_linking::can_link_to_emitter(*receiver)) {
+      const OperationKey receiver_light_linking_key(
+          &receiver->id, NodeType::SHADING, OperationCode::LIGHT_LINKING_UPDATE);
+      add_relation(emitter_light_linking_key,
+                   receiver_light_linking_key,
+                   "Emitter -> Receiver Light Linking");
+    }
+  }
+  FOREACH_COLLECTION_OBJECT_RECURSIVE_END;
 }
 
 void DepsgraphRelationBuilder::build_constraints(ID *id,

@@ -3028,6 +3028,7 @@ class VIEW3D_MT_make_links(Menu):
 
         layout.separator()
         layout.operator("object.light_linking_receivers_link")
+        layout.operator("object.light_linking_blockers_link")
 
 
 class VIEW3D_MT_brush_paint_modes(Menu):

@@ -281,10 +281,16 @@ void ED_operatortypes_object(void)
   WM_operatortype_append(OBJECT_OT_quadriflow_remesh);
 
   /* Light linking. */
-  WM_operatortype_append(OBJECT_OT_light_linking_collection_new);
-  WM_operatortype_append(OBJECT_OT_light_linking_unlink_from_collection);
+
+  WM_operatortype_append(OBJECT_OT_light_linking_receiver_collection_new);
   WM_operatortype_append(OBJECT_OT_light_linking_receivers_select);
   WM_operatortype_append(OBJECT_OT_light_linking_receivers_link);
+
+  WM_operatortype_append(OBJECT_OT_light_linking_blocker_collection_new);
+  WM_operatortype_append(OBJECT_OT_light_linking_blockers_select);
+  WM_operatortype_append(OBJECT_OT_light_linking_blockers_link);
+
+  WM_operatortype_append(OBJECT_OT_light_linking_unlink_from_collection);
 }
 
 void ED_operatormacros_object(void)

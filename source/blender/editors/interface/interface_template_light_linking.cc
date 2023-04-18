@@ -74,7 +74,7 @@ class CollectionDropTarget : public AbstractViewItemDropTarget {
     Scene *scene = CTX_data_scene(C);
 
     LISTBASE_FOREACH (wmDragID *, drag_id, &drag.ids) {
-      BKE_light_linking_receiver_to_collection(bmain, &collection_, drag_id->id);
+      BKE_light_linking_add_receiver_to_collection(bmain, &collection_, drag_id->id);
     }
 
     /* It is possible that the light linking collection is also used by the view layer.
@@ -119,14 +119,7 @@ class CollectionViewItem : public BasicTreeViewItem {
 
     uiItemR(sub,
             &collection_light_linking_ptr,
-            "light_state",
-            UI_ITEM_R_ICON_ONLY | UI_ITEM_R_COMPACT,
-            "",
-            ICON_NONE);
-
-    uiItemR(sub,
-            &collection_light_linking_ptr,
-            "shadow_state",
+            "link_state",
             UI_ITEM_R_ICON_ONLY | UI_ITEM_R_COMPACT,
             "",
             ICON_NONE);
@@ -140,7 +133,11 @@ class CollectionViewItem : public BasicTreeViewItem {
     PointerRNA id_ptr;
     RNA_id_pointer_create(id_, &id_ptr);
 
+    PointerRNA collection_ptr;
+    RNA_id_pointer_create(&collection_.id, &collection_ptr);
+
     uiLayoutSetContextPointer(&row, "id", &id_ptr);
+    uiLayoutSetContextPointer(&row, "collection", &collection_ptr);
 
     uiItemO(&row, "", ICON_X, "OBJECT_OT_light_linking_unlink_from_collection");
   }

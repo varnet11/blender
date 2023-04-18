@@ -324,6 +324,7 @@ const EnumPropertyItem rna_enum_object_axis_items[] = {
 #  include "BKE_global.h"
 #  include "BKE_gpencil_modifier_legacy.h"
 #  include "BKE_key.h"
+#  include "BKE_light_linking.h"
 #  include "BKE_material.h"
 #  include "BKE_mesh.h"
 #  include "BKE_mesh_wrapper.h"
@@ -2343,21 +2344,24 @@ void rna_Object_lightgroup_set(PointerRNA *ptr, const char *value)
   BKE_lightgroup_membership_set(&((Object *)ptr->owner_id)->lightgroup, value);
 }
 
-static void rna_LightLinking_collection_set(PointerRNA *ptr,
-                                            PointerRNA value,
-                                            struct ReportList *UNUSED(reports))
+static void rna_LightLinking_receiver_collection_set(PointerRNA *ptr,
+                                                     PointerRNA value,
+                                                     struct ReportList *UNUSED(reports))
 {
-  LightLinking *light_linking = (LightLinking *)ptr->data;
-  Collection *collection = (Collection *)value.data;
+  Object *object = (Object *)ptr->owner_id;
+  Collection *new_collection = (Collection *)value.data;
 
-  if (light_linking->collection != NULL) {
-    id_us_min(&light_linking->collection->id);
-  }
+  BKE_light_linking_collection_assign_only(object, new_collection, LIGHT_LINKING_RECEIVER);
+}
 
-  light_linking->collection = collection;
-  if (light_linking->collection) {
-    id_us_plus(&light_linking->collection->id);
-  }
+static void rna_LightLinking_blocker_collection_set(PointerRNA *ptr,
+                                                    PointerRNA value,
+                                                    struct ReportList *UNUSED(reports))
+{
+  Object *object = (Object *)ptr->owner_id;
+  Collection *new_collection = (Collection *)value.data;
+
+  BKE_light_linking_collection_assign_only(object, new_collection, LIGHT_LINKING_BLOCKER);
 }
 
 static void rna_LightLinking_collection_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *ptr)
@@ -3921,13 +3925,24 @@ static void rna_def_object_light_linking(BlenderRNA *brna)
   RNA_def_struct_sdna(srna, "LightLinking");
   RNA_def_struct_ui_text(srna, "Light Linking", "");
 
-  prop = RNA_def_property(srna, "collection", PROP_POINTER, PROP_NONE);
+  prop = RNA_def_property(srna, "receiver_collection", PROP_POINTER, PROP_NONE);
   RNA_def_property_struct_type(prop, "Collection");
   RNA_def_property_flag(prop, PROP_EDITABLE);
-  RNA_def_property_pointer_funcs(prop, NULL, "rna_LightLinking_collection_set", NULL, NULL);
+  RNA_def_property_pointer_funcs(
+      prop, NULL, "rna_LightLinking_receiver_collection_set", NULL, NULL);
   RNA_def_property_ui_text(prop,
                            "Receiver Collection",
                            "Collection which defines light linking relation of this emitter");
+  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_LightLinking_collection_update");
+
+  prop = RNA_def_property(srna, "blocker_collection", PROP_POINTER, PROP_NONE);
+  RNA_def_property_struct_type(prop, "Collection");
+  RNA_def_property_flag(prop, PROP_EDITABLE);
+  RNA_def_property_pointer_funcs(
+      prop, NULL, "rna_LightLinking_blocker_collection_set", NULL, NULL);
+  RNA_def_property_ui_text(prop,
+                           "Blocker Collection",
+                           "Collection which defines objects which block light from this emitter");
   RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_LightLinking_collection_update");
 }
 

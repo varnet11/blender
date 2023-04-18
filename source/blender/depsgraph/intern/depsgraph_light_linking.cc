@@ -154,10 +154,9 @@ void EmitterDataMap::clear()
 EmitterData *EmitterDataMap::ensure_data_if_possible(const Scene &scene, const Object &emitter)
 {
   BLI_assert(DEG_is_original_id(&emitter.id));
-  BLI_assert(emitter.light_linking.collection);
 
-  const LightLinking &light_linking = emitter.light_linking;
-  const Collection *collection = light_linking.collection;
+  const Collection *collection = get_collection(emitter);
+  BLI_assert(collection);
 
   /* Performance note.
    *
@@ -197,8 +196,7 @@ EmitterData *EmitterDataMap::ensure_data_if_possible(const Scene &scene, const O
 
 const EmitterData *EmitterDataMap::get_data(const Object &emitter) const
 {
-  const LightLinking &light_linking = emitter.light_linking;
-  const Collection *collection_eval = light_linking.collection;
+  const Collection *collection_eval = get_collection(emitter);
 
   if (!collection_eval) {
     return nullptr;
@@ -213,8 +211,7 @@ bool EmitterDataMap::can_skip_emitter(const Object &emitter) const
 {
   BLI_assert(DEG_is_original_id(&emitter.id));
 
-  const LightLinking &light_linking = emitter.light_linking;
-  const Collection *collection = light_linking.collection;
+  const Collection *collection = get_collection(emitter);
 
   if (!collection) {
     return true;
@@ -235,17 +232,9 @@ void LinkingData::link_object(const EmitterData &emitter_data,
                               const eCollectionLightLinkingState link_state,
                               const Object &object)
 {
-  if (link_state == COLLECTION_LIGHT_LINKING_STATE_NONE) {
-    return;
-  }
-
   LightSet &light_set = ensure_light_set_for(object);
 
   switch (link_state) {
-    case COLLECTION_LIGHT_LINKING_STATE_NONE:
-      BLI_assert_unreachable();
-      break;
-
     case COLLECTION_LIGHT_LINKING_STATE_INCLUDE:
       light_set.include_collection_mask |= emitter_data.collection_mask;
       light_set.exclude_collection_mask &= ~emitter_data.collection_mask;
@@ -365,7 +354,9 @@ static void foreach_light_collection_object(const Collection &collection, Proc &
 
 void Cache::clear()
 {
-  emitter_data_map_.clear();
+  light_emitter_data_map_.clear();
+  shadow_emitter_data_map_.clear();
+
   light_linking_.clear();
   shadow_linking_.clear();
 }
@@ -374,26 +365,46 @@ void Cache::add_emitter(const Scene &scene, const Object &emitter)
 {
   BLI_assert(DEG_is_original_id(&emitter.id));
 
-  if (emitter_data_map_.can_skip_emitter(emitter)) {
+  add_light_linking_emitter(scene, emitter);
+  add_shadow_linking_emitter(scene, emitter);
+}
+
+void Cache::add_light_linking_emitter(const Scene &scene, const Object &emitter)
+{
+  BLI_assert(DEG_is_original_id(&emitter.id));
+
+  if (light_emitter_data_map_.can_skip_emitter(emitter)) {
     return;
   }
 
-  const LightLinking &light_linking = emitter.light_linking;
-  Collection *collection = light_linking.collection;
+  const EmitterData *light_emitter_data = light_emitter_data_map_.ensure_data_if_possible(scene,
+                                                                                          emitter);
+  if (light_emitter_data) {
+    foreach_light_collection_object(
+        *emitter.light_linking.receiver_collection,
+        [&](const CollectionLightLinking &collection_light_linking, const Object &receiver) {
+          add_receiver_object(*light_emitter_data, collection_light_linking, receiver);
+        });
+  }
+}
 
-  const EmitterData *emitter_data = emitter_data_map_.ensure_data_if_possible(scene, emitter);
-  if (!emitter_data) {
-    /* The number of possible emitters exceeded in the scene. */
+void Cache::add_shadow_linking_emitter(const Scene &scene, const Object &emitter)
+{
+  BLI_assert(DEG_is_original_id(&emitter.id));
+
+  if (shadow_emitter_data_map_.can_skip_emitter(emitter)) {
     return;
   }
 
-  /* Add collection bit to all receivers affected by this emitter or any emitter with the same
-   * receiver collection. */
-  foreach_light_collection_object(
-      *collection,
-      [&](const CollectionLightLinking &collection_light_linking, const Object &receiver) {
-        add_receiver_object(*emitter_data, collection_light_linking, receiver);
-      });
+  const EmitterData *shadow_emitter_data = shadow_emitter_data_map_.ensure_data_if_possible(
+      scene, emitter);
+  if (shadow_emitter_data) {
+    foreach_light_collection_object(
+        *emitter.light_linking.blocker_collection,
+        [&](const CollectionLightLinking &collection_light_linking, const Object &receiver) {
+          add_blocker_object(*shadow_emitter_data, collection_light_linking, receiver);
+        });
+  }
 }
 
 void Cache::add_receiver_object(const EmitterData &emitter_data,
@@ -402,19 +413,26 @@ void Cache::add_receiver_object(const EmitterData &emitter_data,
 {
   BLI_assert(DEG_is_original_id(&receiver.id));
 
-  if (receiver.light_linking.collection != nullptr) {
-    /* If the object has receiver collection configure do not consider it as a receiver, avoiding
-     * dependency cycles. */
+  if (!can_link_to_emitter(receiver)) {
     return;
   }
 
-  /* Light linking. */
   light_linking_.link_object(
-      emitter_data, eCollectionLightLinkingState(collection_light_linking.light_state), receiver);
+      emitter_data, eCollectionLightLinkingState(collection_light_linking.link_state), receiver);
+}
 
-  /* Shadow linking. */
+void Cache::add_blocker_object(const EmitterData &emitter_data,
+                               const CollectionLightLinking &collection_light_linking,
+                               const Object &blocker)
+{
+  BLI_assert(DEG_is_original_id(&blocker.id));
+
+  if (!can_link_to_emitter(blocker)) {
+    return;
+  }
+
   shadow_linking_.link_object(
-      emitter_data, eCollectionLightLinkingState(collection_light_linking.shadow_state), receiver);
+      emitter_data, eCollectionLightLinkingState(collection_light_linking.link_state), blocker);
 }
 
 void Cache::end_build(const Scene &scene)
@@ -423,8 +441,8 @@ void Cache::end_build(const Scene &scene)
     return;
   }
 
-  light_linking_.end_build(scene, emitter_data_map_);
-  shadow_linking_.end_build(scene, emitter_data_map_);
+  light_linking_.end_build(scene, light_emitter_data_map_);
+  shadow_linking_.end_build(scene, shadow_emitter_data_map_);
 }
 
 /* Set runtime data in light linking. */
@@ -449,13 +467,21 @@ void Cache::eval_runtime_data(Object &object_eval) const
   light_linking.runtime.blocker_shadow_set = shadow_linking_.get_light_set_for(object_eval);
 
   /* Emitter configuration. */
-  const EmitterData *emitter_data = emitter_data_map_.get_data(object_eval);
-  if (emitter_data) {
-    light_linking.runtime.light_set_membership = emitter_data->light_membership.get_mask();
-    light_linking.runtime.shadow_set_membership = emitter_data->shadow_membership.get_mask();
+
+  const EmitterData *light_emitter_data = light_emitter_data_map_.get_data(object_eval);
+  if (light_emitter_data) {
+    light_linking.runtime.light_set_membership = light_emitter_data->light_membership.get_mask();
   }
   else {
     light_linking.runtime.light_set_membership = EmitterSetMembership::SET_MEMBERSHIP_ALL;
+  }
+
+  const EmitterData *shadow_emitter_data = shadow_emitter_data_map_.get_data(object_eval);
+  if (shadow_emitter_data) {
+    light_linking.runtime.shadow_set_membership =
+        shadow_emitter_data->shadow_membership.get_mask();
+  }
+  else {
     light_linking.runtime.shadow_set_membership = EmitterSetMembership::SET_MEMBERSHIP_ALL;
   }
 }

@@ -11,7 +11,10 @@
 
 #include "BLI_map.hh"
 
+#include "BKE_light_linking.h" /* LightLinkingType */
+
 #include "DNA_collection_types.h" /* eCollectionLightLinkingState */
+#include "DNA_object_types.h"
 
 struct Collection;
 struct CollectionLightLinking;
@@ -84,6 +87,8 @@ class EmitterDataMap {
   using MapType = Map<const Collection *, EmitterData>;
 
  public:
+  explicit EmitterDataMap(const LightLinkingType link_type) : link_type_(link_type) {}
+
   /* Returns true if there is no information about emitters at all. */
   bool is_empty() const
   {
@@ -116,6 +121,20 @@ class EmitterDataMap {
   }
 
  private:
+  /* Get linked collection depending on whether this is emitter information os for light or shadow
+   * linking. */
+  /* TODO(sergey): Check whether template specialization is preferred here. */
+  inline const Collection *get_collection(const Object &emitter) const
+  {
+    if (link_type_ == LIGHT_LINKING_BLOCKER) {
+      return emitter.light_linking.blocker_collection;
+    }
+
+    return emitter.light_linking.receiver_collection;
+  }
+
+  LightLinkingType link_type_ = LIGHT_LINKING_RECEIVER;
+
   /* Emitter-centric information: indexed by an original emitter object, contains accumulated
    * information about emitter. */
   MapType emitter_data_map_;
@@ -127,7 +146,7 @@ class EmitterDataMap {
 /* Common part of receiver (for light linking) and blocker (for shadow lining) data. */
 class LinkingData {
  public:
-  explicit LinkingData(const bool is_shadow) : is_shadow_(is_shadow) {}
+  explicit LinkingData(const LightLinkingType link_type) : link_type_(link_type) {}
 
   /* Entirely clear the state, become ready for a new light linking relations build. */
   void clear();
@@ -166,17 +185,17 @@ class LinkingData {
 
   /* Get light set membership information of the emitter data depending whether this linking
    * data is a light or shadow linking. */
-  /* TODO(sergey): Check whether such per-update_emitters_membership() call is fast enough, or
-   * whether template specialization is preferred here. */
-  inline EmitterSetMembership &get_emitter_set_membership(EmitterData &emitter_data)
+  /* TODO(sergey): Check whether template specialization is preferred here. */
+  inline EmitterSetMembership &get_emitter_set_membership(EmitterData &emitter_data) const
   {
-    if (is_shadow_) {
+    if (link_type_ == LIGHT_LINKING_BLOCKER) {
       return emitter_data.shadow_membership;
     }
+
     return emitter_data.light_membership;
   }
 
-  bool is_shadow_ = false;
+  LightLinkingType link_type_ = LIGHT_LINKING_RECEIVER;
 
   /* Receiver/blocker-centric view of light sets: indexed by an original receiver object, contains
    * light set which defines from which emitters it receives light from or casts shadow when is lit
@@ -231,6 +250,10 @@ class Cache {
   void eval_runtime_data(Object &object_eval) const;
 
  private:
+  /* Add emitter information specific for light and shadow linking. */
+  void add_light_linking_emitter(const Scene &scene, const Object &emitter);
+  void add_shadow_linking_emitter(const Scene &scene, const Object &emitter);
+
   /* Add receiver or blocker object with the given light linking configuration.
    *
    * The term receiver here is meant in a wider meaning of it. For the light linking it is a
@@ -238,19 +261,30 @@ class Cache {
   void add_receiver_object(const EmitterData &emitter_data,
                            const CollectionLightLinking &collection_light_linking,
                            const Object &receiver);
+  void add_blocker_object(const EmitterData &emitter_data,
+                          const CollectionLightLinking &collection_light_linking,
+                          const Object &blocker);
 
   /* Returns true if there is light linking configuration in the scene. */
   bool has_light_linking() const
   {
-    return !emitter_data_map_.is_empty();
+    return !light_emitter_data_map_.is_empty() || !shadow_emitter_data_map_.is_empty();
   }
 
   /* Per-emitter light and shadow linking information. */
-  EmitterDataMap emitter_data_map_;
+  EmitterDataMap light_emitter_data_map_{LIGHT_LINKING_RECEIVER};
+  EmitterDataMap shadow_emitter_data_map_{LIGHT_LINKING_BLOCKER};
 
   /* Light and shadow linking data. */
-  LinkingData light_linking_{false};
-  LinkingData shadow_linking_{true};
+  LinkingData light_linking_{LIGHT_LINKING_RECEIVER};
+  LinkingData shadow_linking_{LIGHT_LINKING_BLOCKER};
 };
+
+/* Check whether object can be linked to an emitter without causing feedback loop. */
+inline bool can_link_to_emitter(const Object &object)
+{
+  return object.light_linking.receiver_collection == nullptr &&
+         object.light_linking.blocker_collection == nullptr;
+}
 
 }  // namespace blender::deg::light_linking

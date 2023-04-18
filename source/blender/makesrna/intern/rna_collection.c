@@ -519,7 +519,6 @@ static void rna_def_collection_light_linking(BlenderRNA *brna)
 
   /* TODO(sergey): Use proper icons. */
   static const EnumPropertyItem light_linking_state_items[] = {
-      {COLLECTION_LIGHT_LINKING_STATE_NONE, "NONE", ICON_AUTO, "None", ""},
       {COLLECTION_LIGHT_LINKING_STATE_INCLUDE, "INCLUDE", ICON_OUTLINER_OB_LIGHT, "Include", ""},
       {COLLECTION_LIGHT_LINKING_STATE_EXCLUDE, "EXCLUDE", ICON_LIGHT, "Exclude", ""},
       {0, NULL, 0, NULL, NULL},
@@ -534,18 +533,10 @@ static void rna_def_collection_light_linking(BlenderRNA *brna)
   RNA_def_struct_path_func(srna, "rna_CollectionLightLinking_path");
 
   /* Light state. */
-  prop = RNA_def_property(srna, "light_state", PROP_ENUM, PROP_NONE);
+  prop = RNA_def_property(srna, "link_state", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, light_linking_state_items);
   RNA_def_property_ui_text(
-      prop, "Light State", "Light receiving state of the object or collection");
-  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
-  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_CollectionLightLinking_update");
-
-  /* Shadow state. */
-  prop = RNA_def_property(srna, "shadow_state", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_items(prop, light_linking_state_items);
-  RNA_def_property_ui_text(
-      prop, "Shadow State", "Shadow casting state of the object or collection");
+      prop, "Link State", "Light or shadow receiving state of the object or collection");
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
   RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_CollectionLightLinking_update");
 }

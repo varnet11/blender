@@ -1118,7 +1118,8 @@ void DepsgraphNodeBuilder::build_object_light_linking(Object *object)
 
   graph_->light_linking_cache.add_emitter(*graph_->scene, *object);
 
-  build_light_linking_collection(object->light_linking.collection);
+  build_light_linking_collection(object->light_linking.receiver_collection);
+  build_light_linking_collection(object->light_linking.blocker_collection);
 }
 
 void DepsgraphNodeBuilder::build_light_linking_collection(Collection *collection)

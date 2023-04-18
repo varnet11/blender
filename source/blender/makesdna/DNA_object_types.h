@@ -284,18 +284,18 @@ typedef struct LightLinkingRuntime {
 } LightLinkingRuntime;
 
 typedef struct LightLinking {
-  /* Collection which contains objects (possibly via nested collection indirection) which defines
+  /* Collections which contains objects (possibly via nested collection indirection) which defines
    * the light linking relation: such as whether objects are included or excluded from being lit by
-   * this emitter, and whether they receive shadows from this emitter.
+   * this emitter (receiver_collection), oe whether they block light from this emitter
+   * (blocker_collection).
    *
    * If the collection is a null pointer then all objects from the current scene are receiving
    * light from this emitter, and nothing is excluded from receiving the light and shadows.
    *
    * The emitter in this context is assumed to be either object of lamp type, or objects with
    * surface which has emissive shader. */
-  struct Collection *collection;
-
-  void *_pad;
+  struct Collection *receiver_collection;
+  struct Collection *blocker_collection;
 
   LightLinkingRuntime runtime;
 } LightLinking;
