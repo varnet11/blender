@@ -3188,6 +3188,8 @@ static void node_draw_zones(TreeDrawContext & /*tree_draw_ctx*/,
     }
     immVertex3fv(pos, fillet_boundary_positions[0]);
     immEnd();
+
+    immUnbindProgram();
   }
 
   for (const int zone_i : zones->zones.index_range()) {
