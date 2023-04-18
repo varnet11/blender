@@ -3047,9 +3047,6 @@ static void add_rect_corner_positions(Vector<float2> &positions, const rctf &rec
   positions.append({rect.xmax, rect.ymax});
 }
 
-std::array<float2, 4> node_link_bezier_points_dragged(const SpaceNode &snode,
-                                                      const bNodeLink &link);
-
 static void find_bounds_by_zone_recursive(const SpaceNode &snode,
                                           const TreeZone &zone,
                                           const Span<int> parent_zone_by_node,
