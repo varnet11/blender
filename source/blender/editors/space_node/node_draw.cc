@@ -3146,13 +3146,10 @@ static void node_draw_zones(TreeDrawContext & /*tree_draw_ctx*/,
     boundary_curve.cyclic_for_write().first() = true;
     boundary_curve.fill_curve_types(CURVE_TYPE_POLY);
     MutableSpan<float3> boundary_curve_positions = boundary_curve.positions_for_write();
-    MutableSpan<int> boundary_curve_offsets = boundary_curve.offsets_for_write();
-    boundary_curve_offsets[0] = 0;
-    boundary_curve_offsets[1] = boundary_positions_num;
+    boundary_curve.offsets_for_write().copy_from({0, boundary_positions_num});
     for (const int i : boundary_positions.index_range()) {
       boundary_curve_positions[i] = float3(boundary_positions[i], 0.0f);
     }
-    boundary_curve.tag_topology_changed();
 
     fillet_curve_by_zone[zone_i] = geometry::fillet_curves_poly(
         boundary_curve,
@@ -3175,10 +3172,7 @@ static void node_draw_zones(TreeDrawContext & /*tree_draw_ctx*/,
   const uint pos = GPU_vertformat_attr_add(
       immVertexFormat(), "pos", GPU_COMP_F32, 3, GPU_FETCH_FLOAT);
 
-  /**
-   * Draw all the contour lines after to prevent them from getting hidden.
-   * Once we support other zones (e.g., for loops) we will need to sort them in a smarter way.
-   */
+  /* Draw all the contour lines after to prevent them from getting hidden by overlapping zones. */
   for (const int zone_i : zones->zones.index_range()) {
     if (zone_color[3] == 0.0f) {
       break;
