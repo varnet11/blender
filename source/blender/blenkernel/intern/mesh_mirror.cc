@@ -191,7 +191,7 @@ Mesh *BKE_mesh_mirror_apply_mirror_on_axis_for_modifier(MirrorModifierData *mmd,
   const int src_loops_num = mesh->totloop;
 
   Mesh *result = BKE_mesh_new_nomain_from_template(
-      mesh, src_verts_num * 2, src_edges_num * 2, src_loops_num * 2, src_polys.size() * 2);
+      mesh, src_verts_num * 2, src_edges_num * 2, src_polys.size() * 2, src_loops_num * 2);
 
   /* Copy custom-data to original geometry. */
   CustomData_copy_data(&mesh->vdata, &result->vdata, 0, 0, src_verts_num);
@@ -286,15 +286,14 @@ Mesh *BKE_mesh_mirror_apply_mirror_on_axis_for_modifier(MirrorModifierData *mmd,
     }
   }
 
-  blender::MutableSpan<MEdge> result_edges = result->edges_for_write();
+  blender::MutableSpan<blender::int2> result_edges = result->edges_for_write();
   blender::MutableSpan<int> result_poly_offsets = result->poly_offsets_for_write();
   blender::MutableSpan<int> result_corner_verts = result->corner_verts_for_write();
   blender::MutableSpan<int> result_corner_edges = result->corner_edges_for_write();
 
   /* adjust mirrored edge vertex indices */
   for (const int i : result_edges.index_range().drop_front(src_edges_num)) {
-    result_edges[i].v1 += src_verts_num;
-    result_edges[i].v2 += src_verts_num;
+    result_edges[i] += src_verts_num;
   }
 
   result_poly_offsets.take_front(src_polys.size()).copy_from(mesh->poly_offsets().drop_back(1));
