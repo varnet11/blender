@@ -66,6 +66,11 @@ class BitArrayVector {
     return aligned_group_size_ == 0 ? 0 : data_.size() / aligned_group_size_;
   }
 
+  int64_t group_size() const
+  {
+    return group_size_;
+  }
+
   IndexRange index_range() const
   {
     return IndexRange{this->size()};

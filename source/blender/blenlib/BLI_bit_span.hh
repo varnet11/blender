@@ -326,6 +326,21 @@ class MutableBoundedBitSpan : public MutableBitSpan {
   }
 };
 
+/**
+ * This is overloaded in BLI_bit_vector.hh. The purpose is to make passing #BitVector into bit span
+ * operations more simpler and efficient (interpreting it as `BoundedBitSpan` instead of just
+ * `BitSpan`).
+ */
+template<typename T> inline T to_best_bit_span(const T &data)
+{
+  static_assert(is_same_any_v<std::decay_t<T>,
+                              BitSpan,
+                              MutableBitSpan,
+                              BoundedBitSpan,
+                              MutableBoundedBitSpan>);
+  return data;
+}
+
 template<typename... Args>
 constexpr bool all_bounded_spans =
     (is_same_any_v<std::decay_t<Args>, BoundedBitSpan, MutableBoundedBitSpan> && ...);

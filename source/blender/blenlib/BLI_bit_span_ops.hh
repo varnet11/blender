@@ -6,6 +6,7 @@
 
 namespace blender::bits {
 
+namespace detail {
 /**
  * Evaluates the expression on one or more bit spans and stores the result in the first.
  *
@@ -92,7 +93,7 @@ inline bool any_set_expr(ExprFn &&expr, const FirstBitSpanT &first_arg, const Bi
     /* Fallback or arbitrary bit spans. This could be implemented more efficiently but adds more
      * complexity and is not necessary yet. */
     for (const int64_t i : IndexRange(size)) {
-      const BitInt result = fn(BitInt(first_arg[i].test()), BitInt(args[i].test())...);
+      const BitInt result = expr(BitInt(first_arg[i].test()), BitInt(args[i].test())...);
       if (result != 0) {
         return true;
       }
@@ -137,7 +138,7 @@ inline void foreach_1_index_expr(ExprFn &&expr,
     if (const int64_t final_bits = first_arg.final_bits_num()) {
       BitInt tmp = expr(first_data[full_ints_num] >> first_arg.offset(),
                         (*args.data()[full_ints_num] >> args.offset())...) &
-                   mask_first_n_bits(size);
+                   mask_first_n_bits(final_bits);
       const int64_t offset = full_ints_num << BitToIntIndexShift;
       while (tmp != 0) {
         const int index = bitscan_forward_uint64(tmp);
@@ -156,6 +157,32 @@ inline void foreach_1_index_expr(ExprFn &&expr,
       }
     }
   }
+}
+
+}  // namespace detail
+
+template<typename ExprFn, typename FirstBitSpanT, typename... BitSpanT>
+inline void mix_into_first_expr(ExprFn &&expr,
+                                const FirstBitSpanT &first_arg,
+                                const BitSpanT &...args)
+{
+  detail::mix_into_first_expr(expr, to_best_bit_span(first_arg), to_best_bit_span(args)...);
+}
+
+template<typename ExprFn, typename FirstBitSpanT, typename... BitSpanT>
+inline bool any_set_expr(ExprFn &&expr, const FirstBitSpanT &first_arg, const BitSpanT &...args)
+{
+  return detail::any_set_expr(expr, to_best_bit_span(first_arg), to_best_bit_span(args)...);
+}
+
+template<typename ExprFn, typename HandleFn, typename FirstBitSpanT, typename... BitSpanT>
+inline void foreach_1_index_expr(ExprFn &&expr,
+                                 HandleFn &&handle,
+                                 const FirstBitSpanT &first_arg,
+                                 const BitSpanT &...args)
+{
+  detail::foreach_1_index_expr(
+      expr, handle, to_best_bit_span(first_arg), to_best_bit_span(args)...);
 }
 
 template<typename FirstBitSpanT, typename... BitSpanT>

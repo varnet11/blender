@@ -170,12 +170,12 @@ class BitVector {
     return move_assign_container(*this, std::move(other));
   }
 
-  operator BitSpan() const
+  operator BoundedBitSpan() const
   {
     return {data_, IndexRange(size_in_bits_)};
   }
 
-  operator MutableBitSpan()
+  operator MutableBoundedBitSpan()
   {
     return {data_, IndexRange(size_in_bits_)};
   }
@@ -366,6 +366,18 @@ class BitVector {
     return this->required_ints_for_bits(size_in_bits_);
   }
 };
+
+template<int64_t InlineBufferCapacity, typename Allocator>
+inline BoundedBitSpan to_best_bit_span(const BitVector<InlineBufferCapacity, Allocator> &data)
+{
+  return data;
+}
+
+template<int64_t InlineBufferCapacity, typename Allocator>
+inline MutableBoundedBitSpan to_best_bit_span(BitVector<InlineBufferCapacity, Allocator> &data)
+{
+  return data;
+}
 
 }  // namespace blender::bits
 
