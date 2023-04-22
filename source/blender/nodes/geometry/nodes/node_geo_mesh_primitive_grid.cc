@@ -149,6 +149,7 @@ Mesh *create_grid_mesh(const int verts_x,
     calculate_uvs(mesh, positions, corner_verts, size_x, size_y, uv_map_id);
   }
 
+  mesh->tag_loose_verts_none();
   mesh->loose_edges_tag_none();
 
   const float3 bounds = float3(size_x * 0.5f, size_y * 0.5f, 0.0f);
@@ -198,8 +199,7 @@ static void node_geo_exec(GeoNodeExecParams params)
     return;
   }
 
-  AutoAnonymousAttributeID uv_map_id = params.get_output_anonymous_attribute_id_if_needed(
-      "UV Map");
+  AnonymousAttributeIDPtr uv_map_id = params.get_output_anonymous_attribute_id_if_needed("UV Map");
 
   Mesh *mesh = create_grid_mesh(verts_x, verts_y, size_x, size_y, uv_map_id.get());
   BKE_id_material_eval_ensure_default_slot(&mesh->id);
