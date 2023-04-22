@@ -2358,12 +2358,12 @@ CustomData CustomData_shallow_copy_remove_non_bmesh_attributes(const CustomData 
 class CustomDataLayerImplicitSharing : public ImplicitSharingInfo {
  private:
   const void *data_;
-  const int totelem_;
+  int totelem_;
   const eCustomDataType type_;
 
  public:
   CustomDataLayerImplicitSharing(const void *data, const int totelem, const eCustomDataType type)
-      : ImplicitSharingInfo(1), data_(data), totelem_(totelem), type_(type)
+      : ImplicitSharingInfo(), data_(data), totelem_(totelem), type_(type)
   {
   }
 
@@ -2372,6 +2372,13 @@ class CustomDataLayerImplicitSharing : public ImplicitSharingInfo {
   {
     free_layer_data(type_, data_, totelem_);
     MEM_delete(this);
+  }
+
+  void delete_data_only() override
+  {
+    free_layer_data(type_, data_, totelem_);
+    data_ = nullptr;
+    totelem_ = 0;
   }
 };
 
@@ -2403,6 +2410,9 @@ static void ensure_layer_data_is_mutable(CustomDataLayer &layer, const int totel
     layer.data = copy_layer_data(type, old_data, totelem);
     layer.sharing_info->remove_user_and_delete_if_last();
     layer.sharing_info = make_implicit_sharing_info_for_layer(type, layer.data, totelem);
+  }
+  else {
+    layer.sharing_info->tag_ensured_mutable();
   }
 }
 

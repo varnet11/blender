@@ -87,12 +87,7 @@ template<typename T, eValueType V> class PrimitiveValue;
 using IntValue = PrimitiveValue<int64_t, eValueType::Int>;
 using DoubleValue = PrimitiveValue<double, eValueType::Double>;
 using BooleanValue = PrimitiveValue<bool, eValueType::Boolean>;
-
-template<typename Container, eValueType V, typename ContainerItem = typename Container::value_type>
-class ContainerValue;
-/* ArrayValue stores its items as shared pointer as it shares data with a lookup table that can
- * be created by calling `create_lookup`. */
-using ArrayValue = ContainerValue<Vector<std::shared_ptr<Value>>, eValueType::Array>;
+class ArrayValue;
 
 /**
  * Class containing a (de)serializable value.
@@ -214,7 +209,7 @@ template<
     eValueType V,
 
     /** Type of the data inside the container. */
-    typename ContainerItem>
+    typename ContainerItem = typename Container::value_type>
 class ContainerValue : public Value {
  public:
   using Items = Container;
@@ -235,6 +230,20 @@ class ContainerValue : public Value {
   {
     return inner_value_;
   }
+};
+
+class ArrayValue : public ContainerValue<Vector<std::shared_ptr<Value>>, eValueType::Array> {
+ public:
+  void append(std::shared_ptr<Value> value)
+  {
+    this->elements().append(std::move(value));
+  }
+
+  void append_int(int value);
+  void append_str(std::string value);
+  void append_null();
+  std::shared_ptr<DictionaryValue> append_dict();
+  std::shared_ptr<ArrayValue> append_array();
 };
 
 /**
@@ -268,6 +277,62 @@ class DictionaryValue
     }
     return result;
   }
+
+  const std::shared_ptr<Value> *lookup_value(const StringRef key) const
+  {
+    for (const auto &item : this->elements()) {
+      if (item.first == key) {
+        return &item.second;
+      }
+    }
+    return nullptr;
+  }
+
+  std::optional<StringRefNull> lookup_str(const StringRef key) const
+  {
+    if (const std::shared_ptr<Value> *value = this->lookup_value(key)) {
+      if (const StringValue *str_value = (*value)->as_string_value()) {
+        return StringRefNull(str_value->value());
+      }
+    }
+    return std::nullopt;
+  }
+
+  std::optional<int64_t> lookup_int(const StringRef key) const
+  {
+    if (const std::shared_ptr<Value> *value = this->lookup_value(key)) {
+      if (const IntValue *int_value = (*value)->as_int_value()) {
+        return int_value->value();
+      }
+    }
+    return std::nullopt;
+  }
+
+  const DictionaryValue *lookup_dict(const StringRef key) const
+  {
+    if (const std::shared_ptr<Value> *value = this->lookup_value(key)) {
+      return (*value)->as_dictionary_value();
+    }
+    return nullptr;
+  }
+
+  const ArrayValue *lookup_array(const StringRef key) const
+  {
+    if (const std::shared_ptr<Value> *value = this->lookup_value(key)) {
+      return (*value)->as_array_value();
+    }
+    return nullptr;
+  }
+
+  void append(std::string key, std::shared_ptr<Value> value)
+  {
+    this->elements().append({std::move(key), std::move(value)});
+  }
+
+  void append_int(std::string key, int64_t value);
+  void append_str(std::string key, std::string value);
+  std::shared_ptr<DictionaryValue> append_dict(std::string key);
+  std::shared_ptr<ArrayValue> append_array(std::string key);
 };
 
 /**
@@ -299,5 +364,8 @@ class JsonFormatter : public Formatter {
   void serialize(std::ostream &os, const Value &value) override;
   std::unique_ptr<Value> deserialize(std::istream &is) override;
 };
+
+void write_json_file(StringRef path, const Value &value);
+[[nodiscard]] std::shared_ptr<Value> read_json_file(StringRef path);
 
 }  // namespace blender::io::serialize

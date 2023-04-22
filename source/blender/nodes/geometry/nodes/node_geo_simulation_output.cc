@@ -147,23 +147,37 @@ class LazyFunctionForSimulationOutputNode final : public LazyFunction {
     EvalData &eval_data = *static_cast<EvalData *>(context.storage);
     BLI_SCOPED_DEFER([&]() { eval_data.is_first_evaluation = false; });
 
-    if (modifier_data.current_simulation_state == nullptr) {
-      params.set_default_remaining_outputs();
-      return;
-    }
-
     const bke::sim::SimulationZoneID zone_id = get_simulation_zone_id(*user_data.compute_context,
                                                                       node_id_);
 
-    const bke::sim::SimulationZoneState *cached_zone_state =
-        modifier_data.current_simulation_state->get_zone_state(zone_id);
-    if (cached_zone_state != nullptr && eval_data.is_first_evaluation) {
-      this->output_cached_state(params, *cached_zone_state);
+    const bke::sim::SimulationZoneState *current_zone_state =
+        modifier_data.current_simulation_state ?
+            modifier_data.current_simulation_state->get_zone_state(zone_id) :
+            nullptr;
+    if (eval_data.is_first_evaluation && current_zone_state != nullptr) {
+      this->output_cached_state(params, *current_zone_state);
       return;
     }
 
     if (modifier_data.current_simulation_state_for_write == nullptr) {
-      params.set_default_remaining_outputs();
+      const bke::sim::SimulationZoneState *prev_zone_state =
+          modifier_data.prev_simulation_state ?
+              modifier_data.prev_simulation_state->get_zone_state(zone_id) :
+              nullptr;
+      if (prev_zone_state == nullptr) {
+        params.set_default_remaining_outputs();
+        return;
+      }
+      const bke::sim::SimulationZoneState *next_zone_state =
+          modifier_data.next_simulation_state ?
+              modifier_data.next_simulation_state->get_zone_state(zone_id) :
+              nullptr;
+      if (next_zone_state == nullptr) {
+        this->output_cached_state(params, *prev_zone_state);
+        return;
+      }
+      this->output_mixed_cached_state(
+          params, *prev_zone_state, *next_zone_state, modifier_data.simulation_state_mix_factor);
       return;
     }
 
@@ -204,6 +218,16 @@ class LazyFunctionForSimulationOutputNode final : public LazyFunction {
       }
     }
     params.set_default_remaining_outputs();
+  }
+
+  void output_mixed_cached_state(lf::Params &params,
+                                 const bke::sim::SimulationZoneState &prev_state,
+                                 const bke::sim::SimulationZoneState &next_state,
+                                 const float mix_factor) const
+  {
+    /* TODO: Implement subframe mixing. */
+    this->output_cached_state(params, prev_state);
+    UNUSED_VARS(next_state, mix_factor);
   }
 };
 

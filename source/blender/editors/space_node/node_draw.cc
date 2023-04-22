@@ -34,6 +34,7 @@
 #include "BKE_compute_contexts.hh"
 #include "BKE_context.h"
 #include "BKE_curves.hh"
+#include "BKE_global.h"
 #include "BKE_idtype.h"
 #include "BKE_lib_id.h"
 #include "BKE_main.h"
@@ -3403,6 +3404,9 @@ static void draw_background_color(const SpaceNode &snode)
 
 void node_draw_space(const bContext &C, ARegion &region)
 {
+  if (G.is_rendering) {
+    return;
+  }
   wmWindow *win = CTX_wm_window(&C);
   SpaceNode &snode = *CTX_wm_space_node(&C);
   View2D &v2d = region.v2d;

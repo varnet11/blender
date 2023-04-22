@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 
+#include "BLI_fileops.hh"
 #include "BLI_serialize.hh"
 
 #include "json.hpp"
@@ -197,6 +198,59 @@ static std::unique_ptr<Value> convert_from_json(const nlohmann::ordered_json &j)
   return std::make_unique<NullValue>();
 }
 
+void ArrayValue::append_int(const int value)
+{
+  this->append(std::make_shared<IntValue>(value));
+}
+
+void ArrayValue::append_str(std::string value)
+{
+  this->append(std::make_shared<StringValue>(std::move(value)));
+}
+
+void ArrayValue::append_null()
+{
+  this->append(std::make_shared<NullValue>());
+}
+
+std::shared_ptr<DictionaryValue> ArrayValue::append_dict()
+{
+  auto value = std::make_shared<DictionaryValue>();
+  this->append(value);
+  return value;
+}
+
+std::shared_ptr<ArrayValue> ArrayValue::append_array()
+{
+  auto value = std::make_shared<ArrayValue>();
+  this->append(value);
+  return value;
+}
+
+void DictionaryValue::append_int(std::string key, const int64_t value)
+{
+  this->append(std::move(key), std::make_shared<IntValue>(value));
+}
+
+void DictionaryValue::append_str(std::string key, const std::string value)
+{
+  this->append(std::move(key), std::make_shared<StringValue>(value));
+}
+
+std::shared_ptr<DictionaryValue> DictionaryValue::append_dict(std::string key)
+{
+  auto value = std::make_shared<DictionaryValue>();
+  this->append(std::move(key), value);
+  return value;
+}
+
+std::shared_ptr<ArrayValue> DictionaryValue::append_array(std::string key)
+{
+  auto value = std::make_shared<ArrayValue>();
+  this->append(std::move(key), value);
+  return value;
+}
+
 void JsonFormatter::serialize(std::ostream &os, const Value &value)
 {
   nlohmann::ordered_json j;
@@ -214,6 +268,20 @@ std::unique_ptr<Value> JsonFormatter::deserialize(std::istream &is)
   nlohmann::ordered_json j;
   is >> j;
   return convert_from_json(j);
+}
+
+void write_json_file(const StringRef path, const Value &value)
+{
+  JsonFormatter formatter;
+  fstream stream(path, std::ios::out);
+  formatter.serialize(stream, value);
+}
+
+std::shared_ptr<Value> read_json_file(const StringRef path)
+{
+  JsonFormatter formatter;
+  fstream stream(path, std::ios::in);
+  return formatter.deserialize(stream);
 }
 
 }  // namespace blender::io::serialize

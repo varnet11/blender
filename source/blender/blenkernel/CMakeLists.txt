@@ -266,6 +266,8 @@ set(SRC
   intern/shader_fx.c
   intern/shrinkwrap.cc
   intern/simulation.cc
+  intern/simulation_state.cc
+  intern/simulation_state_serialize.cc
   intern/softbody.c
   intern/sound.c
   intern/speaker.c
@@ -467,6 +469,7 @@ set(SRC
   BKE_shrinkwrap.h
   BKE_simulation.h
   BKE_simulation_state.hh
+  BKE_simulation_state_serialize.hh
   BKE_softbody.h
   BKE_sound.h
   BKE_speaker.h

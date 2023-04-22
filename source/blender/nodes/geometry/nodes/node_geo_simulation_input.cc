@@ -41,7 +41,7 @@ class LazyFunctionForSimulationInputNode final : public LazyFunction {
     GeoNodesLFUserData &user_data = *static_cast<GeoNodesLFUserData *>(context.user_data);
     GeoNodesModifierData &modifier_data = *user_data.modifier_data;
 
-    if (modifier_data.current_simulation_state == nullptr) {
+    if (modifier_data.current_simulation_state_for_write == nullptr) {
       params.set_default_remaining_outputs();
       return;
     }

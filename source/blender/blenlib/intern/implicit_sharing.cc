@@ -13,7 +13,7 @@ class MEMFreeImplicitSharing : public ImplicitSharingInfo {
  public:
   void *data;
 
-  MEMFreeImplicitSharing(void *data) : ImplicitSharingInfo(1), data(data)
+  MEMFreeImplicitSharing(void *data) : data(data)
   {
     BLI_assert(data != nullptr);
   }
@@ -51,6 +51,9 @@ void *make_trivial_data_mutable_impl(void *old_data,
     *sharing_info = info_for_mem_free(new_data);
     return new_data;
   }
+  else {
+    (*sharing_info)->tag_ensured_mutable();
+  }
 
   return old_data;
 }
@@ -85,6 +88,7 @@ void *resize_trivial_array_impl(void *old_data,
        * could theoretically give better performance if the data can be reused in place. */
       void *new_data = static_cast<int *>(MEM_reallocN(old_data, new_size));
       info->data = new_data;
+      (*sharing_info)->tag_ensured_mutable();
       return new_data;
     }
   }

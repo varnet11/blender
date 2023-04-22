@@ -47,8 +47,10 @@ struct GeoNodesModifierData {
   /** Optional logger. */
   geo_eval_log::GeoModifierLog *eval_log = nullptr;
 
-  const bke::sim::ModifierSimulationState *prev_simulation_state = nullptr;
   const bke::sim::ModifierSimulationState *current_simulation_state = nullptr;
+  const bke::sim::ModifierSimulationState *prev_simulation_state = nullptr;
+  const bke::sim::ModifierSimulationState *next_simulation_state = nullptr;
+  float simulation_state_mix_factor = 0.0f;
   bke::sim::ModifierSimulationState *current_simulation_state_for_write = nullptr;
   float simulation_time_delta = 0.0f;
 

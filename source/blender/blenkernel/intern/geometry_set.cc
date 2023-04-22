@@ -120,6 +120,7 @@ GeometryComponent &GeometrySet::get_component_for_write(GeometryComponentType co
   }
   if (component_ptr->is_mutable()) {
     /* If the referenced component is already mutable, return it directly. */
+    component_ptr->tag_ensured_mutable();
     return *component_ptr;
   }
   /* If the referenced component is shared, make a copy. The copy is not shared and is

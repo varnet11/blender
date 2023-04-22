@@ -39,6 +39,7 @@ class SharedDataContainer {
       return nullptr;
     }
     if (data_->is_mutable()) {
+      data_->tag_ensured_mutable();
       return data_.get();
     }
     data_ = data_->copy();
