@@ -1497,6 +1497,23 @@ void ED_init_node_socket_type_virtual(bNodeSocketType *stype)
   stype->draw_color = node_socket_virtual_draw_color;
 }
 
+void ED_node_type_draw_color(const char *idname, float *r_color)
+{
+  using namespace blender::ed::space_node;
+
+  const bNodeSocketType *typeinfo = nodeSocketTypeFind(idname);
+  if (!typeinfo || typeinfo->type == SOCK_CUSTOM) {
+    r_color[0] = 0.0f;
+    r_color[1] = 0.0f;
+    r_color[2] = 0.0f;
+    r_color[3] = 0.0f;
+    return;
+  }
+
+  BLI_assert(typeinfo->type < ARRAY_SIZE(std_node_socket_colors));
+  copy_v4_v4(r_color, std_node_socket_colors[typeinfo->type]);
+}
+
 namespace blender::ed::space_node {
 
 /* ************** Generic drawing ************** */

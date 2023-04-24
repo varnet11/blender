@@ -22,6 +22,8 @@ struct bNodeTree;
 extern "C" {
 #endif
 
+void node_type_draw_color(const char *idname, float *r_color);
+
 struct bNodeSocket *node_add_socket_from_template(struct bNodeTree *ntree,
                                                   struct bNode *node,
                                                   struct bNodeSocketTemplate *stemp,

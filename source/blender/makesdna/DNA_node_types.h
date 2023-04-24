@@ -16,6 +16,8 @@
 #ifdef __cplusplus
 namespace blender {
 template<typename T> class Span;
+template<typename T> class MutableSpan;
+class IndexRange;
 class StringRef;
 class StringRefNull;
 }  // namespace blender
@@ -1600,7 +1602,9 @@ typedef struct NodeSimulationItem {
   /* #eNodeSocketDatatype. */
   /* TODO: Use a different enum instead to support Byte colors, etc. */
   short socket_type;
-  char _pad[6];
+  short _pad;
+  /* Generates unique identifier for sockets. */
+  int identifier;
 } NodeSimulationItem;
 
 typedef struct NodeGeometrySimulationInput {
@@ -1610,7 +1614,16 @@ typedef struct NodeGeometrySimulationInput {
 typedef struct NodeGeometrySimulationOutput {
   NodeSimulationItem *items;
   int items_num;
-  char _pad[4];
+  int active_index;
+  /* Number to give unique IDs to state items. */
+  int next_identifier;
+  int _pad;
+
+#ifdef __cplusplus
+  blender::Span<NodeSimulationItem> items_span() const;
+  blender::MutableSpan<NodeSimulationItem> items_span_for_write();
+  blender::IndexRange items_range() const;
+#endif
 } NodeGeometrySimulationOutput;
 
 typedef struct NodeGeometryDistributePointsInVolume {

@@ -8,7 +8,6 @@
 #include "DEG_depsgraph_query.h"
 
 #include "UI_interface.h"
-#include "UI_resources.h"
 
 #include "NOD_common.h"
 #include "NOD_socket.h"
@@ -25,15 +24,15 @@ void socket_declarations_for_simulation_items(const Span<NodeSimulationItem> ite
       case SOCK_GEOMETRY: {
         {
           std::unique_ptr<decl::Geometry> decl = std::make_unique<decl::Geometry>();
-          decl->name = item.name;
-          decl->identifier = item.name;
+          decl->name = item.name ? item.name : "";
+          decl->identifier = "Item_" + std::to_string(item.identifier);
           decl->in_out = SOCK_IN;
           r_declaration.inputs.append(std::move(decl));
         }
         {
           std::unique_ptr<decl::Geometry> decl = std::make_unique<decl::Geometry>();
-          decl->name = item.name;
-          decl->identifier = item.name;
+          decl->name = item.name ? item.name : "";
+          decl->identifier = "Item_" + std::to_string(item.identifier);
           decl->in_out = SOCK_OUT;
           r_declaration.outputs.append(std::move(decl));
         }
@@ -47,50 +46,26 @@ void socket_declarations_for_simulation_items(const Span<NodeSimulationItem> ite
   r_declaration.outputs.append(decl::create_extend_declaration(SOCK_OUT));
 }
 
+struct SimulationItemsUniqueNameArgs {
+  NodeGeometrySimulationOutput *sim;
+  const NodeSimulationItem *item;
+};
+
 static bool simulation_items_unique_name_check(void *arg, const char *name)
 {
-  const NodeGeometrySimulationOutput &storage = *static_cast<const NodeGeometrySimulationOutput *>(
+  const SimulationItemsUniqueNameArgs &args = *static_cast<const SimulationItemsUniqueNameArgs *>(
       arg);
-  for (const NodeSimulationItem &item : Span(storage.items, storage.items_num)) {
-    if (STREQ(item.name, name)) {
-      return true;
+  for (const NodeSimulationItem &item : args.sim->items_span()) {
+    if (&item != args.item) {
+      if (STREQ(item.name, name)) {
+        return true;
+      }
     }
   }
   if (STREQ(name, "Delta Time")) {
     return true;
   }
   return false;
-}
-
-NodeSimulationItem *simulation_item_add_from_socket(NodeGeometrySimulationOutput &storage,
-                                                    const bNodeSocket &socket)
-{
-  if (socket.type != SOCK_GEOMETRY) {
-    return nullptr;
-  }
-  char unique_name[MAX_NAME + 4] = "";
-  BLI_uniquename_cb(simulation_items_unique_name_check,
-                    &storage,
-                    socket.name,
-                    '.',
-                    unique_name,
-                    ARRAY_SIZE(unique_name));
-
-  NodeSimulationItem *old_items = storage.items;
-  storage.items = MEM_cnew_array<NodeSimulationItem>(storage.items_num + 1, __func__);
-  for (const int i : IndexRange(storage.items_num)) {
-    storage.items[i].name = old_items[i].name;
-    storage.items[i].socket_type = old_items[i].socket_type;
-  }
-
-  NodeSimulationItem &added_item = storage.items[storage.items_num];
-  added_item.name = BLI_strdup(unique_name);
-  added_item.socket_type = socket.type;
-
-  storage.items_num++;
-  MEM_SAFE_FREE(old_items);
-
-  return &added_item;
 }
 
 const CPPType &get_simulation_item_cpp_type(const NodeSimulationItem &item)
@@ -273,10 +248,15 @@ static void node_declare_dynamic(const bNodeTree & /*node_tree*/,
 static void node_init(bNodeTree * /*tree*/, bNode *node)
 {
   NodeGeometrySimulationOutput *data = MEM_cnew<NodeGeometrySimulationOutput>(__func__);
+
+  data->next_identifier = 0;
+
   data->items = MEM_cnew_array<NodeSimulationItem>(1, __func__);
   data->items[0].name = BLI_strdup(DATA_("Geometry"));
   data->items[0].socket_type = SOCK_GEOMETRY;
+  data->items[0].identifier = data->next_identifier++;
   data->items_num = 1;
+
   node->storage = data;
 }
 
@@ -300,8 +280,11 @@ static void node_copy_storage(bNodeTree * /*dst_tree*/, bNode *dst_node, const b
 
   dst_storage->items = MEM_cnew_array<NodeSimulationItem>(src_storage.items_num, __func__);
   dst_storage->items_num = src_storage.items_num;
+  dst_storage->active_index = src_storage.active_index;
+  dst_storage->next_identifier = src_storage.next_identifier;
   for (const int i : IndexRange(src_storage.items_num)) {
     if (char *name = src_storage.items[i].name) {
+      dst_storage->items[i].identifier = src_storage.items[i].identifier;
       dst_storage->items[i].name = BLI_strdup(name);
       dst_storage->items[i].socket_type = src_storage.items[i].socket_type;
     }
@@ -315,8 +298,8 @@ static bool node_insert_link(bNodeTree *ntree, bNode *node, bNodeLink *link)
   NodeGeometrySimulationOutput &storage = node_storage(*node);
   if (link->tonode == node) {
     if (link->tosock->identifier == StringRef("__extend__")) {
-      if (const NodeSimulationItem *item = simulation_item_add_from_socket(storage,
-                                                                           *link->fromsock)) {
+      if (const NodeSimulationItem *item = NOD_geometry_simulation_output_add_item_from_socket(
+              &storage, link->fromnode, link->fromsock)) {
         update_node_declaration_and_sockets(*ntree, *node);
         link->tosock = nodeFindSocket(node, SOCK_IN, item->name);
       }
@@ -328,8 +311,8 @@ static bool node_insert_link(bNodeTree *ntree, bNode *node, bNodeLink *link)
   else {
     BLI_assert(link->fromnode == node);
     if (link->fromsock->identifier == StringRef("__extend__")) {
-      if (const NodeSimulationItem *item = simulation_item_add_from_socket(storage,
-                                                                           *link->tosock)) {
+      if (const NodeSimulationItem *item = NOD_geometry_simulation_output_add_item_from_socket(
+              &storage, link->fromnode, link->tosock)) {
         update_node_declaration_and_sockets(*ntree, *node);
         link->fromsock = nodeFindSocket(node, SOCK_OUT, item->name);
       }
@@ -359,4 +342,203 @@ void register_node_type_geo_simulation_output()
                     file_ns::node_free_storage,
                     file_ns::node_copy_storage);
   nodeRegisterType(&ntype);
+}
+
+blender::Span<NodeSimulationItem> NodeGeometrySimulationOutput::items_span() const
+{
+  return blender::Span<NodeSimulationItem>(items, items_num);
+}
+
+blender::MutableSpan<NodeSimulationItem> NodeGeometrySimulationOutput::items_span_for_write()
+{
+  return blender::MutableSpan<NodeSimulationItem>(items, items_num);
+}
+
+blender::IndexRange NodeGeometrySimulationOutput::items_range() const
+{
+  return blender::IndexRange(items_num);
+}
+
+bool NOD_geometry_simulation_output_item_socket_type_supported(
+    const eNodeSocketDatatype socket_type)
+{
+  return ELEM(socket_type, SOCK_GEOMETRY);
+}
+
+bNode *NOD_geometry_simulation_output_find_node_by_item(bNodeTree *ntree,
+                                                        const NodeSimulationItem *item)
+{
+  ntree->ensure_topology_cache();
+  for (bNode *node : ntree->nodes_by_type("GeometryNodeSimulationOutput")) {
+    NodeGeometrySimulationOutput *sim = static_cast<NodeGeometrySimulationOutput *>(node->storage);
+    if (sim->items_span().contains_ptr(item)) {
+      return node;
+    }
+  }
+  return nullptr;
+}
+
+bool NOD_geometry_simulation_output_item_set_unique_name(NodeGeometrySimulationOutput *sim,
+                                                         NodeSimulationItem *item,
+                                                         const char *name,
+                                                         const char *defname)
+{
+  char unique_name[MAX_NAME + 4];
+  BLI_strncpy(unique_name, name, sizeof(unique_name));
+
+  blender::nodes::SimulationItemsUniqueNameArgs args{sim, item};
+  const bool name_changed = BLI_uniquename_cb(blender::nodes::simulation_items_unique_name_check,
+                                              &args,
+                                              defname,
+                                              '.',
+                                              unique_name,
+                                              ARRAY_SIZE(unique_name));
+  item->name = BLI_strdup(unique_name);
+  return name_changed;
+}
+
+bool NOD_geometry_simulation_output_contains_item(NodeGeometrySimulationOutput *sim,
+                                                  const NodeSimulationItem *item)
+{
+  return sim->items_span().contains_ptr(item);
+}
+
+NodeSimulationItem *NOD_geometry_simulation_output_get_active_item(
+    NodeGeometrySimulationOutput *sim)
+{
+  if (!sim->items_range().contains(sim->active_index)) {
+    return nullptr;
+  }
+  return &sim->items[sim->active_index];
+}
+
+void NOD_geometry_simulation_output_set_active_item(NodeGeometrySimulationOutput *sim,
+                                                    NodeSimulationItem *item)
+{
+  if (sim->items_span().contains_ptr(item)) {
+    sim->active_index = item - sim->items;
+  }
+}
+
+NodeSimulationItem *NOD_geometry_simulation_output_find_item(NodeGeometrySimulationOutput *sim,
+                                                             const char *name)
+{
+  for (NodeSimulationItem &item : sim->items_span_for_write()) {
+    if (STREQ(item.name, name)) {
+      return &item;
+    }
+  }
+  return nullptr;
+}
+
+NodeSimulationItem *NOD_geometry_simulation_output_add_item(NodeGeometrySimulationOutput *sim,
+                                                            const short socket_type,
+                                                            const char *name)
+{
+  return NOD_geometry_simulation_output_insert_item(sim, socket_type, name, sim->items_num);
+}
+
+NodeSimulationItem *NOD_geometry_simulation_output_insert_item(NodeGeometrySimulationOutput *sim,
+                                                               const short socket_type,
+                                                               const char *name,
+                                                               int index)
+{
+  NodeSimulationItem *old_items = sim->items;
+  sim->items = MEM_cnew_array<NodeSimulationItem>(sim->items_num + 1, __func__);
+  for (const int i : blender::IndexRange(index)) {
+    sim->items[i] = old_items[i];
+  }
+  for (const int i : blender::IndexRange(index, sim->items_num - index)) {
+    sim->items[i + 1] = old_items[i];
+  }
+
+  const char *defname = nodeStaticSocketLabel(socket_type, 0);
+  NodeSimulationItem &added_item = sim->items[index];
+  added_item.identifier = sim->next_identifier++;
+  NOD_geometry_simulation_output_item_set_unique_name(sim, &added_item, name, defname);
+  added_item.socket_type = socket_type;
+
+  sim->items_num++;
+  MEM_SAFE_FREE(old_items);
+
+  return &added_item;
+}
+
+NodeSimulationItem *NOD_geometry_simulation_output_add_item_from_socket(
+    NodeGeometrySimulationOutput *sim, const bNode * /*from_node*/, const bNodeSocket *from_sock)
+{
+  if (from_sock->type != SOCK_GEOMETRY) {
+    return nullptr;
+  }
+  return NOD_geometry_simulation_output_insert_item(
+      sim, from_sock->type, from_sock->name, sim->items_num);
+}
+
+NodeSimulationItem *NOD_geometry_simulation_output_insert_item_from_socket(
+    NodeGeometrySimulationOutput *sim,
+    const bNode * /*from_node*/,
+    const bNodeSocket *from_sock,
+    int index)
+{
+  return NOD_geometry_simulation_output_insert_item(sim, from_sock->type, from_sock->name, index);
+}
+
+void NOD_geometry_simulation_output_remove_item(NodeGeometrySimulationOutput *sim,
+                                                NodeSimulationItem *item)
+{
+  const int index = item - sim->items;
+  if (index < 0 || index >= sim->items_num) {
+    return;
+  }
+
+  NodeSimulationItem *old_items = sim->items;
+  sim->items = MEM_cnew_array<NodeSimulationItem>(sim->items_num - 1, __func__);
+  for (const int i : blender::IndexRange(index)) {
+    sim->items[i] = old_items[i];
+  }
+  for (const int i : blender::IndexRange(index, sim->items_num - index).drop_front(1)) {
+    sim->items[i - 1] = old_items[i];
+  }
+
+  MEM_SAFE_FREE(old_items[index].name);
+
+  sim->items_num--;
+  MEM_SAFE_FREE(old_items);
+}
+
+void NOD_geometry_simulation_output_clear_items(struct NodeGeometrySimulationOutput *sim)
+{
+  for (NodeSimulationItem &item : sim->items_span_for_write()) {
+    MEM_SAFE_FREE(item.name);
+  }
+  MEM_SAFE_FREE(sim->items);
+  sim->items = nullptr;
+  sim->items_num = 0;
+}
+
+void NOD_geometry_simulation_output_move_item(NodeGeometrySimulationOutput *sim,
+                                              int from_index,
+                                              int to_index)
+{
+  BLI_assert(from_index >= 0 && from_index < sim->items_num);
+  BLI_assert(to_index >= 0 && to_index < sim->items_num);
+
+  if (from_index == to_index) {
+    return;
+  }
+
+  if (from_index < to_index) {
+    const NodeSimulationItem tmp = sim->items[from_index];
+    for (int i = from_index; i < to_index; ++i) {
+      sim->items[i] = sim->items[i + 1];
+    }
+    sim->items[to_index] = tmp;
+  }
+  else /* from_index > to_index */ {
+    const NodeSimulationItem tmp = sim->items[from_index];
+    for (int i = from_index; i > to_index; --i) {
+      sim->items[i] = sim->items[i - 1];
+    }
+    sim->items[to_index] = tmp;
+  }
 }

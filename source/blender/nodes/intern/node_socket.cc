@@ -39,6 +39,13 @@ using namespace blender;
 using blender::fn::ValueOrField;
 using blender::nodes::SocketDeclarationPtr;
 
+extern "C" void ED_node_type_draw_color(const char *idname, float *r_color);
+
+void node_type_draw_color(const char *idname, float *r_color)
+{
+  ED_node_type_draw_color(idname, r_color);
+}
+
 struct bNodeSocket *node_add_socket_from_template(struct bNodeTree *ntree,
                                                   struct bNode *node,
                                                   struct bNodeSocketTemplate *stemp,
