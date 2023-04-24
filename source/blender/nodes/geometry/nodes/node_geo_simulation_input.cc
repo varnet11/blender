@@ -23,6 +23,7 @@ class LazyFunctionForSimulationInputNode final : public LazyFunction {
  public:
   LazyFunctionForSimulationInputNode(const bNodeTree &node_tree, const bNode &node)
   {
+    debug_name_ = "Simulation Input";
     output_node_id_ = node_storage(node).output_node_id;
     const bNode &output_node = *node_tree.node_by_id(output_node_id_);
     const NodeGeometrySimulationOutput &storage = *static_cast<NodeGeometrySimulationOutput *>(

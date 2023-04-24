@@ -121,6 +121,7 @@ class LazyFunctionForSimulationOutputNode final : public LazyFunction {
  public:
   LazyFunctionForSimulationOutputNode(const bNode &node) : node_id_(node.identifier)
   {
+    debug_name_ = "Simulation Output";
     const NodeGeometrySimulationOutput &storage = node_storage(node);
     simulation_items_ = {storage.items, storage.items_num};
     for (const NodeSimulationItem &item : Span(storage.items, storage.items_num)) {
