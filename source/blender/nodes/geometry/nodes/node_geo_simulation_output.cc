@@ -21,31 +21,62 @@ std::string socket_identifier_for_simulation_item(const NodeSimulationItem &item
   return "Item_" + std::to_string(item.identifier);
 }
 
+static std::unique_ptr<SocketDeclaration> socket_declaration_for_simulation_item(
+    const NodeSimulationItem &item, const eNodeSocketInOut in_out, const int index)
+{
+  BLI_assert(NOD_geometry_simulation_output_item_socket_type_supported(
+      eNodeSocketDatatype(item.socket_type)));
+
+  std::unique_ptr<SocketDeclaration> decl;
+  switch (eNodeSocketDatatype(item.socket_type)) {
+    case SOCK_FLOAT:
+      decl = std::make_unique<decl::Float>();
+      decl->input_field_type = InputSocketFieldType::IsSupported;
+      decl->output_field_dependency = OutputFieldDependency::ForPartiallyDependentField({index});
+      break;
+    case SOCK_VECTOR:
+      decl = std::make_unique<decl::Vector>();
+      decl->input_field_type = InputSocketFieldType::IsSupported;
+      decl->output_field_dependency = OutputFieldDependency::ForPartiallyDependentField({index});
+      break;
+    case SOCK_RGBA:
+      decl = std::make_unique<decl::Color>();
+      decl->input_field_type = InputSocketFieldType::IsSupported;
+      decl->output_field_dependency = OutputFieldDependency::ForPartiallyDependentField({index});
+      break;
+    case SOCK_BOOLEAN:
+      decl = std::make_unique<decl::Bool>();
+      decl->input_field_type = InputSocketFieldType::IsSupported;
+      decl->output_field_dependency = OutputFieldDependency::ForPartiallyDependentField({index});
+      break;
+    case SOCK_INT:
+      decl = std::make_unique<decl::Int>();
+      decl->input_field_type = InputSocketFieldType::IsSupported;
+      decl->output_field_dependency = OutputFieldDependency::ForPartiallyDependentField({index});
+      break;
+    case SOCK_STRING:
+      decl = std::make_unique<decl::String>();
+      break;
+    case SOCK_GEOMETRY:
+      decl = std::make_unique<decl::Geometry>();
+      break;
+    default:
+      BLI_assert_unreachable();
+  }
+
+  decl->name = item.name ? item.name : "";
+  decl->identifier = socket_identifier_for_simulation_item(item);
+  decl->in_out = in_out;
+  return decl;
+}
+
 void socket_declarations_for_simulation_items(const Span<NodeSimulationItem> items,
                                               NodeDeclaration &r_declaration)
 {
-  for (const NodeSimulationItem &item : items) {
-    switch (eNodeSocketDatatype(item.socket_type)) {
-      case SOCK_GEOMETRY: {
-        {
-          std::unique_ptr<decl::Geometry> decl = std::make_unique<decl::Geometry>();
-          decl->name = item.name ? item.name : "";
-          decl->identifier = socket_identifier_for_simulation_item(item);
-          decl->in_out = SOCK_IN;
-          r_declaration.inputs.append(std::move(decl));
-        }
-        {
-          std::unique_ptr<decl::Geometry> decl = std::make_unique<decl::Geometry>();
-          decl->name = item.name ? item.name : "";
-          decl->identifier = socket_identifier_for_simulation_item(item);
-          decl->in_out = SOCK_OUT;
-          r_declaration.outputs.append(std::move(decl));
-        }
-        break;
-      }
-      default:
-        BLI_assert_unreachable();
-    }
+  for (const int i : items.index_range()) {
+    const NodeSimulationItem &item = items[i];
+    r_declaration.inputs.append(socket_declaration_for_simulation_item(item, SOCK_IN, i));
+    r_declaration.outputs.append(socket_declaration_for_simulation_item(item, SOCK_OUT, i));
   }
   r_declaration.inputs.append(decl::create_extend_declaration(SOCK_IN));
   r_declaration.outputs.append(decl::create_extend_declaration(SOCK_OUT));
@@ -73,14 +104,56 @@ static bool simulation_items_unique_name_check(void *arg, const char *name)
   return false;
 }
 
+const CPPType &get_simulation_item_cpp_type(const eNodeSocketDatatype socket_type)
+{
+  const char *socket_idname = nodeStaticSocketType(socket_type, 0);
+  const bNodeSocketType *typeinfo = nodeSocketTypeFind(socket_idname);
+  BLI_assert(typeinfo);
+  BLI_assert(typeinfo->geometry_nodes_cpp_type);
+  return *typeinfo->geometry_nodes_cpp_type;
+}
+
 const CPPType &get_simulation_item_cpp_type(const NodeSimulationItem &item)
 {
-  switch (item.socket_type) {
-    case SOCK_GEOMETRY:
-      return CPPType::get<GeometrySet>();
-    default:
-      BLI_assert_unreachable();
-      return CPPType::get<GeometrySet>();
+  return get_simulation_item_cpp_type(eNodeSocketDatatype(item.socket_type));
+}
+
+/** Create a simulation state item from parameter input data. */
+static std::unique_ptr<bke::sim::SimulationStateItem> make_simulation_state_item(
+    const eNodeSocketDatatype socket_type, void *input_data)
+{
+  if (socket_type == SOCK_GEOMETRY) {
+    GeometrySet *input_geometry = static_cast<GeometrySet *>(input_data);
+    input_geometry->ensure_owns_direct_data();
+    return std::make_unique<bke::sim::GeometrySimulationStateItem>(*input_geometry);
+  }
+  else {
+    /* TODO: Implement for non-geometry state items. */
+    GeometrySet geometry;
+    return std::make_unique<bke::sim::GeometrySimulationStateItem>(geometry);
+  }
+}
+
+/** Copy the current simulation state to the node output parameter. */
+void copy_simulation_state_to_output_param(lf::Params &params,
+                                           const int index,
+                                           const eNodeSocketDatatype socket_type,
+                                           const bke::sim::SimulationStateItem &state_item)
+{
+  const CPPType &cpptype = get_simulation_item_cpp_type(socket_type);
+
+  if (socket_type == SOCK_GEOMETRY) {
+    const bke::sim::GeometrySimulationStateItem &geo_state_item =
+        static_cast<const bke::sim::GeometrySimulationStateItem &>(state_item);
+    params.set_output(index, geo_state_item.geometry());
+  }
+  else {
+    /* TODO: Implement for non-geometry state items. */
+    if (const void *src = cpptype.default_value()) {
+      void *dst = params.get_output_data_ptr(index);
+      cpptype.copy_construct(src, dst);
+      params.output_set(index);
+    }
   }
 }
 
@@ -168,14 +241,16 @@ class LazyFunctionForSimulationOutputNode final : public LazyFunction {
 
     bool all_available = true;
     for (const int i : simulation_items_.index_range()) {
-      GeometrySet *input_geometry = params.try_get_input_data_ptr_or_request<GeometrySet>(i);
-      if (input_geometry == nullptr) {
+      const NodeSimulationItem &item = simulation_items_[i];
+
+      void *input_data = params.try_get_input_data_ptr_or_request(i);
+      if (input_data == nullptr) {
         all_available = false;
         continue;
       }
-      input_geometry->ensure_owns_direct_data();
-      new_zone_state.items[i] = std::make_unique<bke::sim::GeometrySimulationStateItem>(
-          std::move(*input_geometry));
+
+      new_zone_state.items[i] = make_simulation_state_item(eNodeSocketDatatype(item.socket_type),
+                                                           input_data);
     }
 
     if (all_available) {
@@ -186,17 +261,17 @@ class LazyFunctionForSimulationOutputNode final : public LazyFunction {
   void output_cached_state(lf::Params &params, const bke::sim::SimulationZoneState &state) const
   {
     for (const int i : simulation_items_.index_range()) {
+      const NodeSimulationItem &item = simulation_items_[i];
+
       if (i >= state.items.size()) {
         continue;
       }
-      const bke::sim::SimulationStateItem *item = state.items[i].get();
-      if (item == nullptr) {
+      const bke::sim::SimulationStateItem *state_item = state.items[i].get();
+      if (state_item == nullptr) {
         continue;
       }
-      if (auto *geometry_item = dynamic_cast<const bke::sim::GeometrySimulationStateItem *>(
-              item)) {
-        params.set_output(i, geometry_item->geometry());
-      }
+      copy_simulation_state_to_output_param(
+          params, i, eNodeSocketDatatype(item.socket_type), *state_item);
     }
     params.set_default_remaining_outputs();
   }
@@ -369,7 +444,14 @@ blender::IndexRange NodeGeometrySimulationOutput::items_range() const
 bool NOD_geometry_simulation_output_item_socket_type_supported(
     const eNodeSocketDatatype socket_type)
 {
-  return ELEM(socket_type, SOCK_GEOMETRY);
+  return ELEM(socket_type,
+              SOCK_FLOAT,
+              SOCK_VECTOR,
+              SOCK_RGBA,
+              SOCK_BOOLEAN,
+              SOCK_INT,
+              SOCK_STRING,
+              SOCK_GEOMETRY);
 }
 
 bNode *NOD_geometry_simulation_output_find_node_by_item(bNodeTree *ntree,
@@ -450,6 +532,11 @@ NodeSimulationItem *NOD_geometry_simulation_output_insert_item(NodeGeometrySimul
                                                                const char *name,
                                                                int index)
 {
+  if (!NOD_geometry_simulation_output_item_socket_type_supported(
+          eNodeSocketDatatype(socket_type))) {
+    return nullptr;
+  }
+
   NodeSimulationItem *old_items = sim->items;
   sim->items = MEM_cnew_array<NodeSimulationItem>(sim->items_num + 1, __func__);
   for (const int i : blender::IndexRange(index)) {
@@ -474,9 +561,6 @@ NodeSimulationItem *NOD_geometry_simulation_output_insert_item(NodeGeometrySimul
 NodeSimulationItem *NOD_geometry_simulation_output_add_item_from_socket(
     NodeGeometrySimulationOutput *sim, const bNode * /*from_node*/, const bNodeSocket *from_sock)
 {
-  if (from_sock->type != SOCK_GEOMETRY) {
-    return nullptr;
-  }
   return NOD_geometry_simulation_output_insert_item(
       sim, from_sock->type, from_sock->name, sim->items_num);
 }

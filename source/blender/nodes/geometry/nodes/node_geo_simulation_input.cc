@@ -13,6 +13,26 @@
 
 #include "node_geometry_util.hh"
 
+namespace blender::nodes {
+
+/** Copy a node input parameter to the matching output parameter. */
+static void copy_input_to_output_param(lf::Params &params,
+                                       const int index,
+                                       const eNodeSocketDatatype socket_type)
+{
+  const CPPType &cpptype = get_simulation_item_cpp_type(socket_type);
+
+  void *src = params.try_get_input_data_ptr_or_request(index);
+  if (src != nullptr) {
+    /* First output parameter is "Delta Time", state item parameters start at index 1. */
+    void *dst = params.get_output_data_ptr(index + 1);
+    cpptype.move_construct(src, dst);
+    params.output_set(index + 1);
+  }
+}
+
+}  // namespace blender::nodes
+
 namespace blender::nodes::node_geo_simulation_input_cc {
 
 NODE_STORAGE_FUNCS(NodeGeometrySimulationInput);
@@ -65,10 +85,8 @@ class LazyFunctionForSimulationInputNode final : public LazyFunction {
         if (params.output_was_set(i + 1)) {
           continue;
         }
-        GeometrySet *geometry = params.try_get_input_data_ptr_or_request<GeometrySet>(i);
-        if (geometry != nullptr) {
-          params.set_output(i + 1, std::move(*geometry));
-        }
+        copy_input_to_output_param(
+            params, i, eNodeSocketDatatype(simulation_items_[i].socket_type));
       }
     }
     else {
@@ -77,10 +95,11 @@ class LazyFunctionForSimulationInputNode final : public LazyFunction {
           params.set_output(i + 1, GeometrySet());
           continue;
         }
-        const bke::sim::SimulationStateItem *item = prev_zone_state->items[i].get();
-        if (auto *geometry_item = dynamic_cast<const bke::sim::GeometrySimulationStateItem *>(
-                item)) {
-          params.set_output(i + 1, geometry_item->geometry());
+        const bke::sim::SimulationStateItem *state_item = prev_zone_state->items[i].get();
+        if (state_item != nullptr) {
+          /* First output parameter is "Delta Time", state item parameters start at index 1. */
+          copy_simulation_state_to_output_param(
+              params, i + 1, eNodeSocketDatatype(simulation_items_[i].socket_type), *state_item);
         }
       }
     }
