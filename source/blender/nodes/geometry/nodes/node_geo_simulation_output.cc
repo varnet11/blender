@@ -16,6 +16,11 @@
 
 namespace blender::nodes {
 
+std::string socket_identifier_for_simulation_item(const NodeSimulationItem &item)
+{
+  return "Item_" + std::to_string(item.identifier);
+}
+
 void socket_declarations_for_simulation_items(const Span<NodeSimulationItem> items,
                                               NodeDeclaration &r_declaration)
 {
@@ -25,14 +30,14 @@ void socket_declarations_for_simulation_items(const Span<NodeSimulationItem> ite
         {
           std::unique_ptr<decl::Geometry> decl = std::make_unique<decl::Geometry>();
           decl->name = item.name ? item.name : "";
-          decl->identifier = "Item_" + std::to_string(item.identifier);
+          decl->identifier = socket_identifier_for_simulation_item(item);
           decl->in_out = SOCK_IN;
           r_declaration.inputs.append(std::move(decl));
         }
         {
           std::unique_ptr<decl::Geometry> decl = std::make_unique<decl::Geometry>();
           decl->name = item.name ? item.name : "";
-          decl->identifier = "Item_" + std::to_string(item.identifier);
+          decl->identifier = socket_identifier_for_simulation_item(item);
           decl->in_out = SOCK_OUT;
           r_declaration.outputs.append(std::move(decl));
         }
@@ -301,7 +306,8 @@ static bool node_insert_link(bNodeTree *ntree, bNode *node, bNodeLink *link)
       if (const NodeSimulationItem *item = NOD_geometry_simulation_output_add_item_from_socket(
               &storage, link->fromnode, link->fromsock)) {
         update_node_declaration_and_sockets(*ntree, *node);
-        link->tosock = nodeFindSocket(node, SOCK_IN, item->name);
+        link->tosock = nodeFindSocket(
+            node, SOCK_IN, socket_identifier_for_simulation_item(*item).c_str());
       }
       else {
         return false;
@@ -314,7 +320,8 @@ static bool node_insert_link(bNodeTree *ntree, bNode *node, bNodeLink *link)
       if (const NodeSimulationItem *item = NOD_geometry_simulation_output_add_item_from_socket(
               &storage, link->fromnode, link->tosock)) {
         update_node_declaration_and_sockets(*ntree, *node);
-        link->fromsock = nodeFindSocket(node, SOCK_OUT, item->name);
+        link->fromsock = nodeFindSocket(
+            node, SOCK_OUT, socket_identifier_for_simulation_item(*item).c_str());
       }
       else {
         return false;
