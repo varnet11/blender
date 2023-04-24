@@ -183,7 +183,6 @@ wmKeyMap *WM_keymap_guess_opname(const bContext *C, const char *opname)
    *     ED_OT
    *     FLUID_OT
    *     TEXTURE_OT
-   *     UI_OT
    *     WORLD_OT
    */
 
@@ -446,6 +445,10 @@ wmKeyMap *WM_keymap_guess_opname(const bContext *C, const char *opname)
         break;
     }
   }
+  /* User Interface */
+  else if (STRPREFIX(opname, "UI_OT")) {
+    km = WM_keymap_find_all(wm, "User Interface", 0, 0);
+  }
 
   return km;
 }
@@ -490,8 +493,6 @@ bool WM_keymap_uses_event_modifier(const wmKeyMap *keymap, const int event_modif
   return false;
 }
 
-void WM_keymap_fix_linking(void)
-{
-}
+void WM_keymap_fix_linking(void) {}
 
 /** \} */

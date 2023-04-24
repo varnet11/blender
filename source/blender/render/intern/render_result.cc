@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright 2006 Blender Foundation. All rights reserved. */
+ * Copyright 2006 Blender Foundation */
 
 /** \file
  * \ingroup render
@@ -852,7 +852,7 @@ static void render_result_exr_file_cache_path(Scene *sce,
   const char *blendfile_path = BKE_main_blendfile_path_from_global();
   if (blendfile_path[0] != '\0') {
     BLI_split_dirfile(blendfile_path, dirname, filename, sizeof(dirname), sizeof(filename));
-    BLI_path_extension_replace(filename, sizeof(filename), ""); /* strip '.blend' */
+    BLI_path_extension_strip(filename); /* Strip `.blend`. */
     BLI_hash_md5_buffer(blendfile_path, strlen(blendfile_path), path_digest);
   }
   else {

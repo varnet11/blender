@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright 2005 Blender Foundation. All rights reserved. */
+ * Copyright 2005 Blender Foundation */
 
 /** \file
  * \ingroup modifiers
@@ -52,8 +52,8 @@ struct LaplacianSystem {
 
   /* Pointers to data. */
   float (*vertexCos)[3];
-  blender::Span<MEdge> edges;
-  blender::Span<MPoly> polys;
+  blender::Span<blender::int2> edges;
+  blender::OffsetIndices<int> polys;
   blender::Span<int> corner_verts;
   LinearSolver *context;
 
@@ -112,17 +112,17 @@ static LaplacianSystem *init_laplacian_system(int a_numEdges, int a_numLoops, in
 
 static float compute_volume(const float center[3],
                             float (*vertexCos)[3],
-                            const blender::Span<MPoly> polys,
+                            const blender::OffsetIndices<int> polys,
                             const blender::Span<int> corner_verts)
 {
   float vol = 0.0f;
 
   for (const int i : polys.index_range()) {
-    const MPoly &poly = polys[i];
-    int corner_first = poly.loopstart;
+    const blender::IndexRange poly = polys[i];
+    int corner_first = poly.start();
     int corner_prev = corner_first + 1;
     int corner_curr = corner_first + 2;
-    int corner_term = corner_first + poly.totloop;
+    int corner_term = corner_first + poly.size();
 
     for (; corner_curr != corner_term; corner_prev = corner_curr, corner_curr++) {
       vol += volume_tetrahedron_signed_v3(center,
@@ -168,8 +168,8 @@ static void init_laplacian_matrix(LaplacianSystem *sys)
   uint idv1, idv2;
 
   for (i = 0; i < sys->edges.size(); i++) {
-    idv1 = sys->edges[i].v1;
-    idv2 = sys->edges[i].v2;
+    idv1 = sys->edges[i][0];
+    idv2 = sys->edges[i][1];
 
     v1 = sys->vertexCos[idv1];
     v2 = sys->vertexCos[idv2];
@@ -191,9 +191,9 @@ static void init_laplacian_matrix(LaplacianSystem *sys)
   const blender::Span<int> corner_verts = sys->corner_verts;
 
   for (const int i : sys->polys.index_range()) {
-    const MPoly &poly = sys->polys[i];
-    int corner_next = poly.loopstart;
-    int corner_term = corner_next + poly.totloop;
+    const blender::IndexRange poly = sys->polys[i];
+    int corner_next = poly.start();
+    int corner_term = corner_next + poly.size();
     int corner_prev = corner_term - 2;
     int corner_curr = corner_term - 1;
 
@@ -229,8 +229,8 @@ static void init_laplacian_matrix(LaplacianSystem *sys)
     }
   }
   for (i = 0; i < sys->edges.size(); i++) {
-    idv1 = sys->edges[i].v1;
-    idv2 = sys->edges[i].v2;
+    idv1 = sys->edges[i][0];
+    idv2 = sys->edges[i][1];
     /* if is boundary, apply scale-dependent umbrella operator only with neighbors in boundary */
     if (sys->ne_ed_num[idv1] != sys->ne_fa_num[idv1] &&
         sys->ne_ed_num[idv2] != sys->ne_fa_num[idv2]) {
@@ -248,9 +248,9 @@ static void fill_laplacian_matrix(LaplacianSystem *sys)
   const blender::Span<int> corner_verts = sys->corner_verts;
 
   for (const int i : sys->polys.index_range()) {
-    const MPoly &poly = sys->polys[i];
-    int corner_next = poly.loopstart;
-    int corner_term = corner_next + poly.totloop;
+    const blender::IndexRange poly = sys->polys[i];
+    int corner_next = poly.start();
+    int corner_term = corner_next + poly.size();
     int corner_prev = corner_term - 2;
     int corner_curr = corner_term - 1;
 
@@ -301,8 +301,8 @@ static void fill_laplacian_matrix(LaplacianSystem *sys)
   }
 
   for (i = 0; i < sys->edges.size(); i++) {
-    idv1 = sys->edges[i].v1;
-    idv2 = sys->edges[i].v2;
+    idv1 = sys->edges[i][0];
+    idv2 = sys->edges[i][1];
     /* Is boundary */
     if (sys->ne_ed_num[idv1] != sys->ne_fa_num[idv1] &&
         sys->ne_ed_num[idv2] != sys->ne_fa_num[idv2] && sys->zerola[idv1] == false &&

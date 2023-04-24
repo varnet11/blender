@@ -48,7 +48,7 @@ Object *MeshFromGeometry::create_mesh(Main *bmain,
   const int64_t tot_face_elems{mesh_geometry_.face_elements_.size()};
   const int64_t tot_loops{mesh_geometry_.total_loops_};
 
-  Mesh *mesh = BKE_mesh_new_nomain(tot_verts_object, tot_edges, tot_loops, tot_face_elems);
+  Mesh *mesh = BKE_mesh_new_nomain(tot_verts_object, tot_edges, tot_face_elems, tot_loops);
   Object *obj = BKE_object_add_only_object(bmain, OB_MESH, ob_name.c_str());
   obj->data = BKE_object_obdata_add_from_type(bmain, OB_MESH, ob_name.c_str());
 
@@ -183,7 +183,7 @@ void MeshFromGeometry::create_polys_loops(Mesh *mesh, bool use_vertex_groups)
     dverts = mesh->deform_verts_for_write();
   }
 
-  MutableSpan<MPoly> polys = mesh->polys_for_write();
+  MutableSpan<int> poly_offsets = mesh->poly_offsets_for_write();
   MutableSpan<int> corner_verts = mesh->corner_verts_for_write();
   bke::MutableAttributeAccessor attributes = mesh->attributes_for_write();
   bke::SpanAttributeWriter<int> material_indices =
@@ -202,9 +202,7 @@ void MeshFromGeometry::create_polys_loops(Mesh *mesh, bool use_vertex_groups)
       continue;
     }
 
-    MPoly &poly = polys[poly_idx];
-    poly.totloop = curr_face.corner_count_;
-    poly.loopstart = tot_loop_idx;
+    poly_offsets[poly_idx] = tot_loop_idx;
     sharp_faces.span[poly_idx] = !curr_face.shaded_smooth;
     material_indices.span[poly_idx] = curr_face.material_index;
     /* Importing obj files without any materials would result in negative indices, which is not
@@ -250,17 +248,17 @@ void MeshFromGeometry::create_vertex_groups(Object *obj)
 
 void MeshFromGeometry::create_edges(Mesh *mesh)
 {
-  MutableSpan<MEdge> edges = mesh->edges_for_write();
+  MutableSpan<int2> edges = mesh->edges_for_write();
 
   const int64_t tot_edges{mesh_geometry_.edges_.size()};
   const int64_t total_verts{mesh_geometry_.get_vertex_count()};
   UNUSED_VARS_NDEBUG(total_verts);
   for (int i = 0; i < tot_edges; ++i) {
-    const MEdge &src_edge = mesh_geometry_.edges_[i];
-    MEdge &dst_edge = edges[i];
-    dst_edge.v1 = mesh_geometry_.global_to_local_vertices_.lookup_default(src_edge.v1, 0);
-    dst_edge.v2 = mesh_geometry_.global_to_local_vertices_.lookup_default(src_edge.v2, 0);
-    BLI_assert(dst_edge.v1 < total_verts && dst_edge.v2 < total_verts);
+    const int2 &src_edge = mesh_geometry_.edges_[i];
+    int2 &dst_edge = edges[i];
+    dst_edge[0] = mesh_geometry_.global_to_local_vertices_.lookup_default(src_edge[0], 0);
+    dst_edge[1] = mesh_geometry_.global_to_local_vertices_.lookup_default(src_edge[1], 0);
+    BLI_assert(dst_edge[0] < total_verts && dst_edge[0] < total_verts);
   }
 
   /* Set argument `update` to true so that existing, explicitly imported edges can be merged

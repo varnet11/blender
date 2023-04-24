@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright 2012 Blender Foundation. All rights reserved. */
+ * Copyright 2012 Blender Foundation */
 
 /** \file
  * \ingroup pybmesh
@@ -305,7 +305,7 @@ static PySequenceMethods bpy_bmeditselseq_as_sequence = {
 };
 
 static PyMappingMethods bpy_bmeditselseq_as_mapping = {
-    /*mp_len*/ (lenfunc)bpy_bmeditselseq_length,
+    /*mp_length*/ (lenfunc)bpy_bmeditselseq_length,
     /*mp_subscript*/ (binaryfunc)bpy_bmeditselseq_subscript,
     /*mp_ass_subscript*/ (objobjargproc)NULL,
 };

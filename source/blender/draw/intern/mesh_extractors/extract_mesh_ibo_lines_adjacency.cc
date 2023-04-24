@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright 2021 Blender Foundation. All rights reserved. */
+ * Copyright 2021 Blender Foundation */
 
 /** \file
  * \ingroup draw
@@ -142,7 +142,7 @@ static void extract_lines_adjacency_finish(const MeshRenderData * /*mr*/,
   /* Create edges for remaining non manifold edges. */
   EdgeHashIterator *ehi = BLI_edgehashIterator_new(data->eh);
   for (; !BLI_edgehashIterator_isDone(ehi); BLI_edgehashIterator_step(ehi)) {
-    uint v2, v3, l1, l2, l3;
+    int v2, v3, l1, l2, l3;
     int v_data = POINTER_AS_INT(BLI_edgehashIterator_getValue(ehi));
     if (v_data != NO_EDGE) {
       BLI_edgehashIterator_getKey(ehi, &v2, &v3);
@@ -216,7 +216,7 @@ static void extract_lines_adjacency_iter_subdiv_mesh(const DRWSubdivCache *subdi
                                                      const MeshRenderData *mr,
                                                      void *_data,
                                                      uint subdiv_quad_index,
-                                                     const MPoly * /*coarse_quad*/)
+                                                     const int /*coarse_quad_index*/)
 {
   extract_lines_adjacency_iter_subdiv(subdiv_cache, mr, _data, subdiv_quad_index);
 }

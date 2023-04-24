@@ -1,9 +1,9 @@
 
 msgid ""
 msgstr ""
-"Project-Id-Version: Blender 3.5.0 Beta (b'3962d9b931f1')\n"
+"Project-Id-Version: Blender 3.6.0 Alpha (b'dfa42c614fb4')\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-03-20 13:37:56\n"
+"POT-Creation-Date: 2023-04-17 09:43:08\n"
 "PO-Revision-Date: 2023-01-28 11:09+0800\n"
 "Last-Translator: Cheng-Chia Tseng <pswo10680@gmail.com>\n"
 "Language-Team: Chinese (Traditional) <http://weblate.slat.org/projects/blender/blender/zh_Hant/>\n"
@@ -1479,14 +1479,6 @@ msgid "Vector font data-blocks"
 msgstr "向量字型資料塊"
 
 
-msgid "Grease Pencil"
-msgstr "蠟筆"
-
-
-msgid "Grease Pencil data-blocks"
-msgstr "蠟筆資料塊"
-
-
 msgid "Images"
 msgstr "影像"
 
@@ -1653,6 +1645,10 @@ msgstr "外形鍵"
 
 msgid "Shape Key data-blocks"
 msgstr "外形鍵資料塊"
+
+
+msgid "Simulations"
+msgstr "模擬"
 
 
 msgid "Sounds"
@@ -9353,8 +9349,8 @@ msgid "Fonts"
 msgstr "字型"
 
 
-msgid "Simulations"
-msgstr "模擬"
+msgid "Grease Pencil"
+msgstr "蠟筆"
 
 
 msgid "Show workspace data-blocks"
@@ -15989,6 +15985,10 @@ msgid "Active Movie Clip"
 msgstr "作用中影片剪輯"
 
 
+msgid "Mirror Object"
+msgstr "鏡像物體"
+
+
 msgid "Distance Model"
 msgstr "距離模型"
 
@@ -16469,10 +16469,6 @@ msgstr "記憶體"
 
 msgid "Text file is in memory, without a corresponding file on disk"
 msgstr "文字檔位於記憶體中，磁碟中沒有相對應的檔案"
-
-
-msgid "Modified"
-msgstr "已修改"
 
 
 msgid "Text file on disk is different than the one in memory"
@@ -19474,6 +19470,10 @@ msgid "Bone Roll"
 msgstr "骨骼滾動"
 
 
+msgid "Select More/Less"
+msgstr "較多/較少選取"
+
+
 msgid "Special Characters"
 msgstr "特殊字元"
 
@@ -19484,10 +19484,6 @@ msgstr "面資料"
 
 msgid "Mesh Select Mode"
 msgstr "網格選取模式"
-
-
-msgid "Select More/Less"
-msgstr "較多/較少選取"
 
 
 msgid "Select Similar"
@@ -21100,10 +21096,6 @@ msgstr "在其他變形物體上 (較慢且較耗費記憶體) 動態重新計�
 
 msgid "Mirroring modifier"
 msgstr "鏡像處理修改器"
-
-
-msgid "Mirror Object"
-msgstr "鏡像物體"
 
 
 msgid "Object to use as mirror"
@@ -23813,10 +23805,6 @@ msgid "Y position of the middle of the box"
 msgstr "方塊中間的 Y 位置"
 
 
-msgid "Bright/Contrast"
-msgstr "亮度/對比"
-
-
 msgid "Keep output image premultiplied alpha"
 msgstr "保持輸出圖片的 alpha 為預乘模式"
 
@@ -24585,10 +24573,6 @@ msgid "Hue Correct"
 msgstr "色相校正"
 
 
-msgid "Hue Saturation Value"
-msgstr "色相飽和度明度"
-
-
 msgid "ID Mask"
 msgstr "ID 遮罩"
 
@@ -25118,10 +25102,6 @@ msgid "Wrap all pixels on both axes"
 msgstr "於兩軸包覆所有像素"
 
 
-msgid "ColorRamp"
-msgstr "色彩漸變"
-
-
 msgid "Vector Blur"
 msgstr "向量模糊"
 
@@ -25337,10 +25317,6 @@ msgstr "背景"
 
 msgid "Blackbody"
 msgstr "黑體"
-
-
-msgid "Bright Contrast"
-msgstr "亮度對比"
 
 
 msgid "Anisotropic BSDF"
@@ -25847,14 +25823,6 @@ msgid "Use Tips"
 msgstr "使用提示"
 
 
-msgid "Cross Product"
-msgstr "向量積"
-
-
-msgid "Wrap"
-msgstr "包覆"
-
-
 msgid "Z Axis"
 msgstr "Z 軸"
 
@@ -26306,10 +26274,6 @@ msgid "Copy Keyframes"
 msgstr "複製鍵幀"
 
 
-msgid "Copy selected keyframes to the copy/paste buffer"
-msgstr "將選取的鍵幀複製至複製/貼上緩衝中"
-
-
 msgctxt "Operator"
 msgid "Delete Keyframes"
 msgstr "刪除鍵幀"
@@ -26490,10 +26454,6 @@ msgstr "建立新的動作"
 msgctxt "Operator"
 msgid "Paste Keyframes"
 msgstr "貼上鍵幀"
-
-
-msgid "Paste keyframes from copy/paste buffer for the selected channels, starting on the current frame"
-msgstr "為所選通道從複製/貼上緩衝區內貼上鍵幀，從目前框幀開始"
 
 
 msgid "Method of merging pasted keys and existing"
@@ -26778,6 +26738,14 @@ msgstr "以互動方式更改目前幀號"
 msgctxt "Operator"
 msgid "Select Channel Keyframes"
 msgstr "選取通道鍵幀"
+
+
+msgid "Include Handles"
+msgstr "包括控制桿"
+
+
+msgid "Include handles of keyframes when calculating extents"
+msgstr "當計算範圍時包括鍵幀的控制桿"
 
 
 msgctxt "Operator"
@@ -28044,10 +28012,6 @@ msgid "Copy Tracks"
 msgstr "複製軌道"
 
 
-msgid "Copy selected tracks to clipboard"
-msgstr "將所選軌道複製至剪貼簿"
-
-
 msgctxt "Operator"
 msgid "Create Plane Track"
 msgstr "建立平面軌道"
@@ -28357,10 +28321,6 @@ msgstr "啟用多重視圖"
 msgctxt "Operator"
 msgid "Paste Tracks"
 msgstr "貼上軌道"
-
-
-msgid "Paste tracks from clipboard"
-msgstr "從剪貼簿貼上軌道"
 
 
 msgctxt "Operator"
@@ -29032,6 +28992,10 @@ msgstr "從剪貼簿貼上"
 
 msgid "Paste text from clipboard"
 msgstr "從剪貼簿貼上文字"
+
+
+msgid "Selection"
+msgstr "選取項"
 
 
 msgctxt "Operator"
@@ -30669,10 +30633,6 @@ msgid "Amount to decrease or increase character spacing with"
 msgstr "字元間距要增減的量"
 
 
-msgid "Selection"
-msgstr "選取項"
-
-
 msgid "Next or Selection"
 msgstr "下一項或目前選項"
 
@@ -31365,6 +31325,14 @@ msgid "Place the cursor on the midpoint of selected keyframes"
 msgstr "將游標放置至所選鍵幀的中點"
 
 
+msgid "Filter Width"
+msgstr "過濾寬度"
+
+
+msgid "Sigma"
+msgstr "Sigma"
+
+
 msgctxt "Operator"
 msgid "Clear Ghost Curves"
 msgstr "清除殘影曲線"
@@ -31389,10 +31357,6 @@ msgstr "將游標值 (Y/水平部份) 作為鏡像線翻轉所選鍵幀的值"
 
 msgid "Flip times of selected keyframes, effectively reversing the order they appear in"
 msgstr "翻轉所選框幀的時間，可有效反轉它們出現的順序"
-
-
-msgid "Include Handles"
-msgstr "包括控制桿"
 
 
 msgid "Are handles tested individually against the selection criteria"
@@ -31476,10 +31440,6 @@ msgstr "殼曲線的振幅會總結 (或者，當啟用「累加」時，正差�
 
 msgid "The output is a square curve (negative values always result in -1, and positive ones in 1)"
 msgstr "輸出為平方曲線 (負值總是 -1，而正值總是 1)"
-
-
-msgid "Include handles of keyframes when calculating extents"
-msgstr "當計算範圍時包括鍵幀的控制桿"
 
 
 msgid "Reset viewable area to show selected keyframe range"
@@ -31681,10 +31641,6 @@ msgstr "另存為影像"
 
 msgid "Save the image with another name and/or settings"
 msgstr "以另一個名稱與/或設定儲存該影像"
-
-
-msgid "Create a new image file without modifying the current image in blender"
-msgstr "在不修改目前影像的情況下在 blender 中建立一個新的影像檔"
 
 
 msgid "Save As Render"
@@ -34603,14 +34559,6 @@ msgid "Clear the boundaries for viewer operations"
 msgstr "清除檢視器操作的邊界"
 
 
-msgid "Copies selected nodes to the clipboard"
-msgstr "將所選節點複製到剪貼簿"
-
-
-msgid "Pastes nodes from the clipboard to the active node tree"
-msgstr "將來自剪貼簿的節點貼至作用中節點樹"
-
-
 msgctxt "Operator"
 msgid "Collapse and Hide Unused Sockets"
 msgstr "收闔並隱藏未使用的接口"
@@ -36067,10 +36015,6 @@ msgid "Name filter using '*', '?' and '[abc]' unix style wildcards"
 msgstr "使用 '*'、'?' 和 '[abc]' 等 unix 樣式萬用符來過濾名稱"
 
 
-msgid "Set select on random visible objects"
-msgstr "設定可見物體的隨機選取"
-
-
 msgid "Render and display faces uniform, using Face Normals"
 msgstr "使用面法線算繪而顯示出統一的面"
 
@@ -36382,31 +36326,6 @@ msgstr "製作作用中頂點群組的副本"
 msgctxt "Operator"
 msgid "Copy Vertex Group to Selected"
 msgstr "將頂點群組複製至已選取"
-
-
-msgctxt "Operator"
-msgid "Fix Vertex Group Deform"
-msgstr "修正頂點群組變形"
-
-
-msgid "Modify the position of selected vertices by changing only their respective groups' weights (this tool may be slow for many vertices)"
-msgstr "藉由僅更改其對應群組權重來修改所選頂點的位置 (此工具可能對許多頂點來說相當緩慢)"
-
-
-msgid "Change Sensitivity"
-msgstr "更改敏感度"
-
-
-msgid "Change the amount weights are altered with each iteration: lower values are slower"
-msgstr "更改被每此迭代修改的權重量：較低的值較慢"
-
-
-msgid "The distance to move to"
-msgstr "要移動的距離"
-
-
-msgid "The distance moved can be changed by this multiplier"
-msgstr "可以透過此乘數更改的移動距離"
 
 
 msgid "Invert active vertex group's weights"
@@ -37674,10 +37593,6 @@ msgid "Copy Pose"
 msgstr "複製姿勢"
 
 
-msgid "Copies the current pose of the selected bones to copy/paste buffer"
-msgstr "將所選骨骼的目前姿勢複製到複製/貼上緩衝中"
-
-
 msgctxt "Operator"
 msgid "Add Bone Group"
 msgstr "添加骨骼群組"
@@ -38760,10 +38675,6 @@ msgid "Copy Line Set"
 msgstr "複製線條集"
 
 
-msgid "Copy the active line set to a buffer"
-msgstr "將作用中線條集複製至緩衝中"
-
-
 msgctxt "Operator"
 msgid "Move Line Set"
 msgstr "移動線條集"
@@ -38776,10 +38687,6 @@ msgstr "變更作用中線條集在線條集清單中的位置"
 msgctxt "Operator"
 msgid "Paste Line Set"
 msgstr "貼上線條集"
-
-
-msgid "Paste the buffer content to the active line set"
-msgstr "將緩衝內容貼至作用中線條集"
 
 
 msgctxt "Operator"
@@ -39965,10 +39872,6 @@ msgid "Add Scene Strip"
 msgstr "添加場景片段"
 
 
-msgid "Add a strip to the sequencer using a blender scene as a source"
-msgstr "使用一個 blendr 場景作為來源添加片段至序段編輯器中"
-
-
 msgid "Select a strip (last selected becomes the \"active strip\")"
 msgstr "選取一個片段 (最後一個選取項會成為「作用中片段」)"
 
@@ -40569,10 +40472,6 @@ msgid "Toggle overwrite while typing"
 msgstr "輸入時切換覆寫"
 
 
-msgid "Paste text selected elsewhere rather than copied (X11 only)"
-msgstr "在其他地方貼上所選文字，而不是複製 (僅用於 X11)"
-
-
 msgctxt "Operator"
 msgid "Refresh PyConstraints"
 msgstr "重新整理 PyContraints"
@@ -40665,10 +40564,6 @@ msgstr "根據列選取文字"
 
 msgid "Select word under cursor"
 msgstr "所選游標位置的單詞"
-
-
-msgid "Set cursor selection"
-msgstr "設定游標選取"
 
 
 msgctxt "Operator"
@@ -41559,6 +41454,10 @@ msgid "Export the UV layout to a bitmap image"
 msgstr "將 UV 配置匯出至點陣圖影像"
 
 
+msgid "Modified"
+msgstr "已修改"
+
+
 msgid "Exports UVs from the modified mesh"
 msgstr "從修改的網格匯出 UV"
 
@@ -41607,10 +41506,6 @@ msgstr "隱藏(未)選取的 UV 頂點"
 msgctxt "Operator"
 msgid "Lightmap Pack"
 msgstr "光照映射打包"
-
-
-msgid "New Image"
-msgstr "新增影像"
 
 
 msgid "Pack Quality"
@@ -41673,6 +41568,10 @@ msgstr "島塊間的空間"
 
 msgid "Rotate islands for best fit"
 msgstr "旋轉島塊以最佳適應"
+
+
+msgid "Bounding box"
+msgstr "邊界方塊"
 
 
 msgctxt "Operator"
@@ -42536,10 +42435,6 @@ msgid "Save a Collada file"
 msgstr "儲存一件 Collada 檔案"
 
 
-msgid "Apply modifiers to exported mesh (non destructive))"
-msgstr "為匯出的網格套用修改器 (無破壞性)"
-
-
 msgid "Only export deforming bones with armatures"
 msgstr "僅匯出含骨架的變形骨骼"
 
@@ -42658,6 +42553,10 @@ msgstr "情境枚舉循環"
 
 msgid "Toggle a context value"
 msgstr "切換情境值"
+
+
+msgid "Wrap"
+msgstr "包覆"
 
 
 msgctxt "Operator"
@@ -43582,10 +43481,6 @@ msgid "Set the mask layer from the UV map buttons"
 msgstr "從 UV 映射按鈕設定遮罩分層"
 
 
-msgid "Maximum edge length for dynamic topology sculpting (as divisor of blender unit - higher value means smaller edge length)"
-msgstr "動態拓撲雕刻的邊線最大長度 (作為 Blender 單位的除數 - 值越大代表邊線長度越短)"
-
-
 msgid "Detail Refine Method"
 msgstr "細化方式"
 
@@ -43769,10 +43664,6 @@ msgstr "布料預置"
 
 msgid "Tracking Settings"
 msgstr "追蹤設定"
-
-
-msgid "Lens"
-msgstr "鏡頭"
 
 
 msgid "Predefined tracking settings"
@@ -44375,11 +44266,6 @@ msgstr "插補"
 msgctxt "Operator"
 msgid "Thickness"
 msgstr "厚度"
-
-
-msgctxt "Operator"
-msgid "Slide"
-msgstr "滑動"
 
 
 msgid "Default tools for particle mode"
@@ -45514,6 +45400,10 @@ msgid "Color of texture overlay"
 msgstr "紋理疊層的色彩"
 
 
+msgid "Only keyframes of selected F-Curves are visible and editable"
+msgstr "僅所選 F 曲線的鍵幀可見且可被編輯"
+
+
 msgid "Undo Memory Size"
 msgstr "取消動作記憶體大小"
 
@@ -46426,14 +46316,6 @@ msgid "Time to animate the view in milliseconds, zero to disable"
 msgstr "讓視圖動畫的時間，單位為 ms，0 為停用"
 
 
-msgid "TimeCode Style"
-msgstr "時間碼樣式"
-
-
-msgid "Format of Time Codes displayed when not displaying timing in terms of frames"
-msgstr "當不以框幀作計時顯示時，要顯示的時間碼格式"
-
-
 msgid "Minimal Info"
 msgstr "最少資訊"
 
@@ -46752,10 +46634,6 @@ msgstr "使用實驗中與未完成的功能，可能導致失敗，或是未來
 
 msgid "Image brightness scale"
 msgstr "影像亮度縮放"
-
-
-msgid "Filter Width"
-msgstr "過濾寬度"
 
 
 msgid "Pixel filter width"
@@ -47300,10 +47178,6 @@ msgstr "算繪的結果，包含所有層與通遞"
 
 msgid "Bias"
 msgstr "偏差"
-
-
-msgid "Bias towards faces further away from the object (in blender units)"
-msgstr "遠離物體朝向面的偏差 (以 bender 單位計量)"
 
 
 msgid "Number of samples used for ambient occlusion baking from multires"
@@ -48834,20 +48708,12 @@ msgid "Scene Sequence"
 msgstr "場景序段"
 
 
-msgid "Sequence strip to used the rendered image of a scene"
-msgstr "場景的算繪影像要使用的序段片段"
-
-
 msgid "Scene that this sequence uses"
 msgstr "此序段使用的場景"
 
 
 msgid "Camera Override"
 msgstr "攝影機凌駕"
-
-
-msgid "Override the scenes active camera"
-msgstr "凌駕場景作用中攝影機"
 
 
 msgid "Sound Sequence"
@@ -50106,14 +49972,6 @@ msgid "Use Normalization"
 msgstr "使用規一處理"
 
 
-msgid "Only Selected Curve Keyframes"
-msgstr "僅選取曲線鍵幀"
-
-
-msgid "Only keyframes of selected F-Curves are visible and editable"
-msgstr "僅所選 F 曲線的鍵幀可見且可被編輯"
-
-
 msgid "Only Selected Keyframes Handles"
 msgstr "僅選取的鍵幀控制桿"
 
@@ -50738,6 +50596,10 @@ msgid "3D View near clipping distance (perspective view only)"
 msgstr "3D 視圖的近處剪輯距離 (僅限透視法檢視)"
 
 
+msgid "Lens"
+msgstr "鏡頭"
+
+
 msgid "Viewport lens angle"
 msgstr "視接口鏡頭角度"
 
@@ -50784,10 +50646,6 @@ msgstr "在此 3D 視接口內同步虛擬實境作業階段的檢視器畫面"
 
 msgid "3D Region"
 msgstr "3D 區塊"
-
-
-msgid "3D region in this space, in case of quad view the camera region"
-msgstr "此空間中的 3D 區塊，避免攝影機區塊的四角形視圖"
 
 
 msgid "Quad View Regions"
@@ -52691,10 +52549,6 @@ msgid "Consider objects as whole when finding volume center"
 msgstr "當尋找體積中心時將物體視為整體"
 
 
-msgid "Project individual elements on the surface of other objects"
-msgstr "將各自元素投影至其他物體的表面上"
-
-
 msgid "Snap onto Selectable Only"
 msgstr "僅針對選取吸附"
 
@@ -53121,14 +52975,6 @@ msgstr "所有物體原點"
 
 msgid "Show the object origin center dot for all (selected and unselected) objects"
 msgstr "顯示所有物體的物體原始中心點 (無論選取與否)"
-
-
-msgid "Hidden Wire"
-msgstr "隱藏線框"
-
-
-msgid "Use hidden wireframe display"
-msgstr "使用隱藏的線框顯示"
 
 
 msgid "Outline Selected"
@@ -54602,10 +54448,6 @@ msgid "Invert"
 msgstr "反轉"
 
 
-msgid "Old"
-msgstr "老舊"
-
-
 msgid "Date"
 msgstr "日期"
 
@@ -55044,6 +54886,11 @@ msgstr "擴展"
 
 
 msgctxt "Operator"
+msgid "Slide"
+msgstr "滑動"
+
+
+msgctxt "Operator"
 msgid "Back"
 msgstr "後"
 
@@ -55270,6 +55117,11 @@ msgid "Make and Replace Links"
 msgstr "製作連結並替換連結"
 
 
+msgctxt "Operator"
+msgid "Online Manual"
+msgstr "線上手冊"
+
+
 msgid "Inputs:"
 msgstr "輸入："
 
@@ -55461,16 +55313,16 @@ msgid "One Object Per Line"
 msgstr "每列一個物體"
 
 
-msgid "File: %s"
-msgstr "檔案：%s"
-
-
 msgid "Text: External"
 msgstr "文字：外部"
 
 
 msgid "Text: Internal"
 msgstr "文字：內部"
+
+
+msgid "File: %s"
+msgstr "檔案：%s"
 
 
 msgctxt "Operator"
@@ -55618,10 +55470,6 @@ msgstr "面板標題"
 
 msgid "Widget Label"
 msgstr "小工具標籤"
-
-
-msgid "Scripts"
-msgstr "指令稿"
 
 
 msgid "Render Output"
@@ -56043,11 +55891,6 @@ msgstr "量子化"
 msgctxt "Operator"
 msgid "Limit Total"
 msgstr "限制總計"
-
-
-msgctxt "Operator"
-msgid "Fix Deforms"
-msgstr "修正變形"
 
 
 msgctxt "Operator"
@@ -56751,10 +56594,6 @@ msgid "Loading failed: "
 msgstr "載入失敗： "
 
 
-msgid "Loading '%s' failed: "
-msgstr "載入「%s」失敗： "
-
-
 msgid "Appended Data"
 msgstr "已附資料"
 
@@ -57097,6 +56936,10 @@ msgid "Unable to open '%s': %s"
 msgstr "無法開啟「%s」：%s"
 
 
+msgid "Untitled"
+msgstr "無標題"
+
+
 msgid "Unable to make version backup: filename too short"
 msgstr "無法製作版本備份：檔名過短"
 
@@ -57401,22 +57244,6 @@ msgid "No pose to copy"
 msgstr "無姿勢可複製"
 
 
-msgid "Copied pose to buffer"
-msgstr "姿勢已複製到緩衝"
-
-
-msgid "Copy buffer is empty"
-msgstr "複製緩衝是空"
-
-
-msgid "Copy buffer is not from pose mode"
-msgstr "複製緩衝不是從姿勢模式而來"
-
-
-msgid "Copy buffer has no pose"
-msgstr "複製緩衝沒有姿勢"
-
-
 msgid "Programming error: missing clear transform function or keying set name"
 msgstr "程式設計錯誤：遺失清楚變換函式或鍵處理集名稱"
 
@@ -57687,11 +57514,6 @@ msgstr "重設單項回預設值"
 msgctxt "Operator"
 msgid "Remove Shortcut"
 msgstr "移除快捷鍵"
-
-
-msgctxt "Operator"
-msgid "Online Manual"
-msgstr "線上手冊"
 
 
 msgctxt "Operator"
@@ -58879,10 +58701,6 @@ msgid "No fullscreen areas were found"
 msgstr "找不到全螢幕面積"
 
 
-msgid "Untitled"
-msgstr "無標題"
-
-
 msgid "Image could not be found"
 msgstr "無法找到影像"
 
@@ -59406,10 +59224,6 @@ msgstr "內部錯誤 - AnimData 塊無效"
 
 msgid "No valid action to add"
 msgstr "無有效的動作可添加"
-
-
-msgid "Clipboard is empty"
-msgstr "剪貼簿為空白"
 
 
 msgid "Some nodes references could not be restored, will be left empty"
@@ -60861,10 +60675,6 @@ msgid "Determinator"
 msgstr "判定器"
 
 
-msgid "Bounding box"
-msgstr "邊界方塊"
-
-
 msgid "Color Space:"
 msgstr "色彩空間："
 
@@ -61009,6 +60819,10 @@ msgid "Speed:"
 msgstr "速度："
 
 
+msgid "Old"
+msgstr "老舊"
+
+
 msgid "Edge Crease"
 msgstr "邊線皺摺"
 
@@ -61063,10 +60877,6 @@ msgstr "穿透粗糙度"
 
 msgid "Emission Strength"
 msgstr "發光強度"
-
-
-msgid "Sigma"
-msgstr "Sigma"
 
 
 msgid "View Vector"
@@ -61364,11 +61174,6 @@ msgid "Hue Correct"
 msgstr "色相校正"
 
 
-msgctxt "Sequence"
-msgid "Bright/Contrast"
-msgstr "亮度/對比"
-
-
 msgid "Strips must be the same length"
 msgstr "片段必須長度相同"
 
@@ -61453,44 +61258,12 @@ msgid "Engine '%s' not available for scene '%s' (an add-on may need to be instal
 msgstr "「%s」引擎無法用於「%s」場景 (可能需要安裝或啟用某項附加元件)"
 
 
-msgid "Cannot read file '%s': %s"
-msgstr "無法讀取「%s」檔案：%s"
-
-
-msgid "File format is not supported in file '%s'"
-msgstr "不支援「%s」檔案的格式"
-
-
-msgid "File path '%s' invalid"
-msgstr "無效的檔案路徑「%s」"
-
-
-msgid "Unknown error loading '%s'"
-msgstr "未知的載入錯誤「%s」"
-
-
-msgid "Application Template '%s' not found"
-msgstr "找不到「%s」應用程式範本"
-
-
-msgid "Could not read '%s'"
-msgstr "無法讀取「%s」"
-
-
-msgid "Cannot save blend file, path '%s' is not writable"
-msgstr "無法儲存 blend 檔，「%s」路徑無法寫入"
-
-
 msgid "Cannot overwrite used library '%.240s'"
 msgstr "無法覆寫已使用的函式庫「%.240s」"
 
 
 msgid "Saved \"%s\""
 msgstr "已儲存「%s」"
-
-
-msgid "Can't read alternative start-up file: '%s'"
-msgstr "無法讀取替代性初始啟動檔：「%s」"
 
 
 msgid "Not a library"

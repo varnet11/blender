@@ -322,8 +322,8 @@ BLI_NOINLINE static void propagate_existing_attributes(
 
 namespace {
 struct AttributeOutputs {
-  AutoAnonymousAttributeID normal_id;
-  AutoAnonymousAttributeID rotation_id;
+  AnonymousAttributeIDPtr normal_id;
+  AnonymousAttributeIDPtr rotation_id;
 };
 }  // namespace
 
@@ -539,13 +539,10 @@ static void point_distribution_calculate(GeometrySet &geometry_set,
 
   PointCloud *pointcloud = BKE_pointcloud_new_nomain(positions.size());
   bke::MutableAttributeAccessor point_attributes = pointcloud->attributes_for_write();
-  bke::SpanAttributeWriter<float3> point_positions =
-      point_attributes.lookup_or_add_for_write_only_span<float3>("position", ATTR_DOMAIN_POINT);
   bke::SpanAttributeWriter<float> point_radii =
       point_attributes.lookup_or_add_for_write_only_span<float>("radius", ATTR_DOMAIN_POINT);
-  point_positions.span.copy_from(positions);
+  pointcloud->positions_for_write().copy_from(positions);
   point_radii.span.fill(0.05f);
-  point_positions.finish();
   point_radii.finish();
 
   geometry_set.replace_pointcloud(pointcloud);
@@ -593,19 +590,6 @@ static void node_geo_exec(GeoNodeExecParams params)
   });
 
   params.set_output("Points", std::move(geometry_set));
-
-  if (attribute_outputs.normal_id) {
-    params.set_output(
-        "Normal",
-        AnonymousAttributeFieldInput::Create<float3>(std::move(attribute_outputs.normal_id),
-                                                     params.attribute_producer_name()));
-  }
-  if (attribute_outputs.rotation_id) {
-    params.set_output(
-        "Rotation",
-        AnonymousAttributeFieldInput::Create<float3>(std::move(attribute_outputs.rotation_id),
-                                                     params.attribute_producer_name()));
-  }
 }
 
 }  // namespace blender::nodes::node_geo_distribute_points_on_faces_cc

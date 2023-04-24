@@ -62,7 +62,7 @@ typedef struct EffectInfo {
 } EffectInfo;
 
 const EnumPropertyItem rna_enum_sequence_modifier_type_items[] = {
-    {seqModifierType_BrightContrast, "BRIGHT_CONTRAST", ICON_NONE, "Bright/Contrast", ""},
+    {seqModifierType_BrightContrast, "BRIGHT_CONTRAST", ICON_NONE, "Brightness/Contrast", ""},
     {seqModifierType_ColorBalance, "COLOR_BALANCE", ICON_NONE, "Color Balance", ""},
     {seqModifierType_Curves, "CURVES", ICON_NONE, "Curves", ""},
     {seqModifierType_HueCorrect, "HUE_CORRECT", ICON_NONE, "Hue Correct", ""},
@@ -1496,8 +1496,8 @@ static void rna_SequenceTimelineChannel_name_set(PointerRNA *ptr, const char *va
                  sizeof(channel->name));
 }
 
-static void rna_SequenceTimelineChannel_mute_update(Main *UNUSED(bmain),
-                                                    Scene *UNUSED(active_scene),
+static void rna_SequenceTimelineChannel_mute_update(Main *bmain,
+                                                    Scene *active_scene,
                                                     PointerRNA *ptr)
 {
   Scene *scene = (Scene *)ptr->owner_id;
@@ -1516,6 +1516,8 @@ static void rna_SequenceTimelineChannel_mute_update(Main *UNUSED(bmain),
   LISTBASE_FOREACH (Sequence *, seq, seqbase) {
     SEQ_relations_invalidate_cache_composite(scene, seq);
   }
+
+  rna_Sequence_sound_update(bmain, active_scene, ptr);
 }
 
 static char *rna_SeqTimelineChannel_path(const PointerRNA *ptr)
@@ -2119,7 +2121,7 @@ static void rna_def_sequence(BlenderRNA *brna)
   RNA_def_property_float_sdna(prop, NULL, "start");
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
   RNA_def_property_ui_text(prop, "Start Frame", "X position where the strip begins");
-  RNA_def_property_ui_range(prop, MINFRAME, MAXFRAME, 3, 0);
+  RNA_def_property_ui_range(prop, MINFRAME, MAXFRAME, 100.0f, 0);
   RNA_def_property_float_funcs(
       prop, NULL, "rna_Sequence_start_frame_set", NULL); /* overlap tests and calc_seq_disp */
   RNA_def_property_editable_func(prop, "rna_Sequence_frame_editable");
@@ -2157,7 +2159,7 @@ static void rna_def_sequence(BlenderRNA *brna)
   RNA_def_property_float_sdna(prop, NULL, "startofs");
   //  RNA_def_property_clear_flag(prop, PROP_EDITABLE); /* overlap tests */
   RNA_def_property_ui_text(prop, "Start Offset", "");
-  RNA_def_property_ui_range(prop, MINFRAME, MAXFRAME, 3, 0);
+  RNA_def_property_ui_range(prop, MINFRAME, MAXFRAME, 100.0f, 0);
   RNA_def_property_float_funcs(
       prop, NULL, "rna_Sequence_frame_offset_start_set", "rna_Sequence_frame_offset_start_range");
   RNA_def_property_update(prop, NC_SCENE | ND_SEQUENCER, "rna_Sequence_frame_change_update");
@@ -2166,7 +2168,7 @@ static void rna_def_sequence(BlenderRNA *brna)
   RNA_def_property_float_sdna(prop, NULL, "endofs");
   //  RNA_def_property_clear_flag(prop, PROP_EDITABLE); /* overlap tests */
   RNA_def_property_ui_text(prop, "End Offset", "");
-  RNA_def_property_ui_range(prop, MINFRAME, MAXFRAME, 3, 0);
+  RNA_def_property_ui_range(prop, MINFRAME, MAXFRAME, 100.0f, 0);
   RNA_def_property_float_funcs(
       prop, NULL, "rna_Sequence_frame_offset_end_set", "rna_Sequence_frame_offset_end_range");
   RNA_def_property_update(prop, NC_SCENE | ND_SEQUENCER, "rna_Sequence_frame_change_update");
@@ -2751,7 +2753,7 @@ static void rna_def_scene(BlenderRNA *brna)
 
   srna = RNA_def_struct(brna, "SceneSequence", "Sequence");
   RNA_def_struct_ui_text(
-      srna, "Scene Sequence", "Sequence strip to used the rendered image of a scene");
+      srna, "Scene Sequence", "Sequence strip using the rendered image of a scene");
   RNA_def_struct_sdna(srna, "Sequence");
 
   prop = RNA_def_property(srna, "scene", PROP_POINTER, PROP_NONE);
@@ -2762,7 +2764,7 @@ static void rna_def_scene(BlenderRNA *brna)
   prop = RNA_def_property(srna, "scene_camera", PROP_POINTER, PROP_NONE);
   RNA_def_property_flag(prop, PROP_EDITABLE);
   RNA_def_property_pointer_funcs(prop, NULL, NULL, NULL, "rna_Camera_object_poll");
-  RNA_def_property_ui_text(prop, "Camera Override", "Override the scenes active camera");
+  RNA_def_property_ui_text(prop, "Camera Override", "Override the scene's active camera");
   RNA_def_property_update(prop, NC_SCENE | ND_SEQUENCER, "rna_Sequence_invalidate_raw_update");
 
   prop = RNA_def_property(srna, "scene_input", PROP_ENUM, PROP_NONE);
@@ -2819,7 +2821,7 @@ static void rna_def_movie(BlenderRNA *brna)
   prop = RNA_def_property(srna, "retiming_handles", PROP_COLLECTION, PROP_NONE);
   RNA_def_property_collection_sdna(prop, NULL, "retiming_handles", NULL);
   RNA_def_property_struct_type(prop, "RetimingHandle");
-  RNA_def_property_ui_text(prop, "Retiming Hndles", "");
+  RNA_def_property_ui_text(prop, "Retiming Handles", "");
   RNA_def_property_collection_funcs(prop,
                                     "rna_SequenceEditor_retiming_handles_begin",
                                     "rna_iterator_array_next",

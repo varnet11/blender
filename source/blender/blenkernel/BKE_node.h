@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright 2005 Blender Foundation. All rights reserved. */
+ * Copyright 2005 Blender Foundation */
 
 #pragma once
 
@@ -154,10 +154,12 @@ typedef struct CPPTypeHandle CPPTypeHandle;
  * Defines the appearance and behavior of a socket in the UI.
  */
 typedef struct bNodeSocketType {
-  /* Identifier name */
+  /** Identifier name. */
   char idname[64];
-  /* Type label */
+  /** Type label. */
   char label[64];
+  /** Sub-type label. */
+  char subtype_label[64];
 
   void (*draw)(struct bContext *C,
                struct uiLayout *layout,
@@ -295,6 +297,12 @@ typedef struct bNodeType {
   void (*initfunc_api)(const struct bContext *C, struct PointerRNA *ptr);
   void (*freefunc_api)(struct PointerRNA *ptr);
   void (*copyfunc_api)(struct PointerRNA *ptr, const struct bNode *src_node);
+
+  /**
+   * An additional poll test for deciding whether nodes should be an option in search menus.
+   * Potentially more strict poll than #poll(), but doesn't have to check the same things.
+   */
+  bool (*add_ui_poll)(const struct bContext *C);
 
   /**
    * Can this node type be added to a node tree?
@@ -634,6 +642,7 @@ bool nodeIsStaticSocketType(const struct bNodeSocketType *stype);
 const char *nodeStaticSocketType(int type, int subtype);
 const char *nodeStaticSocketInterfaceType(int type, int subtype);
 const char *nodeStaticSocketLabel(int type, int subtype);
+const char *nodeSocketSubTypeLabel(int subtype);
 
 /* Helper macros for iterating over node types. */
 #define NODE_SOCKET_TYPES_BEGIN(stype) \
@@ -731,6 +740,18 @@ bNode *node_copy_with_mapping(bNodeTree *dst_tree,
                               Map<const bNodeSocket *, bNodeSocket *> &new_socket_map);
 
 bNode *node_copy(bNodeTree *dst_tree, const bNode &src_node, int flag, bool use_unique);
+
+/**
+ * Move socket default from \a src (input socket) to locations specified by \a dst (output socket).
+ * Result value moved in specific location. (potentially multiple group nodes socket values, if \a
+ * dst is a group input node).
+ * \note Conceptually, the effect should be such that the evaluation of
+ * this graph again returns the value in src.
+ */
+void node_socket_move_default_value(Main &bmain,
+                                    bNodeTree &tree,
+                                    bNodeSocket &src,
+                                    bNodeSocket &dst);
 
 /**
  * Free the node itself.
@@ -1560,6 +1581,7 @@ void BKE_nodetree_remove_layer_n(struct bNodeTree *ntree, struct Scene *scene, i
 #define GEO_NODE_SDF_VOLUME_SPHERE 1196
 #define GEO_NODE_MEAN_FILTER_SDF_VOLUME 1197
 #define GEO_NODE_OFFSET_SDF_VOLUME 1198
+#define GEO_NODE_INDEX_OF_NEAREST 1199
 
 /** \} */
 

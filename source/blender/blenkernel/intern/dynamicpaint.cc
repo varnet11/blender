@@ -1414,24 +1414,24 @@ static void dynamicPaint_initAdjacencyData(DynamicPaintSurface *surface, const b
     /* For vertex format, count every vertex that is connected by an edge */
     int numOfEdges = mesh->totedge;
     int numOfPolys = mesh->totpoly;
-    const blender::Span<MEdge> edges = mesh->edges();
-    const blender::Span<MPoly> polys = mesh->polys();
+    const blender::Span<blender::int2> edges = mesh->edges();
+    const blender::OffsetIndices polys = mesh->polys();
     const blender::Span<int> corner_verts = mesh->corner_verts();
 
     /* count number of edges per vertex */
     for (int i = 0; i < numOfEdges; i++) {
-      ad->n_num[edges[i].v1]++;
-      ad->n_num[edges[i].v2]++;
+      ad->n_num[edges[i][0]]++;
+      ad->n_num[edges[i][1]]++;
 
-      temp_data[edges[i].v1]++;
-      temp_data[edges[i].v2]++;
+      temp_data[edges[i][0]]++;
+      temp_data[edges[i][1]]++;
     }
 
     /* also add number of vertices to temp_data
      * to locate points on "mesh edge" */
     for (int i = 0; i < numOfPolys; i++) {
-      for (int j = 0; j < polys[i].totloop; j++) {
-        temp_data[corner_verts[polys[i].loopstart + j]]++;
+      for (const int vert : corner_verts.slice(polys[i])) {
+        temp_data[vert]++;
       }
     }
 
@@ -1456,15 +1456,15 @@ static void dynamicPaint_initAdjacencyData(DynamicPaintSurface *surface, const b
     /* and now add neighbor data using that info */
     for (int i = 0; i < numOfEdges; i++) {
       /* first vertex */
-      int index = edges[i].v1;
+      int index = edges[i][0];
       n_pos = ad->n_index[index] + temp_data[index];
-      ad->n_target[n_pos] = edges[i].v2;
+      ad->n_target[n_pos] = edges[i][1];
       temp_data[index]++;
 
       /* second vertex */
-      index = edges[i].v2;
+      index = edges[i][1];
       n_pos = ad->n_index[index] + temp_data[index];
-      ad->n_target[n_pos] = edges[i].v1;
+      ad->n_target[n_pos] = edges[i][0];
       temp_data[index]++;
     }
   }
@@ -1790,7 +1790,7 @@ struct DynamicPaintModifierApplyData {
 
   float (*vert_positions)[3];
   blender::Span<blender::float3> vert_normals;
-  blender::Span<MPoly> polys;
+  blender::OffsetIndices<int> polys;
   blender::Span<int> corner_verts;
 
   float (*fcolor)[4];
@@ -1859,7 +1859,6 @@ static void dynamic_paint_apply_surface_vpaint_cb(void *__restrict userdata,
   const DynamicPaintModifierApplyData *data = static_cast<DynamicPaintModifierApplyData *>(
       userdata);
 
-  const blender::Span<MPoly> polys = data->polys;
   const blender::Span<int> corner_verts = data->corner_verts;
 
   const DynamicPaintSurface *surface = data->surface;
@@ -1869,8 +1868,7 @@ static void dynamic_paint_apply_surface_vpaint_cb(void *__restrict userdata,
   MLoopCol *mloopcol = data->mloopcol;
   MLoopCol *mloopcol_wet = data->mloopcol_wet;
 
-  for (int j = 0; j < polys[p_index].totloop; j++) {
-    const int l_index = polys[p_index].loopstart + j;
+  for (const int l_index : data->polys[p_index]) {
     const int v_index = corner_verts[l_index];
 
     /* save layer data to output layer */
@@ -1906,7 +1904,7 @@ static void dynamic_paint_apply_surface_wave_cb(void *__restrict userdata,
  */
 static Mesh *dynamicPaint_Modifier_apply(DynamicPaintModifierData *pmd, Object *ob, Mesh *mesh)
 {
-  Mesh *result = BKE_mesh_copy_for_eval(mesh, false);
+  Mesh *result = BKE_mesh_copy_for_eval(mesh);
 
   if (pmd->canvas && !(pmd->canvas->flags & MOD_DPAINT_BAKING) &&
       pmd->type == MOD_DYNAMICPAINT_TYPE_CANVAS) {
@@ -1928,7 +1926,7 @@ static Mesh *dynamicPaint_Modifier_apply(DynamicPaintModifierData *pmd, Object *
 
           /* vertex color paint */
           if (surface->type == MOD_DPAINT_SURFACE_T_PAINT) {
-            const blender::Span<MPoly> polys = result->polys();
+            const blender::OffsetIndices polys = result->polys();
             const blender::Span<int> corner_verts = result->corner_verts();
 
             /* paint is stored on dry and wet layers, so mix final color first */
@@ -2051,7 +2049,7 @@ static Mesh *dynamicPaint_Modifier_apply(DynamicPaintModifierData *pmd, Object *
     if (runtime_data->brush_mesh != nullptr) {
       BKE_id_free(nullptr, runtime_data->brush_mesh);
     }
-    runtime_data->brush_mesh = BKE_mesh_copy_for_eval(result, false);
+    runtime_data->brush_mesh = BKE_mesh_copy_for_eval(result);
   }
 
   return result;
@@ -2072,7 +2070,7 @@ static void canvas_copyMesh(DynamicPaintCanvasSettings *canvas, Mesh *mesh)
     BKE_id_free(nullptr, runtime->canvas_mesh);
   }
 
-  runtime->canvas_mesh = BKE_mesh_copy_for_eval(mesh, false);
+  runtime->canvas_mesh = BKE_mesh_copy_for_eval(mesh);
 }
 
 /*
@@ -3798,7 +3796,7 @@ static void dynamicPaint_brushMeshCalculateVelocity(Depsgraph *depsgraph,
                                       SUBFRAME_RECURSION,
                                       BKE_scene_ctime_get(scene),
                                       eModifierType_DynamicPaint);
-  mesh_p = BKE_mesh_copy_for_eval(dynamicPaint_brush_mesh_get(brush), false);
+  mesh_p = BKE_mesh_copy_for_eval(dynamicPaint_brush_mesh_get(brush));
   numOfVerts_p = mesh_p->totvert;
 
   float(*positions_p)[3] = BKE_mesh_vert_positions_for_write(mesh_p);
@@ -4284,7 +4282,7 @@ static bool dynamicPaint_paintMesh(Depsgraph *depsgraph,
     Bounds3D mesh_bb = {{0}};
     VolumeGrid *grid = bData->grid;
 
-    mesh = BKE_mesh_copy_for_eval(brush_mesh, false);
+    mesh = BKE_mesh_copy_for_eval(brush_mesh);
     float(*positions)[3] = BKE_mesh_vert_positions_for_write(mesh);
     const blender::Span<blender::float3> vert_normals = mesh->vert_normals();
     const blender::Span<int> corner_verts = mesh->corner_verts();

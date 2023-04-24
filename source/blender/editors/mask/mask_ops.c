@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright 2012 Blender Foundation. All rights reserved. */
+ * Copyright 2012 Blender Foundation */
 
 /** \file
  * \ingroup edmask
@@ -2069,7 +2069,7 @@ void MASK_OT_copy_splines(wmOperatorType *ot)
 {
   /* identifiers */
   ot->name = "Copy Splines";
-  ot->description = "Copy selected splines to clipboard";
+  ot->description = "Copy the selected splines to the internal clipboard";
   ot->idname = "MASK_OT_copy_splines";
 
   /* api callbacks */
@@ -2113,7 +2113,7 @@ void MASK_OT_paste_splines(wmOperatorType *ot)
 {
   /* identifiers */
   ot->name = "Paste Splines";
-  ot->description = "Paste splines from clipboard";
+  ot->description = "Paste splines from the internal clipboard";
   ot->idname = "MASK_OT_paste_splines";
 
   /* api callbacks */

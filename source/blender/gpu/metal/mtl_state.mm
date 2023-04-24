@@ -607,6 +607,19 @@ void MTLFence::wait()
     return;
   }
 
+  /* Note(#106431 #106704): `sync_event` is a global cross-context synchronization primitive used
+   * to ensure GPU workloads execute in the correct order across contexts.
+   *
+   * To prevent unexpected GPU stalls, this needs to be reset when used along side explicit
+   * synchronization. Previously this was handled during frame boundaries, however, to eliminate
+   * situational flickering (#106704), only reset this during the cases where we are waiting on
+   * synchronization primitives. */
+  if (MTLCommandBufferManager::sync_event != nil) {
+    [MTLCommandBufferManager::sync_event release];
+    MTLCommandBufferManager::sync_event = nil;
+    MTLCommandBufferManager::event_signal_val = 0;
+  }
+
   if (signalled_) {
     MTLContext *ctx = MTLContext::get();
     BLI_assert(ctx);
@@ -629,7 +642,7 @@ void MTLStateManager::texture_unpack_row_length_set(uint len)
   ctx->pipeline_state.unpack_row_length = len;
 }
 
-void MTLStateManager::texture_bind(Texture *tex_, eGPUSamplerState sampler_type, int unit)
+void MTLStateManager::texture_bind(Texture *tex_, GPUSamplerState sampler_type, int unit)
 {
   BLI_assert(tex_);
   gpu::MTLTexture *mtl_tex = static_cast<gpu::MTLTexture *>(tex_);
@@ -674,7 +687,7 @@ void MTLStateManager::texture_unbind_all()
 
 void MTLStateManager::image_bind(Texture *tex_, int unit)
 {
-  this->texture_bind(tex_, GPU_SAMPLER_DEFAULT, unit);
+  this->texture_bind(tex_, GPUSamplerState::default_sampler(), unit);
 }
 
 void MTLStateManager::image_unbind(Texture *tex_)
@@ -689,4 +702,4 @@ void MTLStateManager::image_unbind_all()
 
 /** \} */
 
-}  // blender::gpu
+}  // namespace blender::gpu

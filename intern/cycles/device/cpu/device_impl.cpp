@@ -14,7 +14,11 @@
 #endif
 
 #ifdef WITH_EMBREE
-#  include <embree3/rtcore.h>
+#  if EMBREE_MAJOR_VERSION >= 4
+#    include <embree4/rtcore.h>
+#  else
+#    include <embree3/rtcore.h>
+#  endif
 #endif
 
 #include "device/cpu/kernel.h"
@@ -80,7 +84,7 @@ CPUDevice::~CPUDevice()
   texture_info.free();
 }
 
-BVHLayoutMask CPUDevice::get_bvh_layout_mask() const
+BVHLayoutMask CPUDevice::get_bvh_layout_mask(uint /*kernel_features*/) const
 {
   BVHLayoutMask bvh_layout_mask = BVH_LAYOUT_BVH2;
 #ifdef WITH_EMBREE

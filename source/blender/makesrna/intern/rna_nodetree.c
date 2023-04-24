@@ -2679,9 +2679,7 @@ static void rna_Node_width_range(
   *max = *softmax = node->typeinfo->maxwidth;
 }
 
-static void rna_Node_width_hidden_set(PointerRNA *UNUSED(ptr), float UNUSED(value))
-{
-}
+static void rna_Node_width_hidden_set(PointerRNA *UNUSED(ptr), float UNUSED(value)) {}
 
 static float rna_Node_width_hidden_get(PointerRNA *UNUSED(ptr))
 {
@@ -4751,9 +4749,7 @@ static const EnumPropertyItem prop_image_extension[] = {
 
 /* -- Common nodes ---------------------------------------------------------- */
 
-static void def_group_input(StructRNA *UNUSED(srna))
-{
-}
+static void def_group_input(StructRNA *UNUSED(srna)) {}
 
 static void def_group_output(StructRNA *srna)
 {
@@ -5018,7 +5014,7 @@ static void def_vector_math(StructRNA *srna)
   RNA_def_property_enum_sdna(prop, NULL, "custom1");
   RNA_def_property_enum_items(prop, rna_enum_node_vec_math_items);
   RNA_def_property_ui_text(prop, "Operation", "");
-  RNA_def_struct_translation_context(srna, BLT_I18NCONTEXT_ID_NODETREE);
+  RNA_def_property_translation_context(prop, BLT_I18NCONTEXT_ID_NODETREE);
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_ShaderNode_socket_update");
 }
 
@@ -8583,9 +8579,7 @@ static void def_cmp_switch(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 }
 
-static void def_cmp_switch_view(StructRNA *UNUSED(srna))
-{
-}
+static void def_cmp_switch_view(StructRNA *UNUSED(srna)) {}
 
 static void def_cmp_colorcorrection(StructRNA *srna)
 {
@@ -11222,6 +11216,12 @@ static void rna_def_node_socket(BlenderRNA *brna)
   RNA_def_property_flag(prop, PROP_REGISTER_OPTIONAL);
   RNA_def_property_ui_text(prop, "Type Label", "Label to display for the socket type in the UI");
 
+  prop = RNA_def_property(srna, "bl_subtype_label", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_sdna(prop, NULL, "typeinfo->subtype_label");
+  RNA_def_property_flag(prop, PROP_REGISTER_OPTIONAL);
+  RNA_def_property_ui_text(
+      prop, "Subtype Label", "Label to display for the socket subtype in the UI");
+
   /* draw socket */
   func = RNA_def_function(srna, "draw", NULL);
   RNA_def_function_ui_description(func, "Draw socket");
@@ -11338,6 +11338,12 @@ static void rna_def_node_socket_interface(BlenderRNA *brna)
   RNA_def_property_string_sdna(prop, NULL, "typeinfo->label");
   RNA_def_property_flag(prop, PROP_REGISTER_OPTIONAL);
   RNA_def_property_ui_text(prop, "Type Label", "Label to display for the socket type in the UI");
+
+  prop = RNA_def_property(srna, "bl_subtype_label", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_sdna(prop, NULL, "typeinfo->subtype_label");
+  RNA_def_property_flag(prop, PROP_REGISTER_OPTIONAL);
+  RNA_def_property_ui_text(
+      prop, "Subtype Label", "Label to display for the socket subtype in the UI");
 
   func = RNA_def_function(srna, "draw", NULL);
   RNA_def_function_ui_description(func, "Draw template settings");

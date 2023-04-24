@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-# Copyright 2006 Blender Foundation. All rights reserved.
+# Copyright 2006 Blender Foundation
 
 set(INC
   ..
@@ -208,24 +208,12 @@ if(WITH_IMAGE_CINEON)
   add_definitions(-DWITH_CINEON)
 endif()
 
-if(WITH_IMAGE_DDS)
-  add_definitions(-DWITH_DDS)
-endif()
-
-if(WITH_IMAGE_HDR)
-  add_definitions(-DWITH_HDR)
-endif()
-
 if(WITH_IMAGE_OPENEXR)
   add_definitions(-DWITH_OPENEXR)
 endif()
 
 if(WITH_IMAGE_OPENJPEG)
   add_definitions(-DWITH_OPENJPEG)
-endif()
-
-if(WITH_IMAGE_TIFF)
-  add_definitions(-DWITH_TIFF)
 endif()
 
 if(WITH_WEBP)

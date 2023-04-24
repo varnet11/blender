@@ -242,7 +242,7 @@ static void snap_object_data_mesh_get(SnapObjectContext *sctx,
                                       BVHTreeFromMesh *r_treedata)
 {
   const Span<float3> vert_positions = me_eval->vert_positions();
-  const Span<MPoly> polys = me_eval->polys();
+  const blender::OffsetIndices polys = me_eval->polys();
   const Span<int> corner_verts = me_eval->corner_verts();
 
   if (ob_eval->type == OB_MESH) {
@@ -1428,7 +1428,7 @@ struct Nearest2dUserData {
     struct {
       const float (*vert_positions)[3];
       const blender::float3 *vert_normals;
-      const MEdge *edges; /* only used for #BVHTreeFromMeshEdges */
+      const blender::int2 *edges; /* only used for #BVHTreeFromMeshEdges */
       const int *corner_verts;
       const int *corner_edges;
       const MLoopTri *looptris;
@@ -1464,10 +1464,10 @@ static void cb_bvert_no_copy(const int index, const Nearest2dUserData *data, flo
 
 static void cb_medge_verts_get(const int index, const Nearest2dUserData *data, int r_v_index[2])
 {
-  const MEdge *edge = &data->edges[index];
+  const blender::int2 &edge = data->edges[index];
 
-  r_v_index[0] = edge->v1;
-  r_v_index[1] = edge->v2;
+  r_v_index[0] = edge[0];
+  r_v_index[1] = edge[1];
 }
 
 static void cb_bedge_verts_get(const int index, const Nearest2dUserData *data, int r_v_index[2])
@@ -1480,14 +1480,14 @@ static void cb_bedge_verts_get(const int index, const Nearest2dUserData *data, i
 
 static void cb_mlooptri_edges_get(const int index, const Nearest2dUserData *data, int r_v_index[3])
 {
-  const MEdge *edges = data->edges;
+  const blender::int2 *edges = data->edges;
   const int *corner_verts = data->corner_verts;
   const int *corner_edges = data->corner_edges;
   const MLoopTri *lt = &data->looptris[index];
   for (int j = 2, j_next = 0; j_next < 3; j = j_next++) {
-    const MEdge *edge = &edges[corner_edges[lt->tri[j]]];
+    const blender::int2 &edge = edges[corner_edges[lt->tri[j]]];
     const int tri_edge[2] = {corner_verts[lt->tri[j]], corner_verts[lt->tri[j_next]]};
-    if (ELEM(edge->v1, tri_edge[0], tri_edge[1]) && ELEM(edge->v2, tri_edge[0], tri_edge[1])) {
+    if (ELEM(edge[0], tri_edge[0], tri_edge[1]) && ELEM(edge[1], tri_edge[0], tri_edge[1])) {
       // printf("real edge found\n");
       r_v_index[j] = corner_edges[lt->tri[j]];
     }
@@ -1785,13 +1785,13 @@ static eSnapMode snap_mesh_polygon(SnapObjectContext *sctx,
                              params->use_backface_culling,
                              &nearest2d);
 
-    const MPoly &poly = mesh->polys()[sctx->ret.index];
+    const blender::IndexRange poly = mesh->polys()[sctx->ret.index];
 
     if (sctx->runtime.snap_to_flag & SCE_SNAP_MODE_EDGE) {
       elem = SCE_SNAP_MODE_EDGE;
       BLI_assert(nearest2d.edges != nullptr);
-      const int *poly_edges = &nearest2d.corner_edges[poly.loopstart];
-      for (int i = poly.totloop; i--;) {
+      const int *poly_edges = &nearest2d.corner_edges[poly.start()];
+      for (int i = poly.size(); i--;) {
         cb_snap_edge(&nearest2d,
                      poly_edges[i],
                      &neasrest_precalc,
@@ -1802,8 +1802,8 @@ static eSnapMode snap_mesh_polygon(SnapObjectContext *sctx,
     }
     else {
       elem = SCE_SNAP_MODE_VERTEX;
-      const int *poly_verts = &nearest2d.corner_verts[poly.loopstart];
-      for (int i = poly.totloop; i--;) {
+      const int *poly_verts = &nearest2d.corner_verts[poly.start()];
+      for (int i = poly.size(); i--;) {
         cb_snap_vert(&nearest2d,
                      poly_verts[i],
                      &neasrest_precalc,
@@ -3275,7 +3275,9 @@ static eSnapMode transform_snap_context_project_view3d_mixed_impl(SnapObjectCont
     }
   }
 
-  if (snap_to_flag & SCE_SNAP_MODE_FACE_RAYCAST) {
+  bool use_occlusion_test = params->use_occlusion_test && !XRAY_ENABLED(v3d);
+
+  if ((snap_to_flag & SCE_SNAP_MODE_FACE_RAYCAST) || use_occlusion_test) {
     float ray_start[3], ray_normal[3];
     if (!ED_view3d_win_to_ray_clipped_ex(
             depsgraph, region, v3d, mval, nullptr, ray_normal, ray_start, true)) {

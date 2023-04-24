@@ -53,7 +53,16 @@ float seq_time_media_playback_rate_factor_get(const Scene *scene, const Sequence
   return seq->media_playback_rate / scene_playback_rate;
 }
 
-float seq_give_frame_index(const Scene *scene, Sequence *seq, float timeline_frame)
+int seq_time_strip_original_content_length_get(const Scene *scene, const Sequence *seq)
+{
+  if (seq->type == SEQ_TYPE_SOUND_RAM) {
+    return seq->len;
+  }
+
+  return seq->len / seq_time_media_playback_rate_factor_get(scene, seq);
+}
+
+float SEQ_give_frame_index(const Scene *scene, Sequence *seq, float timeline_frame)
 {
   float frame_index;
   float sta = SEQ_time_start_frame_get(seq);
@@ -159,7 +168,6 @@ void seq_update_sound_bounds_recursive(const Scene *scene, Sequence *metaseq)
       scene, metaseq, metaseq_start(metaseq), metaseq_end(metaseq));
 }
 
-/* Update meta strip content start and end, update sound playback range. */
 void SEQ_time_update_meta_strip_range(const Scene *scene, Sequence *seq_meta)
 {
   if (seq_meta == NULL) {
@@ -228,7 +236,6 @@ void seq_time_effect_range_set(const Scene *scene, Sequence *seq)
   seq->len = seq->enddisp - seq->startdisp;
 }
 
-/* Update strip startdisp and enddisp (n-input effects have no len to calculate these). */
 void seq_time_update_effects_strip_range(const Scene *scene, SeqCollection *effects)
 {
   if (effects == NULL) {
@@ -496,10 +503,6 @@ bool SEQ_time_has_still_frames(const Scene *scene, const Sequence *seq)
 
 int SEQ_time_strip_length_get(const Scene *scene, const Sequence *seq)
 {
-  if (seq->type == SEQ_TYPE_SOUND_RAM) {
-    return seq->len;
-  }
-
   if (SEQ_retiming_is_active(seq)) {
     SeqRetimingHandle *handle_start = seq->retiming_handles;
     SeqRetimingHandle *handle_end = seq->retiming_handles + (SEQ_retiming_handles_count(seq) - 1);

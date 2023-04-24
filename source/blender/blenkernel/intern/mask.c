@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright 2012 Blender Foundation. All rights reserved. */
+ * Copyright 2012 Blender Foundation */
 
 /** \file
  * \ingroup bke
@@ -139,7 +139,7 @@ static void mask_blend_read_data(BlendDataReader *reader, ID *id)
   BLO_read_list(reader, &mask->masklayers);
 
   LISTBASE_FOREACH (MaskLayer *, masklay, &mask->masklayers) {
-    /* can't use newdataadr since it's a pointer within an array */
+    /* Can't use #newdataadr since it's a pointer within an array. */
     MaskSplinePoint *act_point_search = NULL;
 
     BLO_read_list(reader, &masklay->splines);

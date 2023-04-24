@@ -83,8 +83,7 @@ static void add_mesh_debug_column_names(
       if (CustomData_has_layer(&mesh.edata, CD_ORIGINDEX)) {
         fn({(char *)"Original Index"}, false);
       }
-      fn({(char *)"Vertex 1"}, false);
-      fn({(char *)"Vertex 2"}, false);
+      fn({(char *)"Vertices"}, false);
       break;
     case ATTR_DOMAIN_FACE:
       if (CustomData_has_layer(&mesh.pdata, CD_ORIGINDEX)) {
@@ -119,7 +118,6 @@ static std::unique_ptr<ColumnValues> build_mesh_debug_columns(const Mesh &mesh,
       return {};
     }
     case ATTR_DOMAIN_EDGE: {
-      const Span<MEdge> edges = mesh.edges();
       if (name == "Original Index") {
         const int *data = static_cast<const int *>(
             CustomData_get_layer(&mesh.edata, CD_ORIGINDEX));
@@ -127,22 +125,12 @@ static std::unique_ptr<ColumnValues> build_mesh_debug_columns(const Mesh &mesh,
           return std::make_unique<ColumnValues>(name, VArray<int>::ForSpan({data, mesh.totedge}));
         }
       }
-      if (name == "Vertex 1") {
-        return std::make_unique<ColumnValues>(
-            name, VArray<int>::ForFunc(edges.size(), [edges](int64_t index) {
-              return edges[index].v1;
-            }));
-      }
-      if (name == "Vertex 2") {
-        return std::make_unique<ColumnValues>(
-            name, VArray<int>::ForFunc(edges.size(), [edges](int64_t index) {
-              return edges[index].v2;
-            }));
+      if (name == "Vertices") {
+        return std::make_unique<ColumnValues>(name, VArray<int2>::ForSpan(mesh.edges()));
       }
       return {};
     }
     case ATTR_DOMAIN_FACE: {
-      const Span<MPoly> polys = mesh.polys();
       if (name == "Original Index") {
         const int *data = static_cast<const int *>(
             CustomData_get_layer(&mesh.pdata, CD_ORIGINDEX));
@@ -152,14 +140,13 @@ static std::unique_ptr<ColumnValues> build_mesh_debug_columns(const Mesh &mesh,
       }
       if (name == "Corner Start") {
         return std::make_unique<ColumnValues>(
-            name, VArray<int>::ForFunc(polys.size(), [polys](int64_t index) {
-              return polys[index].loopstart;
-            }));
+            name, VArray<int>::ForSpan(mesh.poly_offsets().drop_back(1)));
       }
       if (name == "Corner Size") {
+        const OffsetIndices polys = mesh.polys();
         return std::make_unique<ColumnValues>(
             name, VArray<int>::ForFunc(polys.size(), [polys](int64_t index) {
-              return polys[index].totloop;
+              return polys[index].size();
             }));
       }
       return {};
@@ -523,28 +510,23 @@ GeometrySet spreadsheet_get_display_geometry_set(const SpaceSpreadsheet *sspread
     }
   }
   else {
-    if (object_eval->mode == OB_MODE_EDIT && object_eval->type == OB_MESH) {
-      Mesh *mesh = BKE_modifier_get_evaluated_mesh_from_evaluated_object(object_eval);
-      if (mesh == nullptr) {
-        return geometry_set;
+    if (BLI_listbase_is_single(&sspreadsheet->viewer_path.path)) {
+      if (const GeometrySet *geometry_eval = object_eval->runtime.geometry_set_eval) {
+        geometry_set = *geometry_eval;
       }
-      BKE_mesh_wrapper_ensure_mdata(mesh);
-      MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
-      mesh_component.replace(mesh, GeometryOwnershipType::ReadOnly);
+
+      if (object_eval->mode == OB_MODE_EDIT && object_eval->type == OB_MESH) {
+        if (Mesh *mesh = BKE_modifier_get_evaluated_mesh_from_evaluated_object(object_eval)) {
+          BKE_mesh_wrapper_ensure_mdata(mesh);
+          geometry_set.replace_mesh(mesh, GeometryOwnershipType::ReadOnly);
+        }
+      }
     }
     else {
-      if (BLI_listbase_count(&sspreadsheet->viewer_path.path) == 1) {
-        /* Use final evaluated object. */
-        if (object_eval->runtime.geometry_set_eval != nullptr) {
-          geometry_set = *object_eval->runtime.geometry_set_eval;
-        }
-      }
-      else {
-        if (const ViewerNodeLog *viewer_log =
-                nodes::geo_eval_log::GeoModifierLog::find_viewer_node_log_for_path(
-                    sspreadsheet->viewer_path)) {
-          geometry_set = viewer_log->geometry;
-        }
+      if (const ViewerNodeLog *viewer_log =
+              nodes::geo_eval_log::GeoModifierLog::find_viewer_node_log_for_path(
+                  sspreadsheet->viewer_path)) {
+        geometry_set = viewer_log->geometry;
       }
     }
   }

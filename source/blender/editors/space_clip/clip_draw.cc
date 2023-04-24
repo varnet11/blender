@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright 2011 Blender Foundation. All rights reserved. */
+ * Copyright 2011 Blender Foundation */
 
 /** \file
  * \ingroup spclip
@@ -27,7 +27,7 @@
 #include "BKE_tracking.h"
 
 #include "ED_clip.h"
-#include "ED_gpencil.h"
+#include "ED_gpencil_legacy.h"
 #include "ED_mask.h"
 #include "ED_screen.h"
 #include "ED_util.h"

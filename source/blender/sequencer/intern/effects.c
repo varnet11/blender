@@ -652,17 +652,11 @@ static void build_gammatabs(void)
   }
 }
 
-static void init_gammacross(Sequence *UNUSED(seq))
-{
-}
+static void init_gammacross(Sequence *UNUSED(seq)) {}
 
-static void load_gammacross(Sequence *UNUSED(seq))
-{
-}
+static void load_gammacross(Sequence *UNUSED(seq)) {}
 
-static void free_gammacross(Sequence *UNUSED(seq), const bool UNUSED(do_id_user))
-{
-}
+static void free_gammacross(Sequence *UNUSED(seq), const bool UNUSED(do_id_user)) {}
 
 static void do_gammacross_effect_byte(
     float fac, int x, int y, uchar *rect1, uchar *rect2, uchar *out)
@@ -2620,7 +2614,7 @@ float seq_speed_effect_target_frame_get(Scene *scene,
   }
 
   SEQ_effect_handle_get(seq_speed); /* Ensure, that data are initialized. */
-  int frame_index = seq_give_frame_index(scene, seq_speed, timeline_frame);
+  int frame_index = SEQ_give_frame_index(scene, seq_speed, timeline_frame);
   SpeedControlVars *s = (SpeedControlVars *)seq_speed->effectdata;
   const Sequence *source = seq_speed->seq1;
 
@@ -3420,17 +3414,11 @@ static ImBuf *do_text_effect(const SeqRenderData *context,
 /** \name Sequence Effect Factory
  * \{ */
 
-static void init_noop(Sequence *UNUSED(seq))
-{
-}
+static void init_noop(Sequence *UNUSED(seq)) {}
 
-static void load_noop(Sequence *UNUSED(seq))
-{
-}
+static void load_noop(Sequence *UNUSED(seq)) {}
 
-static void free_noop(Sequence *UNUSED(seq), const bool UNUSED(do_id_user))
-{
-}
+static void free_noop(Sequence *UNUSED(seq), const bool UNUSED(do_id_user)) {}
 
 static int num_inputs_default(void)
 {

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright 2004 Blender Foundation. All rights reserved. */
+ * Copyright 2004 Blender Foundation */
 
 /** \file
  * \ingroup edmesh
@@ -6814,8 +6814,7 @@ static void sort_bmelem_flag(bContext *C,
         /* Multiplying with totface and adding i ensures us
          * we keep current order for all faces of same mat. */
         sb[affected[2]++].srt = srt * float(totelem[2]) + float(i);
-        // printf("e: %d; srt: %f; final: %f\n",
-        //        i, srt, srt * ((float)totface) + ((float)i));
+        // printf("e: %d; srt: %f; final: %f\n", i, srt, srt * float(totface) + float(i));
       }
       else {
         pb[i] = true;
@@ -9371,8 +9370,12 @@ enum {
 };
 
 static EnumPropertyItem normal_vector_tool_items[] = {
-    {EDBM_CLNOR_TOOLS_COPY, "COPY", 0, "Copy Normal", "Copy normal to buffer"},
-    {EDBM_CLNOR_TOOLS_PASTE, "PASTE", 0, "Paste Normal", "Paste normal from buffer"},
+    {EDBM_CLNOR_TOOLS_COPY, "COPY", 0, "Copy Normal", "Copy normal to the internal clipboard"},
+    {EDBM_CLNOR_TOOLS_PASTE,
+     "PASTE",
+     0,
+     "Paste Normal",
+     "Paste normal from the internal clipboard"},
     {EDBM_CLNOR_TOOLS_ADD, "ADD", 0, "Add Normal", "Add normal vector with selection"},
     {EDBM_CLNOR_TOOLS_MULTIPLY,
      "MULTIPLY",
@@ -9383,7 +9386,7 @@ static EnumPropertyItem normal_vector_tool_items[] = {
      "RESET",
      0,
      "Reset Normal",
-     "Reset buffer and/or normal of selected element"},
+     "Reset the internal clipboard and/or normal of selected element"},
     {0, nullptr, 0, nullptr, nullptr},
 };
 

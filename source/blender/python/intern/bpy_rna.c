@@ -84,6 +84,7 @@
  * `bpy.app.handler` callbacks for example.
  * Even though this is arguably "correct", it's going to cause problems for existing scripts,
  * so accept having this for the time being. */
+
 BPy_StructRNA *bpy_context_module = NULL; /* for fast access */
 
 static PyObject *pyrna_struct_Subtype(PointerRNA *ptr);
@@ -2370,6 +2371,13 @@ static PyObject *pyrna_prop_collection_subscript_str(BPy_PropertyRNA *self, cons
     RNA_property_collection_begin(&self->ptr, self->prop, &iter);
     for (int i = 0; iter.valid; RNA_property_collection_next(&iter), i++) {
       PropertyRNA *nameprop = RNA_struct_name_property(iter.ptr.type);
+      BLI_assert_msg(
+          nameprop,
+          "Attempted to use a string to index into a collection of items with no 'nameproperty'.");
+      if (nameprop == NULL) {
+        /* For non-debug builds, bail if there's no 'nameproperty' to check. */
+        break;
+      }
       char *nameptr = RNA_property_string_get_alloc(
           &iter.ptr, nameprop, name, sizeof(name), &namelen);
       if ((keylen == namelen) && STREQ(nameptr, keyname)) {
@@ -3251,13 +3259,13 @@ static int pyrna_prop_array_ass_subscript(BPy_PropertyArrayRNA *self,
 
 /* For slice only. */
 static PyMappingMethods pyrna_prop_array_as_mapping = {
-    /*mp_len*/ (lenfunc)pyrna_prop_array_length,
+    /*mp_length*/ (lenfunc)pyrna_prop_array_length,
     /*mp_subscript*/ (binaryfunc)pyrna_prop_array_subscript,
     /*mp_ass_subscript*/ (objobjargproc)pyrna_prop_array_ass_subscript,
 };
 
 static PyMappingMethods pyrna_prop_collection_as_mapping = {
-    /*mp_len*/ (lenfunc)pyrna_prop_collection_length,
+    /*mp_length*/ (lenfunc)pyrna_prop_collection_length,
     /*mp_subscript*/ (binaryfunc)pyrna_prop_collection_subscript,
     /*mp_ass_subscript*/ (objobjargproc)pyrna_prop_collection_ass_subscript,
 };
@@ -5343,18 +5351,23 @@ static PyObject *foreach_getset(BPy_PropertyRNA *self, PyObject *args, int set)
     buffer_is_compat = false;
     if (PyObject_CheckBuffer(seq)) {
       Py_buffer buf;
-      PyObject_GetBuffer(seq, &buf, PyBUF_SIMPLE | PyBUF_FORMAT);
-
-      /* Check if the buffer matches. */
-
-      buffer_is_compat = foreach_compat_buffer(raw_type, attr_signed, buf.format);
-
-      if (buffer_is_compat) {
-        ok = RNA_property_collection_raw_set(
-            NULL, &self->ptr, self->prop, attr, buf.buf, raw_type, tot);
+      if (PyObject_GetBuffer(seq, &buf, PyBUF_SIMPLE | PyBUF_FORMAT) == -1) {
+        /* Request failed. A `PyExc_BufferError` will have been raised,
+         * so clear it to silently fall back to accessing as a sequence. */
+        PyErr_Clear();
       }
+      else {
+        /* Check if the buffer matches. */
 
-      PyBuffer_Release(&buf);
+        buffer_is_compat = foreach_compat_buffer(raw_type, attr_signed, buf.format);
+
+        if (buffer_is_compat) {
+          ok = RNA_property_collection_raw_set(
+              NULL, &self->ptr, self->prop, attr, buf.buf, raw_type, tot);
+        }
+
+        PyBuffer_Release(&buf);
+      }
     }
 
     /* Could not use the buffer, fallback to sequence. */
@@ -5399,18 +5412,23 @@ static PyObject *foreach_getset(BPy_PropertyRNA *self, PyObject *args, int set)
     buffer_is_compat = false;
     if (PyObject_CheckBuffer(seq)) {
       Py_buffer buf;
-      PyObject_GetBuffer(seq, &buf, PyBUF_SIMPLE | PyBUF_FORMAT);
-
-      /* Check if the buffer matches, TODO: signed/unsigned types. */
-
-      buffer_is_compat = foreach_compat_buffer(raw_type, attr_signed, buf.format);
-
-      if (buffer_is_compat) {
-        ok = RNA_property_collection_raw_get(
-            NULL, &self->ptr, self->prop, attr, buf.buf, raw_type, tot);
+      if (PyObject_GetBuffer(seq, &buf, PyBUF_SIMPLE | PyBUF_FORMAT) == -1) {
+        /* Request failed. A `PyExc_BufferError` will have been raised,
+         * so clear it to silently fall back to accessing as a sequence. */
+        PyErr_Clear();
       }
+      else {
+        /* Check if the buffer matches. */
 
-      PyBuffer_Release(&buf);
+        buffer_is_compat = foreach_compat_buffer(raw_type, attr_signed, buf.format);
+
+        if (buffer_is_compat) {
+          ok = RNA_property_collection_raw_get(
+              NULL, &self->ptr, self->prop, attr, buf.buf, raw_type, tot);
+        }
+
+        PyBuffer_Release(&buf);
+      }
     }
 
     /* Could not use the buffer, fallback to sequence. */
@@ -6515,10 +6533,6 @@ static PyObject *pyrna_func_doc_get(BPy_FunctionRNA *self, void *UNUSED(closure)
   return ret;
 }
 
-/**
- * Sub-classes of #pyrna_struct_Type which support idprop definitions use this as a meta-class.
- * \note tp_base member is set to `&PyType_Type` on initialization.
- */
 PyTypeObject pyrna_struct_meta_idprop_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
     /*tp_name*/ "bpy_struct_meta_idprop",
@@ -6578,6 +6592,7 @@ PyTypeObject pyrna_struct_meta_idprop_Type = {
 };
 
 /*-----------------------BPy_StructRNA method def------------------------------*/
+
 PyTypeObject pyrna_struct_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
     /*tp_name*/ "bpy_struct",
@@ -6644,6 +6659,7 @@ PyTypeObject pyrna_struct_Type = {
 };
 
 /*-----------------------BPy_PropertyRNA method def------------------------------*/
+
 PyTypeObject pyrna_prop_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
     /*tp_name*/ "bpy_prop",
@@ -6870,6 +6886,7 @@ static PyTypeObject pyrna_prop_collection_idprop_Type = {
 };
 
 /*-----------------------BPy_PropertyRNA method def------------------------------*/
+
 PyTypeObject pyrna_func_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
     /*tp_name*/ "bpy_func",
@@ -7316,6 +7333,7 @@ static PyObject *pyrna_struct_Subtype(PointerRNA *ptr)
 }
 
 /*-----------------------CreatePyObject---------------------------------*/
+
 PyObject *pyrna_struct_CreatePyObject(PointerRNA *ptr)
 {
   BPy_StructRNA *pyrna = NULL;
@@ -7837,6 +7855,7 @@ int pyrna_struct_as_ptr_or_null_parse(PyObject *o, void *p)
 }
 
 /* Orphan functions, not sure where they should go. */
+
 StructRNA *srna_from_self(PyObject *self, const char *error_prefix)
 {
 
@@ -8680,13 +8699,12 @@ static void bpy_class_free(void *pyob_ptr)
   PyGILState_Release(gilstate);
 }
 
-/**
- * \note This isn't essential to run on startup, since sub-types will lazy initialize.
- * But keep running in debug mode so we get immediate notification of bad class hierarchy
- * or any errors in "bpy_types.py" at load time, so errors don't go unnoticed.
- */
 void pyrna_alloc_types(void)
 {
+  /* NOTE: This isn't essential to run on startup, since sub-types will lazy initialize.
+   * But keep running in debug mode so we get immediate notification of bad class hierarchy
+   * or any errors in "bpy_types.py" at load time, so errors don't go unnoticed. */
+
 #ifdef DEBUG
   PyGILState_STATE gilstate;
 

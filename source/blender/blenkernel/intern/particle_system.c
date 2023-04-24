@@ -1355,26 +1355,24 @@ void psys_update_particle_tree(ParticleSystem *psys, float cfra)
 {
   if (psys) {
     PARTICLE_P;
-    int totpart = 0;
 
     if (!psys->tree || psys->tree_frame != cfra) {
+      int totpart = 0;
       LOOP_SHOWN_PARTICLES
       {
-        totpart++;
+        if (pa->alive == PARS_ALIVE) {
+          totpart++;
+        }
       }
 
       BLI_kdtree_3d_free(psys->tree);
-      psys->tree = BLI_kdtree_3d_new(psys->totpart);
+      psys->tree = BLI_kdtree_3d_new(totpart);
 
       LOOP_SHOWN_PARTICLES
       {
         if (pa->alive == PARS_ALIVE) {
-          if (pa->state.time == cfra) {
-            BLI_kdtree_3d_insert(psys->tree, p, pa->prev_state.co);
-          }
-          else {
-            BLI_kdtree_3d_insert(psys->tree, p, pa->state.co);
-          }
+          const float *co = (pa->state.time == cfra) ? pa->prev_state.co : pa->state.co;
+          BLI_kdtree_3d_insert(psys->tree, p, co);
         }
       }
       BLI_kdtree_3d_balance(psys->tree);
@@ -3309,7 +3307,6 @@ static void hair_create_input_mesh(ParticleSimulationData *sim,
   ParticleSystem *psys = sim->psys;
   ParticleSettings *part = psys->part;
   Mesh *mesh;
-  MEdge *edge;
   MDeformVert *dvert;
   HairKey *key;
   PARTICLE_P;
@@ -3323,7 +3320,8 @@ static void hair_create_input_mesh(ParticleSimulationData *sim,
     *r_mesh = mesh = BKE_mesh_new_nomain(totpoint, totedge, 0, 0);
   }
   float(*positions)[3] = BKE_mesh_vert_positions_for_write(mesh);
-  edge = BKE_mesh_edges_for_write(mesh);
+  vec2i *edge = CustomData_get_layer_named_for_write(
+      &mesh->edata, CD_PROP_INT32_2D, ".edge_verts", mesh->totedge);
   dvert = BKE_mesh_deform_verts_for_write(mesh);
 
   if (psys->clmd->hairdata == NULL) {
@@ -3390,8 +3388,8 @@ static void hair_create_input_mesh(ParticleSimulationData *sim,
           sub_v3_v3(positions[vert_index], co_next);
           mul_m4_v3(hairmat, positions[vert_index]);
 
-          edge->v1 = pa->hair_index - 1;
-          edge->v2 = pa->hair_index;
+          edge->x = pa->hair_index - 1;
+          edge->y = pa->hair_index;
 
           dvert = hair_set_pinning(dvert, 1.0f);
 
@@ -3411,8 +3409,8 @@ static void hair_create_input_mesh(ParticleSimulationData *sim,
         mul_m4_v3(hairmat, positions[vert_index]);
 
         if (k) {
-          edge->v1 = pa->hair_index + k - 1;
-          edge->v2 = pa->hair_index + k;
+          edge->x = pa->hair_index + k - 1;
+          edge->y = pa->hair_index + k;
         }
 
         /* roots and disabled hairs should be 1.0, the rest can be anything from 0.0 to 1.0 */

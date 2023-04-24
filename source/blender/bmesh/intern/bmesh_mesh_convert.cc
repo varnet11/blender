@@ -118,6 +118,7 @@ bool BM_attribute_stored_in_bmesh_builtin(const StringRef name)
 {
   return ELEM(name,
               "position",
+              ".edge_verts",
               ".corner_vert",
               ".corner_edge",
               ".hide_vert",
@@ -268,10 +269,10 @@ void BM_mesh_bm_from_me(BMesh *bm, const Mesh *me, const struct BMeshFromMeshPar
   if (me->totvert == 0) {
     if (is_new) {
       /* No verts? still copy custom-data layout. */
-      CustomData_copy(&mesh_vdata, &bm->vdata, mask.vmask, CD_CONSTRUCT, 0);
-      CustomData_copy(&mesh_edata, &bm->edata, mask.emask, CD_CONSTRUCT, 0);
-      CustomData_copy(&mesh_pdata, &bm->pdata, mask.pmask, CD_CONSTRUCT, 0);
-      CustomData_copy(&mesh_ldata, &bm->ldata, mask.lmask, CD_CONSTRUCT, 0);
+      CustomData_copy_layout(&mesh_vdata, &bm->vdata, mask.vmask, CD_CONSTRUCT, 0);
+      CustomData_copy_layout(&mesh_edata, &bm->edata, mask.emask, CD_CONSTRUCT, 0);
+      CustomData_copy_layout(&mesh_pdata, &bm->pdata, mask.pmask, CD_CONSTRUCT, 0);
+      CustomData_copy_layout(&mesh_ldata, &bm->ldata, mask.lmask, CD_CONSTRUCT, 0);
 
       CustomData_bmesh_init_pool(&bm->vdata, me->totvert, BM_VERT);
       CustomData_bmesh_init_pool(&bm->edata, me->totedge, BM_EDGE);
@@ -287,16 +288,20 @@ void BM_mesh_bm_from_me(BMesh *bm, const Mesh *me, const struct BMeshFromMeshPar
   }
 
   if (is_new) {
-    CustomData_copy(&mesh_vdata, &bm->vdata, mask.vmask, CD_SET_DEFAULT, 0);
-    CustomData_copy(&mesh_edata, &bm->edata, mask.emask, CD_SET_DEFAULT, 0);
-    CustomData_copy(&mesh_pdata, &bm->pdata, mask.pmask, CD_SET_DEFAULT, 0);
-    CustomData_copy(&mesh_ldata, &bm->ldata, mask.lmask, CD_SET_DEFAULT, 0);
+    CustomData_copy_layout(&mesh_vdata, &bm->vdata, mask.vmask, CD_SET_DEFAULT, 0);
+    CustomData_copy_layout(&mesh_edata, &bm->edata, mask.emask, CD_SET_DEFAULT, 0);
+    CustomData_copy_layout(&mesh_pdata, &bm->pdata, mask.pmask, CD_SET_DEFAULT, 0);
+    CustomData_copy_layout(&mesh_ldata, &bm->ldata, mask.lmask, CD_SET_DEFAULT, 0);
   }
   else {
-    CustomData_bmesh_merge(&mesh_vdata, &bm->vdata, mask.vmask, CD_SET_DEFAULT, bm, BM_VERT);
-    CustomData_bmesh_merge(&mesh_edata, &bm->edata, mask.emask, CD_SET_DEFAULT, bm, BM_EDGE);
-    CustomData_bmesh_merge(&mesh_pdata, &bm->pdata, mask.pmask, CD_SET_DEFAULT, bm, BM_FACE);
-    CustomData_bmesh_merge(&mesh_ldata, &bm->ldata, mask.lmask, CD_SET_DEFAULT, bm, BM_LOOP);
+    CustomData_bmesh_merge_layout(
+        &mesh_vdata, &bm->vdata, mask.vmask, CD_SET_DEFAULT, bm, BM_VERT);
+    CustomData_bmesh_merge_layout(
+        &mesh_edata, &bm->edata, mask.emask, CD_SET_DEFAULT, bm, BM_EDGE);
+    CustomData_bmesh_merge_layout(
+        &mesh_pdata, &bm->pdata, mask.pmask, CD_SET_DEFAULT, bm, BM_FACE);
+    CustomData_bmesh_merge_layout(
+        &mesh_ldata, &bm->ldata, mask.lmask, CD_SET_DEFAULT, bm, BM_LOOP);
   }
 
   /* -------------------------------------------------------------------- */
@@ -460,11 +465,11 @@ void BM_mesh_bm_from_me(BMesh *bm, const Mesh *me, const struct BMeshFromMeshPar
     bm->elem_index_dirty &= ~BM_VERT; /* Added in order, clear dirty flag. */
   }
 
-  const Span<MEdge> edges = me->edges();
+  const Span<blender::int2> edges = me->edges();
   Array<BMEdge *> etable(me->totedge);
   for (const int i : edges.index_range()) {
     BMEdge *e = etable[i] = BM_edge_create(
-        bm, vtable[edges[i].v1], vtable[edges[i].v2], nullptr, BM_CREATE_SKIP_CD);
+        bm, vtable[edges[i][0]], vtable[edges[i][1]], nullptr, BM_CREATE_SKIP_CD);
     BM_elem_index_set(e, i); /* set_ok */
 
     e->head.hflag = 0;
@@ -487,7 +492,7 @@ void BM_mesh_bm_from_me(BMesh *bm, const Mesh *me, const struct BMeshFromMeshPar
     bm->elem_index_dirty &= ~BM_EDGE; /* Added in order, clear dirty flag. */
   }
 
-  const Span<MPoly> polys = me->polys();
+  const blender::OffsetIndices polys = me->polys();
   const Span<int> corner_verts = me->corner_verts();
   const Span<int> corner_edges = me->corner_edges();
 
@@ -500,11 +505,9 @@ void BM_mesh_bm_from_me(BMesh *bm, const Mesh *me, const struct BMeshFromMeshPar
 
   int totloops = 0;
   for (const int i : polys.index_range()) {
-    BMFace *f = bm_face_create_from_mpoly(*bm,
-                                          corner_verts.slice(polys[i].loopstart, polys[i].totloop),
-                                          corner_edges.slice(polys[i].loopstart, polys[i].totloop),
-                                          vtable,
-                                          etable);
+    const IndexRange poly = polys[i];
+    BMFace *f = bm_face_create_from_mpoly(
+        *bm, corner_verts.slice(poly), corner_edges.slice(poly), vtable, etable);
     if (!ftable.is_empty()) {
       ftable[i] = f;
     }
@@ -538,7 +541,7 @@ void BM_mesh_bm_from_me(BMesh *bm, const Mesh *me, const struct BMeshFromMeshPar
       bm->act_face = f;
     }
 
-    int j = polys[i].loopstart;
+    int j = poly.start();
     BMLoop *l_first = BM_FACE_FIRST_LOOP(f);
     BMLoop *l_iter = l_first;
     do {
@@ -1286,15 +1289,14 @@ static void bm_to_mesh_edges(const BMesh &bm,
                              MutableSpan<bool> sharp_edge,
                              MutableSpan<bool> uv_seams)
 {
-  CustomData_add_layer(&mesh.edata, CD_MEDGE, CD_SET_DEFAULT, mesh.totedge);
+  CustomData_add_layer_named(
+      &mesh.edata, CD_PROP_INT32_2D, CD_CONSTRUCT, mesh.totedge, ".edge_verts");
   const Vector<BMeshToMeshLayerInfo> info = bm_to_mesh_copy_info_calc(bm.edata, mesh.edata);
-  MutableSpan<MEdge> dst_edges = mesh.edges_for_write();
+  MutableSpan<int2> dst_edges = mesh.edges_for_write();
   threading::parallel_for(dst_edges.index_range(), 512, [&](const IndexRange range) {
     for (const int edge_i : range) {
       const BMEdge &src_edge = *bm_edges[edge_i];
-      MEdge &dst_edge = dst_edges[edge_i];
-      dst_edge.v1 = BM_elem_index_get(src_edge.v1);
-      dst_edge.v2 = BM_elem_index_get(src_edge.v2);
+      dst_edges[edge_i] = int2(BM_elem_index_get(src_edge.v1), BM_elem_index_get(src_edge.v2));
       bmesh_block_copy_to_mesh_attributes(info, edge_i, src_edge.head.data);
     }
     if (!select_edge.is_empty()) {
@@ -1328,15 +1330,13 @@ static void bm_to_mesh_faces(const BMesh &bm,
                              MutableSpan<bool> sharp_faces,
                              MutableSpan<int> material_indices)
 {
-  CustomData_add_layer(&mesh.pdata, CD_MPOLY, CD_CONSTRUCT, mesh.totpoly);
+  BKE_mesh_poly_offsets_ensure_alloc(&mesh);
   const Vector<BMeshToMeshLayerInfo> info = bm_to_mesh_copy_info_calc(bm.pdata, mesh.pdata);
-  MutableSpan<MPoly> dst_polys = mesh.polys_for_write();
-  threading::parallel_for(dst_polys.index_range(), 1024, [&](const IndexRange range) {
+  MutableSpan<int> dst_poly_offsets = mesh.poly_offsets_for_write();
+  threading::parallel_for(bm_faces.index_range(), 1024, [&](const IndexRange range) {
     for (const int face_i : range) {
       const BMFace &src_face = *bm_faces[face_i];
-      MPoly &dst_poly = dst_polys[face_i];
-      dst_poly.totloop = src_face.len;
-      dst_poly.loopstart = BM_elem_index_get(BM_FACE_FIRST_LOOP(&src_face));
+      dst_poly_offsets[face_i] = BM_elem_index_get(BM_FACE_FIRST_LOOP(&src_face));
       bmesh_block_copy_to_mesh_attributes(info, face_i, src_face.head.data);
     }
     if (!select_poly.is_empty()) {
@@ -1386,12 +1386,7 @@ void BM_mesh_bm_to_me(Main *bmain, BMesh *bm, Mesh *me, const struct BMeshToMesh
   using namespace blender;
   const int old_verts_num = me->totvert;
 
-  CustomData_free(&me->vdata, me->totvert);
-  CustomData_free(&me->edata, me->totedge);
-  CustomData_free(&me->fdata, me->totface);
-  CustomData_free(&me->ldata, me->totloop);
-  CustomData_free(&me->pdata, me->totpoly);
-  BKE_mesh_runtime_clear_geometry(me);
+  BKE_mesh_clear_geometry(me);
 
   me->totvert = bm->totvert;
   me->totedge = bm->totedge;
@@ -1403,10 +1398,10 @@ void BM_mesh_bm_to_me(Main *bmain, BMesh *bm, Mesh *me, const struct BMeshToMesh
   {
     CustomData_MeshMasks mask = CD_MASK_MESH;
     CustomData_MeshMasks_update(&mask, &params->cd_mask_extra);
-    CustomData_copy(&bm->vdata, &me->vdata, mask.vmask, CD_SET_DEFAULT, me->totvert);
-    CustomData_copy(&bm->edata, &me->edata, mask.emask, CD_SET_DEFAULT, me->totedge);
-    CustomData_copy(&bm->ldata, &me->ldata, mask.lmask, CD_SET_DEFAULT, me->totloop);
-    CustomData_copy(&bm->pdata, &me->pdata, mask.pmask, CD_SET_DEFAULT, me->totpoly);
+    CustomData_copy_layout(&bm->vdata, &me->vdata, mask.vmask, CD_SET_DEFAULT, me->totvert);
+    CustomData_copy_layout(&bm->edata, &me->edata, mask.emask, CD_SET_DEFAULT, me->totedge);
+    CustomData_copy_layout(&bm->ldata, &me->ldata, mask.lmask, CD_SET_DEFAULT, me->totloop);
+    CustomData_copy_layout(&bm->pdata, &me->pdata, mask.pmask, CD_SET_DEFAULT, me->totpoly);
   }
 
   bool need_select_vert = false;
@@ -1593,10 +1588,11 @@ void BM_mesh_bm_to_me(Main *bmain, BMesh *bm, Mesh *me, const struct BMeshToMesh
   material_index.finish();
 }
 
-/* NOTE: The function is called from multiple threads with the same input BMesh and different
- * mesh objects. */
 void BM_mesh_bm_to_me_for_eval(BMesh *bm, Mesh *me, const CustomData_MeshMasks *cd_mask_extra)
 {
+  /* NOTE: The function is called from multiple threads with the same input BMesh and different
+   * mesh objects. */
+
   using namespace blender;
   /* Must be an empty mesh. */
   BLI_assert(me->totvert == 0);
@@ -1617,10 +1613,10 @@ void BM_mesh_bm_to_me_for_eval(BMesh *bm, Mesh *me, const CustomData_MeshMasks *
     CustomData_MeshMasks_update(&mask, cd_mask_extra);
   }
   mask.vmask &= ~CD_MASK_SHAPEKEY;
-  CustomData_merge(&bm->vdata, &me->vdata, mask.vmask, CD_CONSTRUCT, me->totvert);
-  CustomData_merge(&bm->edata, &me->edata, mask.emask, CD_CONSTRUCT, me->totedge);
-  CustomData_merge(&bm->ldata, &me->ldata, mask.lmask, CD_CONSTRUCT, me->totloop);
-  CustomData_merge(&bm->pdata, &me->pdata, mask.pmask, CD_CONSTRUCT, me->totpoly);
+  CustomData_merge_layout(&bm->vdata, &me->vdata, mask.vmask, CD_CONSTRUCT, me->totvert);
+  CustomData_merge_layout(&bm->edata, &me->edata, mask.emask, CD_CONSTRUCT, me->totedge);
+  CustomData_merge_layout(&bm->ldata, &me->ldata, mask.lmask, CD_CONSTRUCT, me->totloop);
+  CustomData_merge_layout(&bm->pdata, &me->pdata, mask.pmask, CD_CONSTRUCT, me->totpoly);
 
   me->runtime->deformed_only = true;
 

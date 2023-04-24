@@ -67,6 +67,7 @@
 #include "BKE_modifier.h"
 #include "BKE_node.h"
 #include "BKE_screen.h"
+#include "BKE_workspace.h"
 
 #include "RNA_access.h"
 #include "RNA_enum_types.h"
@@ -1036,7 +1037,7 @@ static void version_geometry_nodes_extrude_smooth_propagation(bNodeTree &ntree)
     nodeAddLink(&ntree,
                 capture_node,
                 nodeFindSocket(capture_node, SOCK_OUT, "Geometry"),
-                capture_node,
+                node,
                 geometry_in_socket);
     geometry_in_link->tonode = capture_node;
     geometry_in_link->tosock = nodeFindSocket(capture_node, SOCK_IN, "Geometry");
@@ -2219,6 +2220,78 @@ static void version_fix_image_format_copy(Main *bmain, ImageFormatData *format)
       BKE_curvemapping_free(format->view_settings.curve_mapping);
       format->view_settings.curve_mapping = nullptr;
       format->view_settings.flag &= ~COLORMANAGE_VIEW_USE_CURVES;
+    }
+  }
+}
+
+/**
+ * Some editors would manually manage visibility of regions, or lazy create them based on
+ * context. Ensure they are always there now, and use the new #ARegionType.poll().
+ */
+static void version_ensure_missing_regions(ScrArea *area, SpaceLink *sl)
+{
+  ListBase *regionbase = (sl == area->spacedata.first) ? &area->regionbase : &sl->regionbase;
+
+  switch (sl->spacetype) {
+    case SPACE_FILE: {
+      if (ARegion *ui_region = do_versions_add_region_if_not_found(
+              regionbase, RGN_TYPE_UI, "versioning: UI region for file", RGN_TYPE_TOOLS)) {
+        ui_region->alignment = RGN_ALIGN_TOP;
+        ui_region->flag |= RGN_FLAG_DYNAMIC_SIZE;
+      }
+
+      if (ARegion *exec_region = do_versions_add_region_if_not_found(
+              regionbase, RGN_TYPE_EXECUTE, "versioning: execute region for file", RGN_TYPE_UI)) {
+        exec_region->alignment = RGN_ALIGN_BOTTOM;
+        exec_region->flag = RGN_FLAG_DYNAMIC_SIZE;
+      }
+
+      if (ARegion *tool_props_region = do_versions_add_region_if_not_found(
+              regionbase,
+              RGN_TYPE_TOOL_PROPS,
+              "versioning: tool props region for file",
+              RGN_TYPE_EXECUTE)) {
+        tool_props_region->alignment = RGN_ALIGN_RIGHT;
+        tool_props_region->flag = RGN_FLAG_HIDDEN;
+      }
+      break;
+    }
+    case SPACE_CLIP: {
+      ARegion *region;
+
+      region = do_versions_ensure_region(
+          regionbase, RGN_TYPE_UI, "versioning: properties region for clip", RGN_TYPE_HEADER);
+      region->alignment = RGN_ALIGN_RIGHT;
+      region->flag &= ~RGN_FLAG_HIDDEN;
+
+      region = do_versions_ensure_region(
+          regionbase, RGN_TYPE_CHANNELS, "versioning: channels region for clip", RGN_TYPE_UI);
+      region->alignment = RGN_ALIGN_LEFT;
+      region->flag &= ~RGN_FLAG_HIDDEN;
+      region->v2d.scroll = V2D_SCROLL_BOTTOM;
+      region->v2d.flag = V2D_VIEWSYNC_AREA_VERTICAL;
+
+      region = do_versions_ensure_region(
+          regionbase, RGN_TYPE_PREVIEW, "versioning: preview region for clip", RGN_TYPE_WINDOW);
+      region->flag &= ~RGN_FLAG_HIDDEN;
+
+      break;
+    }
+    case SPACE_SEQ: {
+      ARegion *region;
+
+      do_versions_ensure_region(regionbase,
+                                RGN_TYPE_CHANNELS,
+                                "versioning: channels region for sequencer",
+                                RGN_TYPE_TOOLS);
+
+      region = do_versions_ensure_region(regionbase,
+                                         RGN_TYPE_PREVIEW,
+                                         "versioning: preview region for sequencer",
+                                         RGN_TYPE_CHANNELS);
+      sequencer_init_preview_region(region);
+
+      break;
     }
   }
 }
@@ -4177,6 +4250,64 @@ void blo_do_versions_300(FileData *fd, Library * /*lib*/, Main *bmain)
         version_geometry_nodes_extrude_smooth_propagation(*ntree);
       }
     }
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 306, 5)) {
+    /* Some regions used to be added/removed dynamically. Ensure they are always there, there is a
+     * `ARegionType.poll()` now. */
+    LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
+      LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+        LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
+          version_ensure_missing_regions(area, sl);
+
+          /* Ensure expected region state. Previously this was modified to hide/unhide regions. */
+
+          const ListBase *regionbase = (sl == area->spacedata.first) ? &area->regionbase :
+                                                                       &sl->regionbase;
+          if (sl->spacetype == SPACE_SEQ) {
+            ARegion *region_main = BKE_region_find_in_listbase_by_type(regionbase,
+                                                                       RGN_TYPE_WINDOW);
+            region_main->flag &= ~RGN_FLAG_HIDDEN;
+            region_main->alignment = RGN_ALIGN_NONE;
+
+            ARegion *region_preview = BKE_region_find_in_listbase_by_type(regionbase,
+                                                                          RGN_TYPE_PREVIEW);
+            region_preview->flag &= ~RGN_FLAG_HIDDEN;
+            region_preview->alignment = RGN_ALIGN_NONE;
+
+            ARegion *region_channels = BKE_region_find_in_listbase_by_type(regionbase,
+                                                                           RGN_TYPE_CHANNELS);
+            region_channels->alignment = RGN_ALIGN_LEFT;
+          }
+        }
+      }
+
+      /* Replace old hard coded names with brush names, see: #106057. */
+      const char *tool_replace_table[][2] = {
+          {"selection_paint", "Paint Selection"},
+          {"add", "Add"},
+          {"delete", "Delete"},
+          {"density", "Density"},
+          {"comb", "Comb"},
+          {"snake_hook", "Snake Hook"},
+          {"grow_shrink", "Grow / Shrink"},
+          {"pinch", "Pinch"},
+          {"puff", "Puff"},
+          {"smooth", "Comb"},
+          {"slide", "Slide"},
+      };
+      LISTBASE_FOREACH (WorkSpace *, workspace, &bmain->workspaces) {
+        BKE_workspace_tool_id_replace_table(workspace,
+                                            SPACE_VIEW3D,
+                                            CTX_MODE_SCULPT_CURVES,
+                                            "builtin_brush.",
+                                            tool_replace_table,
+                                            ARRAY_SIZE(tool_replace_table));
+      }
+    }
+
+    /* Rename Grease Pencil weight draw brush. */
+    do_versions_rename_id(bmain, ID_BR, "Draw Weight", "Weight Draw");
   }
 
   /**

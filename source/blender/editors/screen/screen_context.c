@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright 2008 Blender Foundation. All rights reserved. */
+ * Copyright 2008 Blender Foundation */
 
 /** \file
  * \ingroup edscr
@@ -41,7 +41,7 @@
 #include "ED_anim_api.h"
 #include "ED_armature.h"
 #include "ED_clip.h"
-#include "ED_gpencil.h"
+#include "ED_gpencil_legacy.h"
 
 #include "SEQ_channels.h"
 #include "SEQ_select.h"

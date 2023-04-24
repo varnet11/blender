@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright 2005 Blender Foundation. All rights reserved. */
+ * Copyright 2005 Blender Foundation */
 
 /** \file
  * \ingroup bke
@@ -189,16 +189,16 @@ void BKE_crazyspace_set_quats_mesh(Mesh *me,
 
   /* first store two sets of tangent vectors in vertices, we derive it just from the face-edges */
   const Span<float3> positions = me->vert_positions();
-  const Span<MPoly> polys = me->polys();
+  const OffsetIndices polys = me->polys();
   const Span<int> corner_verts = me->corner_verts();
 
   for (int i = 0; i < me->totpoly; i++) {
-    const MPoly &poly = polys[i];
-    const int *corner_vert_next = &corner_verts[poly.loopstart];
-    const int *corner_vert_curr = &corner_vert_next[poly.totloop - 1];
-    const int *corner_vert_prev = &corner_vert_next[poly.totloop - 2];
+    const IndexRange poly = polys[i];
+    const int *corner_vert_next = &corner_verts[poly.start()];
+    const int *corner_vert_curr = &corner_vert_next[poly.size() - 1];
+    const int *corner_vert_prev = &corner_vert_next[poly.size() - 2];
 
-    for (int j = 0; j < poly.totloop; j++) {
+    for (int j = 0; j < poly.size(); j++) {
       if (!BLI_BITMAP_TEST(vert_tag, *corner_vert_curr)) {
         const float *co_prev, *co_curr, *co_next; /* orig */
         const float *vd_prev, *vd_curr, *vd_next; /* deform */
@@ -389,7 +389,7 @@ int BKE_sculpt_get_first_deform_matrices(struct Depsgraph *depsgraph,
       if (defmats == nullptr) {
         /* NOTE: Evaluated object is re-set to its original un-deformed state. */
         Mesh *me = static_cast<Mesh *>(object_eval.data);
-        me_eval = BKE_mesh_copy_for_eval(me, true);
+        me_eval = BKE_mesh_copy_for_eval(me);
         crazyspace_init_verts_and_matrices(me_eval, &defmats, &deformedVerts);
       }
 
@@ -470,7 +470,7 @@ void BKE_crazyspace_build_sculpt(struct Depsgraph *depsgraph,
         }
 
         if (mesh_eval == nullptr) {
-          mesh_eval = BKE_mesh_copy_for_eval(mesh, true);
+          mesh_eval = BKE_mesh_copy_for_eval(mesh);
         }
 
         mti->deformVerts(md, &mectx, mesh_eval, deformedVerts, mesh_eval->totvert);

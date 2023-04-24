@@ -27,7 +27,9 @@ NODE_STORAGE_FUNCS(NodeGeometryVolumeToMesh)
 
 static void node_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Geometry>(N_("Volume")).supported_type(GEO_COMPONENT_TYPE_VOLUME);
+  b.add_input<decl::Geometry>(CTX_N_(BLT_I18NCONTEXT_ID_ID, "Volume"))
+      .translation_context(BLT_I18NCONTEXT_ID_ID)
+      .supported_type(GEO_COMPONENT_TYPE_VOLUME);
   b.add_input<decl::Float>(N_("Voxel Size"))
       .default_value(0.3f)
       .min(0.01f)
@@ -121,10 +123,10 @@ static Mesh *create_mesh_from_volume_grids(Span<openvdb::GridBase::ConstPtr> gri
     loop_offset += (3 * data.tris.size() + 4 * data.quads.size());
   }
 
-  Mesh *mesh = BKE_mesh_new_nomain(vert_offset, 0, loop_offset, poly_offset);
+  Mesh *mesh = BKE_mesh_new_nomain(vert_offset, 0, poly_offset, loop_offset);
   BKE_id_material_eval_ensure_default_slot(&mesh->id);
   MutableSpan<float3> positions = mesh->vert_positions_for_write();
-  MutableSpan<MPoly> polys = mesh->polys_for_write();
+  MutableSpan<int> dst_poly_offsets = mesh->poly_offsets_for_write();
   MutableSpan<int> corner_verts = mesh->corner_verts_for_write();
 
   for (const int i : grids.index_range()) {
@@ -136,7 +138,7 @@ static Mesh *create_mesh_from_volume_grids(Span<openvdb::GridBase::ConstPtr> gri
                                      poly_offsets[i],
                                      loop_offsets[i],
                                      positions,
-                                     polys,
+                                     dst_poly_offsets,
                                      corner_verts);
   }
 

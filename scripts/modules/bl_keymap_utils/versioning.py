@@ -24,7 +24,7 @@ def keyconfig_update(keyconfig_data, keyconfig_version):
         for _km_name, _km_parms, km_items_data in keyconfig_data:
             for (_item_op, item_event, _item_prop) in km_items_data["items"]:
                 if item_event.get("value") == 'PRESS':
-                    # Unfortunately we don't know the 'map_type' at this point.
+                    # Unfortunately we don't know the `map_type` at this point.
                     # Setting repeat true on other kinds of events is harmless.
                     item_event["repeat"] = True
 
@@ -76,6 +76,8 @@ def keyconfig_update(keyconfig_data, keyconfig_version):
                     elif item_modal == 'ROTATE':
                         km_items.append(('TRACKBALL', item_event, None))
 
+                # The modal key for "Rotate Normals" also didn't exist until then.
+                km_items.append(('ROTATE_NORMALS', {"type": 'N', "value": 'PRESS'}, None))
                 break
 
     return keyconfig_data

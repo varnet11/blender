@@ -1,9 +1,9 @@
 
 msgid ""
 msgstr ""
-"Project-Id-Version: Blender 3.5.0 Beta (b'3962d9b931f1')\n"
+"Project-Id-Version: Blender 3.6.0 Alpha (b'dfa42c614fb4')\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-03-20 13:37:56\n"
+"POT-Creation-Date: 2023-04-17 09:43:08\n"
 "PO-Revision-Date: 2012-09-07 22:32+0100\n"
 "Last-Translator: Nikola Radovanovic <cobisimo@gmail.com>\n"
 "Language-Team: Nikola Radovanovic\n"
@@ -765,10 +765,6 @@ msgstr "Putanja do .blend datoteke"
 
 msgid "Vector Fonts"
 msgstr "Fontovi"
-
-
-msgid "Grease Pencil"
-msgstr "Skiciranje"
 
 
 msgid "Images"
@@ -4285,6 +4281,10 @@ msgid "Fonts"
 msgstr "Fontovi"
 
 
+msgid "Grease Pencil"
+msgstr "Skiciranje"
+
+
 msgid "File Select Parameters"
 msgstr "Parametri izbora datoteka"
 
@@ -7730,6 +7730,10 @@ msgid "Active Movie Clip"
 msgstr "Aktivni filmski isečak"
 
 
+msgid "Mirror Object"
+msgstr "Objekat kao ogledalo"
+
+
 msgid "Inverse"
 msgstr "Obrnuto"
 
@@ -7990,10 +7994,6 @@ msgstr "Indeks tekuće linije"
 
 msgid "Memory"
 msgstr "Memorija"
-
-
-msgid "Modified"
-msgstr "Izmenjen"
 
 
 msgid "Lines of text"
@@ -10243,10 +10243,6 @@ msgid "Time Mode"
 msgstr "Mod vremena"
 
 
-msgid "Mirror Object"
-msgstr "Objekat kao ogledalo"
-
-
 msgid "Object to use as mirror"
 msgstr "Objekat koji se koristi kao ogledalo"
 
@@ -11202,10 +11198,6 @@ msgid "Width of the box"
 msgstr "Širina kutije"
 
 
-msgid "Bright/Contrast"
-msgstr "Svetlina/kontrast"
-
-
 msgid "Channel Key"
 msgstr "Ključ kanala"
 
@@ -11496,10 +11488,6 @@ msgstr "Okretanje 45"
 
 msgid "Hue Correct"
 msgstr "Korekcija tona"
-
-
-msgid "Hue Saturation Value"
-msgstr "Vredsnot tona i zasićenosti"
 
 
 msgid "Inpaint"
@@ -12078,14 +12066,6 @@ msgid "UV coordinates to be used for mapping"
 msgstr "UV koordinate za mapiranje"
 
 
-msgid "Modulo"
-msgstr "Modul"
-
-
-msgid "Wrap"
-msgstr "Prelom teksta"
-
-
 msgid "Z Axis"
 msgstr "Z osa"
 
@@ -12475,6 +12455,10 @@ msgstr "Promeni kadar"
 
 msgid "Interactively change the current frame number"
 msgstr "Interaktivno menja broj tekućeg kadra"
+
+
+msgid "Include Handles"
+msgstr "Uključi ručke"
 
 
 msgctxt "Operator"
@@ -13171,10 +13155,6 @@ msgid "Copy Tracks"
 msgstr "Spoji staze"
 
 
-msgid "Copy selected tracks to clipboard"
-msgstr "Ubacuje izabrani tekst među isečke"
-
-
 msgctxt "Operator"
 msgid "Set 2D Cursor"
 msgstr "3D kursor"
@@ -13353,10 +13333,6 @@ msgstr "Datoteke"
 msgctxt "Operator"
 msgid "Paste Tracks"
 msgstr "Ostavi staze"
-
-
-msgid "Paste tracks from clipboard"
-msgstr "Ubaci objekte iz spiska isečaka"
 
 
 msgctxt "Operator"
@@ -13721,6 +13697,10 @@ msgstr "Ubaci iz ostave"
 
 msgid "Paste text from clipboard"
 msgstr "Ubaci tekst iz ostave"
+
+
+msgid "Selection"
+msgstr "Izbor"
 
 
 msgctxt "Operator"
@@ -14655,10 +14635,6 @@ msgid "Change Spacing"
 msgstr "Promeni razmak"
 
 
-msgid "Selection"
-msgstr "Izbor"
-
-
 msgctxt "Operator"
 msgid "Line Break"
 msgstr "Prelom redova"
@@ -15126,8 +15102,8 @@ msgid "Only Active"
 msgstr "Samo aktivne"
 
 
-msgid "Include Handles"
-msgstr "Uključi ručke"
+msgid "Sigma"
+msgstr "Sigma"
 
 
 msgctxt "Operator"
@@ -15564,10 +15540,6 @@ msgstr "Postavlja mapiranje teksture u modu slikanja"
 
 msgid "Set the mask's parenting"
 msgstr "Postavlja mapiranje teksture u modu slikanja"
-
-
-msgid "Paste splines from clipboard"
-msgstr "Ubaci krive iz ostave"
 
 
 msgctxt "Operator"
@@ -16711,10 +16683,6 @@ msgid "Zoom in/out the background image"
 msgstr "Spisak pozadinskih slika"
 
 
-msgid "Copies selected nodes to the clipboard"
-msgstr "Ubacuje izabrani tekst u ostavu"
-
-
 msgctxt "Operator"
 msgid "Detach Nodes"
 msgstr "Odvoji čvorove"
@@ -17682,15 +17650,6 @@ msgid "Make a copy of the active vertex group"
 msgstr "Postavlja aktivnu grupu temena"
 
 
-msgctxt "Operator"
-msgid "Fix Vertex Group Deform"
-msgstr "Ispravi deformaciju grupe temena"
-
-
-msgid "Change Sensitivity"
-msgstr "Promeni osetljivost"
-
-
 msgid "Add Weights"
 msgstr "Dodaj težine"
 
@@ -18188,10 +18147,6 @@ msgstr "Kopiraj ograničenja na druge izabrane kosti"
 msgctxt "Operator"
 msgid "Copy Pose"
 msgstr "Kopiraj pozu"
-
-
-msgid "Copies the current pose of the selected bones to copy/paste buffer"
-msgstr "Kopiraj tekuću pozu izabranih kostiju u bafer kopiranja"
 
 
 msgctxt "Operator"
@@ -19957,6 +19912,10 @@ msgid "PNG Image (.png)"
 msgstr "PNG slika (.png)"
 
 
+msgid "Modified"
+msgstr "Izmenjen"
+
+
 msgid "Fill Opacity"
 msgstr "Providnost ispune"
 
@@ -19967,10 +19926,6 @@ msgstr "Režim dužine ivica"
 
 msgid "Length Average"
 msgstr "Prosečno"
-
-
-msgid "New Image"
-msgstr "Slika:"
 
 
 msgid "Pack Quality"
@@ -20429,10 +20384,6 @@ msgid "Save a Collada file"
 msgstr "Sačuvaj kao Collada datoteku"
 
 
-msgid "Apply modifiers to exported mesh (non destructive))"
-msgstr "Primeni modifikatore pi izvozu meša (bez gubitka kvaliteta)"
-
-
 msgid "Only export deforming bones with armatures"
 msgstr "Izvozi samo kosti deformacije sa kosturom"
 
@@ -20488,6 +20439,10 @@ msgstr "Atributi:"
 
 msgid "Cycle backwards"
 msgstr "Unazad"
+
+
+msgid "Wrap"
+msgstr "Prelom teksta"
 
 
 msgid "Header Text"
@@ -20955,10 +20910,6 @@ msgid "Tracking Settings"
 msgstr "Podešavanje praćenja"
 
 
-msgid "Lens"
-msgstr "Sočiva"
-
-
 msgid "Predefined tracking settings"
 msgstr "Predefinisana podešavanja praćenja"
 
@@ -21207,11 +21158,6 @@ msgstr "Krug"
 msgctxt "Operator"
 msgid "Thickness"
 msgstr "Debljina"
-
-
-msgctxt "Operator"
-msgid "Slide"
-msgstr "Klizaj"
 
 
 msgid "Pose Options"
@@ -22486,10 +22432,6 @@ msgid "Bias"
 msgstr "Pristrasnost"
 
 
-msgid "Bias towards faces further away from the object (in blender units)"
-msgstr "Pristrasnost prema licima udaljenim od objekta (u blenderovim jedinicama)"
-
-
 msgid "Number of samples used for ambient occlusion baking from multires"
 msgstr "Broj uzoraka korišćenih za pečenje ambijentalnog senčenja za višerezolucijone objekte"
 
@@ -23072,10 +23014,6 @@ msgstr "Video sekvenca"
 
 msgid "Scene Sequence"
 msgstr "Sekvenca scene"
-
-
-msgid "Override the scenes active camera"
-msgstr "Veličina teksta"
 
 
 msgid "Sound Sequence"
@@ -23714,6 +23652,10 @@ msgstr "Traži ponovo"
 
 msgid "3D View Space"
 msgstr "3D pogled"
+
+
+msgid "Lens"
+msgstr "Sočiva"
 
 
 msgid "Lock Camera to View"
@@ -25334,10 +25276,6 @@ msgid "Invert"
 msgstr "Obrnuto"
 
 
-msgid "Old"
-msgstr "Staro"
-
-
 msgid "Date"
 msgstr "Datum"
 
@@ -25585,6 +25523,11 @@ msgstr "Nastavi"
 
 
 msgctxt "Operator"
+msgid "Slide"
+msgstr "Klizaj"
+
+
+msgctxt "Operator"
 msgid "Back"
 msgstr "Od pozadi"
 
@@ -25728,6 +25671,11 @@ msgid "Make and Replace Links"
 msgstr "Stvori i zameni veze"
 
 
+msgctxt "Operator"
+msgid "Online Manual"
+msgstr "Uputstvo na internetu"
+
+
 msgid "Slot %d"
 msgstr "Slot %d"
 
@@ -25867,16 +25815,16 @@ msgid "One Object Per Line"
 msgstr "Jedan objekat po liniji"
 
 
-msgid "File: %s"
-msgstr "Datoteka: %s"
-
-
 msgid "Text: External"
 msgstr "Tekst: spoljašnji"
 
 
 msgid "Text: Internal"
 msgstr "Tekst: unutrašnji"
+
+
+msgid "File: %s"
+msgstr "Datoteka: %s"
 
 
 msgctxt "Operator"
@@ -26765,11 +26713,6 @@ msgstr "Vrati jedan na početnu vrednost"
 msgctxt "Operator"
 msgid "Remove Shortcut"
 msgstr "Ukloni prečicu"
-
-
-msgctxt "Operator"
-msgid "Online Manual"
-msgstr "Uputstvo na internetu"
 
 
 msgctxt "Operator"
@@ -27922,6 +27865,10 @@ msgid "Val"
 msgstr "Vr."
 
 
+msgid "Old"
+msgstr "Staro"
+
+
 msgid "Edge Crease"
 msgstr "Nabor ivice"
 
@@ -27948,10 +27895,6 @@ msgstr "Hrapavost V"
 
 msgid "Subsurface"
 msgstr "Izdeljena površ"
-
-
-msgid "Sigma"
-msgstr "Sigma"
 
 
 msgid "View Vector"
@@ -28124,11 +28067,6 @@ msgid "Curves"
 msgstr "Krive"
 
 
-msgctxt "Sequence"
-msgid "Bright/Contrast"
-msgstr "Svetlina/kontrast"
-
-
 msgid "Strips must be the same length"
 msgstr "Trake moraju biti iste dužine"
 
@@ -28151,22 +28089,6 @@ msgstr "Blender-ov pregled datoteka"
 
 msgid "unable to open the file"
 msgstr "Ne mogu da otvorim datoteku"
-
-
-msgid "Cannot read file '%s': %s"
-msgstr "Ne mogu da pročitam datoteku '%s': %s"
-
-
-msgid "File format is not supported in file '%s'"
-msgstr "Format nije podržan u datoteci '%s'"
-
-
-msgid "File path '%s' invalid"
-msgstr "Putanja '%s' nije ispravna"
-
-
-msgid "Unknown error loading '%s'"
-msgstr "Nepoznata grešaka prilikom učitavanja: '%s'"
 
 
 msgid "Not a library"

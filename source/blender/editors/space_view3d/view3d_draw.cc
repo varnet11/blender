@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright 2008 Blender Foundation. All rights reserved. */
+ * Copyright 2008 Blender Foundation */
 
 /** \file
  * \ingroup spview3d
@@ -48,7 +48,7 @@
 #include "DRW_engine.h"
 #include "DRW_select_buffer.h"
 
-#include "ED_gpencil.h"
+#include "ED_gpencil_legacy.h"
 #include "ED_info.h"
 #include "ED_keyframing.h"
 #include "ED_screen.h"
@@ -841,7 +841,7 @@ float ED_scene_grid_scale(const Scene *scene, const char **r_grid_unit)
     if (usys) {
       int i = BKE_unit_base_get(usys);
       if (r_grid_unit) {
-        *r_grid_unit = BKE_unit_display_name_get(usys, i);
+        *r_grid_unit = IFACE_(BKE_unit_display_name_get(usys, i));
       }
       return float(BKE_unit_scalar_get(usys, i)) / scene->unit.scale_length;
     }
@@ -928,7 +928,7 @@ float ED_view3d_grid_view_scale(Scene *scene,
       BKE_unit_system_get(scene->unit.system, B_UNIT_LENGTH, &usys, &len);
 
       if (usys) {
-        *r_grid_unit = BKE_unit_display_name_get(usys, len - i - 1);
+        *r_grid_unit = IFACE_(BKE_unit_display_name_get(usys, len - i - 1));
       }
     }
   }
@@ -1886,7 +1886,12 @@ ImBuf *ED_view3d_draw_offscreen_imbuf(Depsgraph *depsgraph,
 
   if (own_ofs) {
     /* bind */
-    ofs = GPU_offscreen_create(sizex, sizey, true, GPU_RGBA8, err_out);
+    ofs = GPU_offscreen_create(sizex,
+                               sizey,
+                               true,
+                               GPU_RGBA8,
+                               GPU_TEXTURE_USAGE_SHADER_READ | GPU_TEXTURE_USAGE_HOST_READ,
+                               err_out);
     if (ofs == nullptr) {
       DRW_opengl_context_disable();
       return nullptr;
@@ -1971,10 +1976,10 @@ ImBuf *ED_view3d_draw_offscreen_imbuf(Depsgraph *depsgraph,
                            nullptr);
 
   if (ibuf->rect_float) {
-    GPU_offscreen_read_pixels(ofs, GPU_DATA_FLOAT, ibuf->rect_float);
+    GPU_offscreen_read_color(ofs, GPU_DATA_FLOAT, ibuf->rect_float);
   }
   else if (ibuf->rect) {
-    GPU_offscreen_read_pixels(ofs, GPU_DATA_UBYTE, ibuf->rect);
+    GPU_offscreen_read_color(ofs, GPU_DATA_UBYTE, ibuf->rect);
   }
 
   /* unbind */

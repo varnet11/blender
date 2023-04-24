@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright 2016 Blender Foundation. All rights reserved. */
+ * Copyright 2016 Blender Foundation */
 
 /** \file
  * \ingroup bke
@@ -399,7 +399,7 @@ bool BKE_cachefile_filepath_get(const Main *bmain,
     const int frame = (int)BKE_cachefile_time_offset(cache_file, (double)ctime, fps);
 
     char ext[32];
-    BLI_path_frame_strip(r_filepath, ext);
+    BLI_path_frame_strip(r_filepath, ext, sizeof(ext));
     BLI_path_frame(r_filepath, frame, frame_len);
     BLI_path_extension_ensure(r_filepath, FILE_MAX, ext);
 

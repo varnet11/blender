@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright 2013 Blender Foundation. All rights reserved. */
+ * Copyright 2013 Blender Foundation */
 
 /** \file
  * \ingroup depsgraph
@@ -481,9 +481,7 @@ Depsgraph *DepsgraphRelationBuilder::getGraph()
 
 /* **** Functions to build relations between entities  **** */
 
-void DepsgraphRelationBuilder::begin_build()
-{
-}
+void DepsgraphRelationBuilder::begin_build() {}
 
 void DepsgraphRelationBuilder::build_id(ID *id)
 {
@@ -1809,7 +1807,7 @@ void DepsgraphRelationBuilder::build_driver_variables(ID *id, FCurve *fcu)
         add_relation(target_key, driver_key, "Target -> Driver");
       }
       else if (dtar->rna_path != nullptr && dtar->rna_path[0] != '\0') {
-        RNAPathKey variable_exit_key(target_id, dtar->rna_path, RNAPointerSource::EXIT);
+        RNAPathKey variable_exit_key(target_prop, dtar->rna_path, RNAPointerSource::EXIT);
         if (RNA_pointer_is_null(&variable_exit_key.ptr)) {
           continue;
         }
@@ -1842,8 +1840,14 @@ void DepsgraphRelationBuilder::build_driver_variables(ID *id, FCurve *fcu)
          * - Modifications of evaluated IDs from a Python handler.
          *   Such modifications are not fully integrated in the dependency graph evaluation as it
          *   has issues with copy-on-write tagging and the fact that relations are defined by the
-         *   original main database status. */
-        if (target_id != variable_exit_key.ptr.owner_id) {
+         *   original main database status.
+         *
+         * The original report for this is #98618.
+         *
+         * The not-so-obvious part is that we don't do such relation for the context properties.
+         * They are resolved at the graph build time and do not change at runtime (#107081).
+         */
+        if (target_id != variable_exit_key.ptr.owner_id && dvar->type != DVAR_TYPE_CONTEXT_PROP) {
           if (deg_copy_on_write_is_needed(GS(target_id->name))) {
             ComponentKey target_id_key(target_id, NodeType::COPY_ON_WRITE);
             add_relation(target_id_key, driver_key, "Target ID -> Driver");
@@ -2056,6 +2060,9 @@ void DepsgraphRelationBuilder::build_rigidbody(Scene *scene)
                      object_transform_final_key,
                      "Rigidbody Sync -> Transform Final");
       }
+
+      /* Relations between colliders and force fields, needed for force field absorption. */
+      build_collision_relations(graph_, nullptr, eModifierType_Collision);
     }
     FOREACH_COLLECTION_OBJECT_RECURSIVE_END;
   }

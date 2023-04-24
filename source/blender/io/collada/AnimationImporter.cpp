@@ -1000,7 +1000,7 @@ void AnimationImporter::translate_Animations(
     ob = armature_importer->get_armature_for_joint(root);
   }
   else {
-    ob = object_map.find(uid) == object_map.end() ? NULL : object_map.find(uid)->second;
+    ob = object_map.find(uid) == object_map.end() ? nullptr : object_map.find(uid)->second;
   }
 
   if (!ob) {
@@ -1013,7 +1013,7 @@ void AnimationImporter::translate_Animations(
   Main *bmain = CTX_data_main(mContext);
 
   if ((animType->transform) != 0) {
-    /* const char *bone_name = is_joint ? bc_get_joint_name(node) : NULL; */ /* UNUSED */
+    // const char *bone_name = is_joint ? bc_get_joint_name(node) : nullptr; /* UNUSED */
     char joint_path[200];
 
     if (is_joint) {

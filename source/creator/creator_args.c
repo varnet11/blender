@@ -582,6 +582,9 @@ static int arg_handle_print_help(int UNUSED(argc), const char **UNUSED(argv), vo
   BLI_args_print_arg_doc(ba, "--debug-gpu");
   BLI_args_print_arg_doc(ba, "--debug-gpu-force-workarounds");
   BLI_args_print_arg_doc(ba, "--debug-gpu-disable-ssbo");
+#  ifdef WITH_RENDERDOC
+  BLI_args_print_arg_doc(ba, "--debug-gpu-renderdoc");
+#  endif
   BLI_args_print_arg_doc(ba, "--debug-wm");
 #  ifdef WITH_XR_OPENXR
   BLI_args_print_arg_doc(ba, "--debug-xr");
@@ -1117,6 +1120,19 @@ static int arg_handle_debug_gpu_set(int UNUSED(argc),
   G.debug |= G_DEBUG_GPU;
   return 0;
 }
+
+#  ifdef WITH_RENDERDOC
+static const char arg_handle_debug_gpu_renderdoc_set_doc[] =
+    "\n"
+    "\tEnable Renderdoc integration for GPU frame grabbing and debugging.";
+static int arg_handle_debug_gpu_renderdoc_set(int UNUSED(argc),
+                                              const char **UNUSED(argv),
+                                              void *UNUSED(data))
+{
+  G.debug |= G_DEBUG_GPU_RENDERDOC | G_DEBUG_GPU;
+  return 0;
+}
+#  endif
 
 static const char arg_handle_gpu_backend_set_doc[] =
     "\n"
@@ -2044,7 +2060,7 @@ static int arg_handle_load_file(int UNUSED(argc), const char **argv, void *data)
   BLI_strncpy(filepath, argv[0], sizeof(filepath));
   BLI_path_slash_native(filepath);
   BLI_path_abs_from_cwd(filepath, sizeof(filepath));
-  BLI_path_normalize(NULL, filepath);
+  BLI_path_normalize(filepath);
 
   /* load the file */
   BKE_reports_init(&reports, RPT_PRINT);
@@ -2140,8 +2156,8 @@ void main_args_setup(bContext *C, bArgs *ba)
   BLI_args_add(ba, NULL, "--log-show-timestamp", CB(arg_handle_log_show_timestamp_set), ba);
   BLI_args_add(ba, NULL, "--log-file", CB(arg_handle_log_file_set), ba);
 
-  /* GPU backend selection should be part of ARG_PASS_ENVIRONMENT for correct GPU context selection
-   * for anim player. */
+  /* GPU backend selection should be part of #ARG_PASS_ENVIRONMENT for correct GPU context
+   * selection for animation player. */
   BLI_args_add(ba, NULL, "--gpu-backend", CB(arg_handle_gpu_backend_set), NULL);
 
   /* Pass: Background Mode & Settings
@@ -2245,6 +2261,9 @@ void main_args_setup(bContext *C, bArgs *ba)
                CB_EX(arg_handle_debug_mode_generic_set, jobs),
                (void *)G_DEBUG_JOBS);
   BLI_args_add(ba, NULL, "--debug-gpu", CB(arg_handle_debug_gpu_set), NULL);
+#  ifdef WITH_RENDERDOC
+  BLI_args_add(ba, NULL, "--debug-gpu-renderdoc", CB(arg_handle_debug_gpu_renderdoc_set), NULL);
+#  endif
 
   BLI_args_add(ba,
                NULL,

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright 2021 Blender Foundation. All rights reserved. */
+ * Copyright 2021 Blender Foundation */
 
 /** \file
  * \ingroup draw
@@ -100,6 +100,7 @@ static uint gpu_component_size_for_attribute_type(eCustomDataType type)
        * comment #extract_attr_init. */
       return 3;
     case CD_PROP_FLOAT2:
+    case CD_PROP_INT32_2D:
       return 2;
     case CD_PROP_FLOAT3:
       return 3;
@@ -116,6 +117,7 @@ static GPUVertFetchMode get_fetch_mode_for_type(eCustomDataType type)
   switch (type) {
     case CD_PROP_INT8:
     case CD_PROP_INT32:
+    case CD_PROP_INT32_2D:
       return GPU_FETCH_INT_TO_FLOAT;
     case CD_PROP_BYTE_COLOR:
       return GPU_FETCH_INT_TO_FLOAT_UNIT;
@@ -128,6 +130,7 @@ static GPUVertCompType get_comp_type_for_type(eCustomDataType type)
 {
   switch (type) {
     case CD_PROP_INT8:
+    case CD_PROP_INT32_2D:
     case CD_PROP_INT32:
       return GPU_COMP_I32;
     case CD_PROP_BYTE_COLOR:
@@ -211,9 +214,9 @@ static void fill_vertbuf_with_attribute(const MeshRenderData *mr,
       break;
     case ATTR_DOMAIN_FACE:
       for (int poly_index = 0; poly_index < mr->poly_len; poly_index++) {
-        const MPoly &poly = mr->polys[poly_index];
+        const IndexRange poly = mr->polys[poly_index];
         const VBOType value = Converter::convert_value(attr_data[poly_index]);
-        for (int l = 0; l < poly.totloop; l++) {
+        for (int l = 0; l < poly.size(); l++) {
           *vbo_data++ = value;
         }
       }
@@ -298,6 +301,9 @@ static void extract_attr(const MeshRenderData *mr,
       break;
     case CD_PROP_INT32:
       extract_attr_generic<int32_t, int3>(mr, vbo, request);
+      break;
+    case CD_PROP_INT32_2D:
+      extract_attr_generic<int2>(mr, vbo, request);
       break;
     case CD_PROP_FLOAT:
       extract_attr_generic<float, float3>(mr, vbo, request);
@@ -432,9 +438,9 @@ static void extract_mesh_attr_viewer_init(const MeshRenderData *mr,
 
   const StringRefNull attr_name = ".viewer";
   const bke::AttributeAccessor attributes = mr->me->attributes();
-  attributes
-      .lookup_or_default<ColorGeometry4f>(attr_name, ATTR_DOMAIN_CORNER, {1.0f, 0.0f, 1.0f, 1.0f})
-      .materialize(attr);
+  const bke::AttributeReader attribute = attributes.lookup_or_default<ColorGeometry4f>(
+      attr_name, ATTR_DOMAIN_CORNER, {1.0f, 0.0f, 1.0f, 1.0f});
+  attribute.varray.materialize(attr);
 }
 
 constexpr MeshExtract create_extractor_attr_viewer()

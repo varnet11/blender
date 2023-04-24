@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright 2008 Blender Foundation. All rights reserved. */
+ * Copyright 2008 Blender Foundation */
 
 /** \file
  * \ingroup spview3d
@@ -71,7 +71,7 @@
 #include "ED_armature.h"
 #include "ED_curve.h"
 #include "ED_curves.h"
-#include "ED_gpencil.h"
+#include "ED_gpencil_legacy.h"
 #include "ED_lattice.h"
 #include "ED_mball.h"
 #include "ED_mesh.h"
@@ -349,7 +349,7 @@ static bool edbm_backbuf_check_and_select_verts_obmode(Mesh *me,
   bke::MutableAttributeAccessor attributes = me->attributes_for_write();
   bke::SpanAttributeWriter<bool> select_vert = attributes.lookup_or_add_for_write_span<bool>(
       ".select_vert", ATTR_DOMAIN_POINT);
-  const VArray<bool> hide_vert = attributes.lookup_or_default<bool>(
+  const VArray<bool> hide_vert = *attributes.lookup_or_default<bool>(
       ".hide_vert", ATTR_DOMAIN_POINT, false);
 
   for (int index = 0; index < me->totvert; index++) {
@@ -380,7 +380,7 @@ static bool edbm_backbuf_check_and_select_faces_obmode(Mesh *me,
   bke::MutableAttributeAccessor attributes = me->attributes_for_write();
   bke::SpanAttributeWriter<bool> select_poly = attributes.lookup_or_add_for_write_span<bool>(
       ".select_poly", ATTR_DOMAIN_FACE);
-  const VArray<bool> hide_poly = attributes.lookup_or_default<bool>(
+  const VArray<bool> hide_poly = *attributes.lookup_or_default<bool>(
       ".hide_poly", ATTR_DOMAIN_FACE, false);
 
   for (int index = 0; index < me->totpoly; index++) {
@@ -3088,12 +3088,13 @@ static int view3d_select_exec(bContext *C, wmOperator *op)
   Object *obedit = CTX_data_edit_object(C);
   Object *obact = CTX_data_active_object(C);
 
-  if (obact && obact->type == OB_GPENCIL_LEGACY && GPENCIL_ANY_MODE((bGPdata *)obact->data)) {
-    /* Prevent acting on Grease Pencil (when not in object mode), it implements its own selection
-     * operator in other modes. We might still fall trough to here (because that operator uses
-     * OPERATOR_PASS_THROUGH to make tweak work) but if we don't stop here code below assumes we
-     * are in object mode it might falsely toggle object selection. Alternatively, this could be
-     * put in the poll function instead. */
+  if (obact && obact->type == OB_GPENCIL_LEGACY && GPENCIL_ANY_MODE((bGPdata *)obact->data) &&
+      (BKE_object_pose_armature_get_with_wpaint_check(obact) == nullptr)) {
+    /* Prevent acting on Grease Pencil (when not in object mode -- or not in weight-paint + pose
+     * selection), it implements its own selection operator in other modes. We might still fall
+     * trough to here (because that operator uses OPERATOR_PASS_THROUGH to make tweak work) but if
+     * we don't stop here code below assumes we are in object mode it might falsely toggle object
+     * selection. Alternatively, this could be put in the poll function instead. */
     return OPERATOR_PASS_THROUGH | OPERATOR_CANCELLED;
   }
 
@@ -3480,7 +3481,7 @@ static void do_nurbs_box_select__doSelect(void *userData,
     }
   }
 }
-static bool do_nurbs_box_select(ViewContext *vc, rcti *rect, const eSelectOp sel_op)
+static bool do_nurbs_box_select(ViewContext *vc, const rcti *rect, const eSelectOp sel_op)
 {
   const bool deselect_all = (sel_op == SEL_OP_SET);
   BoxSelectUserData data;
@@ -3520,7 +3521,7 @@ static void do_lattice_box_select__doSelect(void *userData, BPoint *bp, const fl
     data->is_changed = true;
   }
 }
-static bool do_lattice_box_select(ViewContext *vc, rcti *rect, const eSelectOp sel_op)
+static bool do_lattice_box_select(ViewContext *vc, const rcti *rect, const eSelectOp sel_op)
 {
   BoxSelectUserData data;
 
@@ -3855,7 +3856,10 @@ static int opengl_bone_select_buffer_cmp(const void *sel_a_p, const void *sel_b_
   return 0;
 }
 
-static bool do_object_box_select(bContext *C, ViewContext *vc, rcti *rect, const eSelectOp sel_op)
+static bool do_object_box_select(bContext *C,
+                                 ViewContext *vc,
+                                 const rcti *rect,
+                                 const eSelectOp sel_op)
 {
   View3D *v3d = vc->v3d;
   int totobj = MAXPICKELEMS; /* XXX solve later */
@@ -3928,7 +3932,10 @@ finally:
   return changed;
 }
 
-static bool do_pose_box_select(bContext *C, ViewContext *vc, rcti *rect, const eSelectOp sel_op)
+static bool do_pose_box_select(bContext *C,
+                               ViewContext *vc,
+                               const rcti *rect,
+                               const eSelectOp sel_op)
 {
   blender::Vector<Base *> bases = do_pose_tag_select_op_prepare(vc);
 
@@ -3942,13 +3949,12 @@ static bool do_pose_box_select(bContext *C, ViewContext *vc, rcti *rect, const e
   const int hits = view3d_opengl_select(
       vc, buffer, (totobj + MAXPICKELEMS), rect, VIEW3D_SELECT_ALL, select_filter);
   /*
-   * LOGIC NOTES (theeth):
-   * The buffer and ListBase have the same relative order, which makes the selection
+   * NOTE(@theeth): Regarding the logic use here.
+   * The buffer and #ListBase have the same relative order, which makes the selection
    * very simple. Loop through both data sets at the same time, if the color
    * is the same as the object, we have a hit and can move to the next color
    * and object pair, if not, just move to the next object,
-   * keeping the same color until we have a hit.
-   */
+   * keeping the same color until we have a hit. */
 
   if (hits > 0) {
     /* no need to loop if there's no hit */

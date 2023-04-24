@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright 2017 Blender Foundation. All rights reserved. */
+ * Copyright 2017 Blender Foundation */
 
 /** \file
  * \ingroup draw
@@ -395,6 +395,7 @@ static DRW_MeshCDMask mesh_cd_calc_used_gpu_layers(const Object *object,
         case CD_PROP_BOOL:
         case CD_PROP_INT8:
         case CD_PROP_INT32:
+        case CD_PROP_INT32_2D:
         case CD_PROP_FLOAT:
         case CD_PROP_FLOAT2: {
           if (layer != -1 && domain.has_value()) {

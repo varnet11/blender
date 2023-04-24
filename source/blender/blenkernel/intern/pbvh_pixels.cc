@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright 2022 Blender Foundation. All rights reserved. */
+ * Copyright 2022 Blender Foundation */
 
 #include "BKE_attribute.hh"
 #include "BKE_customdata.h"
@@ -668,7 +668,7 @@ static bool update_pixels(PBVH *pbvh, Mesh *mesh, Image *image, ImageUser *image
   }
 
   const AttributeAccessor attributes = mesh->attributes();
-  const VArraySpan<float2> uv_map = attributes.lookup<float2>(active_uv_name, ATTR_DOMAIN_CORNER);
+  const VArraySpan uv_map = *attributes.lookup<float2>(active_uv_name, ATTR_DOMAIN_CORNER);
 
   uv_islands::MeshData mesh_data(
       {pbvh->looptri, pbvh->totprim},

@@ -48,6 +48,7 @@ struct PaintCurve;
 struct PaintModeSettings;
 struct Palette;
 struct PaletteColor;
+struct RegionView3D;
 struct Scene;
 struct StrokeCache;
 struct Sculpt;
@@ -238,7 +239,8 @@ void BKE_paint_face_set_overlay_color_get(int face_set, int seed, uchar r_color[
 
 bool paint_calculate_rake_rotation(struct UnifiedPaintSettings *ups,
                                    struct Brush *brush,
-                                   const float mouse_pos[2]);
+                                   const float mouse_pos[2],
+                                   ePaintMode paint_mode);
 void paint_update_brush_rake_rotation(struct UnifiedPaintSettings *ups,
                                       struct Brush *brush,
                                       float rotation);
@@ -524,7 +526,8 @@ typedef struct SculptAttribute {
   /* Sculpt usage */
   SculptAttributeParams params;
 
-  /* Used to keep track of which preallocated SculptAttribute instances
+  /**
+   * Used to keep track of which pre-allocated SculptAttribute instances
    * inside of SculptSession.temp_attribute are used.
    */
   bool used;
@@ -579,7 +582,7 @@ typedef struct SculptSession {
 
   /* These are always assigned to base mesh data when using PBVH_FACES and PBVH_GRIDS. */
   float (*vert_positions)[3];
-  blender::Span<MPoly> polys;
+  blender::OffsetIndices<int> polys;
   blender::Span<int> corner_verts;
 
   /* These contain the vertex and poly counts of the final mesh. */

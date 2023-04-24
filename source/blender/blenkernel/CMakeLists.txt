@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-# Copyright 2006 Blender Foundation. All rights reserved.
+# Copyright 2006 Blender Foundation
 
 set(INC
   .
@@ -12,7 +12,7 @@ set(INC
   ../depsgraph
   ../draw
   ../functions
-  ../gpencil_modifiers
+  ../gpencil_modifiers_legacy
   ../gpu
   ../ikplugin
   ../imbuf
@@ -72,6 +72,7 @@ set(SRC
   intern/armature_selection.cc
   intern/armature_update.c
   intern/asset.cc
+  intern/asset_weak_reference.cc
   intern/attribute.cc
   intern/attribute_access.cc
   intern/attribute_math.cc
@@ -143,9 +144,9 @@ set(SRC
   intern/geometry_fields.cc
   intern/geometry_set.cc
   intern/geometry_set_instances.cc
-  intern/gpencil_legacy.c
   intern/gpencil_curve_legacy.c
   intern/gpencil_geom_legacy.cc
+  intern/gpencil_legacy.c
   intern/gpencil_modifier_legacy.c
   intern/gpencil_update_cache_legacy.c
   intern/icons.cc
@@ -180,7 +181,7 @@ set(SRC
   intern/lib_remap.c
   intern/library.c
   intern/light.c
-  intern/lightprobe.c
+  intern/lightprobe.cc
   intern/linestyle.cc
   intern/main.c
   intern/main_idmap.c
@@ -383,9 +384,9 @@ set(SRC
   BKE_geometry_set.hh
   BKE_geometry_set_instances.hh
   BKE_global.h
-  BKE_gpencil_legacy.h
   BKE_gpencil_curve_legacy.h
   BKE_gpencil_geom_legacy.h
+  BKE_gpencil_legacy.h
   BKE_gpencil_modifier_legacy.h
   BKE_gpencil_update_cache_legacy.h
   BKE_icons.h
@@ -505,7 +506,7 @@ set(SRC
   intern/lib_intern.h
   intern/multires_inline.h
   intern/multires_reshape.hh
-  intern/multires_unsubdivide.h
+  intern/multires_unsubdivide.hh
   intern/ocean_intern.h
   intern/pbvh_intern.hh
   intern/pbvh_pixels_copy.hh
@@ -524,7 +525,7 @@ set(LIB
   bf_depsgraph
   bf_draw
   bf_functions
-  bf_gpencil_modifiers
+  bf_gpencil_modifiers_legacy
   bf_gpu
   bf_ikplugin
   bf_imbuf
@@ -593,24 +594,12 @@ if(WITH_IMAGE_OPENEXR)
   add_definitions(-DWITH_OPENEXR)
 endif()
 
-if(WITH_IMAGE_TIFF)
-  add_definitions(-DWITH_TIFF)
-endif()
-
 if(WITH_IMAGE_OPENJPEG)
   add_definitions(-DWITH_OPENJPEG)
 endif()
 
-if(WITH_IMAGE_DDS)
-  add_definitions(-DWITH_DDS)
-endif()
-
 if(WITH_IMAGE_CINEON)
   add_definitions(-DWITH_CINEON)
-endif()
-
-if(WITH_IMAGE_HDR)
-  add_definitions(-DWITH_HDR)
 endif()
 
 if(WITH_IMAGE_WEBP)

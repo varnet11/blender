@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright 2022 Blender Foundation. All rights reserved. */
+ * Copyright 2022 Blender Foundation */
 
 /** \file
  * \ingroup gpu
@@ -8,11 +8,13 @@
 #pragma once
 
 #include "gpu_context_private.hh"
-
 #include "vk_command_buffer.hh"
+#include "vk_common.hh"
+#include "vk_debug.hh"
 #include "vk_descriptor_pools.hh"
 
 namespace blender::gpu {
+class VKFrameBuffer;
 
 class VKContext : public Context {
  private:
@@ -30,6 +32,9 @@ class VKContext : public Context {
 
   /** Limits of the device linked to this context. */
   VkPhysicalDeviceLimits vk_physical_device_limits_;
+
+  /** Functions of vk_ext_debugutils to use in this context. */
+  debug::VKDebuggingTools debugging_tools_;
 
   void *ghost_context_;
 
@@ -55,6 +60,9 @@ class VKContext : public Context {
   bool debug_capture_scope_begin(void *scope) override;
   void debug_capture_scope_end(void *scope) override;
 
+  void activate_framebuffer(VKFrameBuffer &framebuffer);
+  void deactivate_framebuffer();
+
   static VKContext *get(void)
   {
     return static_cast<VKContext *>(Context::get());
@@ -69,6 +77,11 @@ class VKContext : public Context {
   {
     return vk_physical_device_limits_;
   }
+
+  VkInstance instance_get() const
+  {
+    return vk_instance_;
+  };
 
   VkDevice device_get() const
   {
@@ -100,8 +113,20 @@ class VKContext : public Context {
     return mem_allocator_;
   }
 
+  debug::VKDebuggingTools &debugging_tools_get()
+  {
+    return debugging_tools_;
+  }
+
+  const debug::VKDebuggingTools &debugging_tools_get() const
+  {
+    return debugging_tools_;
+  }
+
  private:
   void init_physical_device_limits();
+
+  bool has_active_framebuffer() const;
 };
 
 }  // namespace blender::gpu

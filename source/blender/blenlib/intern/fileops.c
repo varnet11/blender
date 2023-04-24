@@ -46,6 +46,73 @@
 #include "BLI_sys_types.h" /* for intptr_t support */
 #include "BLI_utildefines.h"
 
+#ifdef WIN32
+/* Text string used as the "verb" for Windows shell operations. */
+static char *windows_operation_string(FileExternalOperation operation)
+{
+  switch (operation) {
+    case FILE_EXTERNAL_OPERATION_OPEN:
+      return "open";
+    case FILE_EXTERNAL_OPERATION_FOLDER_OPEN:
+      return "open";
+    case FILE_EXTERNAL_OPERATION_EDIT:
+      return "edit";
+    case FILE_EXTERNAL_OPERATION_NEW:
+      return "new";
+    case FILE_EXTERNAL_OPERATION_FIND:
+      return "find";
+    case FILE_EXTERNAL_OPERATION_SHOW:
+      return "show";
+    case FILE_EXTERNAL_OPERATION_PLAY:
+      return "play";
+    case FILE_EXTERNAL_OPERATION_BROWSE:
+      return "browse";
+    case FILE_EXTERNAL_OPERATION_PREVIEW:
+      return "preview";
+    case FILE_EXTERNAL_OPERATION_PRINT:
+      return "print";
+    case FILE_EXTERNAL_OPERATION_INSTALL:
+      return "install";
+    case FILE_EXTERNAL_OPERATION_RUNAS:
+      return "runas";
+    case FILE_EXTERNAL_OPERATION_PROPERTIES:
+      return "properties";
+    case FILE_EXTERNAL_OPERATION_FOLDER_FIND:
+      return "find";
+    case FILE_EXTERNAL_OPERATION_FOLDER_CMD:
+      return "cmd";
+  }
+  BLI_assert_unreachable();
+  return "";
+}
+#endif
+
+bool BLI_file_external_operation_supported(const char *filepath, FileExternalOperation operation)
+{
+#ifdef WIN32
+  char *opstring = windows_operation_string(operation);
+  return BLI_windows_external_operation_supported(filepath, opstring);
+#else
+  UNUSED_VARS(filepath, operation);
+  return false;
+#endif
+}
+
+bool BLI_file_external_operation_execute(const char *filepath, FileExternalOperation operation)
+{
+#ifdef WIN32
+  char *opstring = windows_operation_string(operation);
+  if (BLI_windows_external_operation_supported(filepath, opstring) &&
+      BLI_windows_external_operation_execute(filepath, opstring)) {
+    return true;
+  }
+  return false;
+#else
+  UNUSED_VARS(filepath, operation);
+  return false;
+#endif
+}
+
 size_t BLI_file_zstd_from_mem_at_pos(
     void *buf, size_t len, FILE *file, size_t file_offset, int compression_level)
 {
@@ -1142,14 +1209,12 @@ static int move_single_file(const char *from, const char *to)
   return RecursiveOp_Callback_OK;
 }
 
-/* if *file represents a directory, moves all its contents into *to, else renames
- * file itself to *to. */
-int BLI_path_move(const char *file, const char *to)
+int BLI_path_move(const char *path, const char *to)
 {
-  int ret = recursive_operation(file, to, move_callback_pre, move_single_file, NULL);
+  int ret = recursive_operation(path, to, move_callback_pre, move_single_file, NULL);
 
   if (ret && ret != -1) {
-    return recursive_operation(file, NULL, NULL, delete_single_file, delete_callback_post);
+    return recursive_operation(path, NULL, NULL, delete_single_file, delete_callback_post);
   }
 
   return ret;

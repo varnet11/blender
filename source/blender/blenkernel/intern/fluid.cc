@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright Blender Foundation. All rights reserved. */
+ * Copyright Blender Foundation */
 
 /** \file
  * \ingroup bke
@@ -1003,7 +1003,7 @@ static void obstacles_from_mesh(Object *coll_ob,
     float *vert_vel = nullptr;
     bool has_velocity = false;
 
-    Mesh *me = BKE_mesh_copy_for_eval(fes->mesh, false);
+    Mesh *me = BKE_mesh_copy_for_eval(fes->mesh);
     float(*positions)[3] = BKE_mesh_vert_positions_for_write(me);
 
     int min[3], max[3], res[3];
@@ -2062,7 +2062,7 @@ static void emit_from_mesh(
 
     /* Copy mesh for thread safety as we modify it.
      * Main issue is its VertArray being modified, then replaced and freed. */
-    Mesh *me = BKE_mesh_copy_for_eval(ffs->mesh, false);
+    Mesh *me = BKE_mesh_copy_for_eval(ffs->mesh);
     float(*positions)[3] = BKE_mesh_vert_positions_for_write(me);
 
     const blender::Span<int> corner_verts = me->corner_verts();
@@ -3229,16 +3229,17 @@ static Mesh *create_liquid_geometry(FluidDomainSettings *fds,
     return nullptr;
   }
 
-  me = BKE_mesh_new_nomain(num_verts, 0, num_faces * 3, num_faces);
+  me = BKE_mesh_new_nomain(num_verts, 0, num_faces, num_faces * 3);
   if (!me) {
     return nullptr;
   }
   float(*positions)[3] = BKE_mesh_vert_positions_for_write(me);
-  blender::MutableSpan<MPoly> polys = me->polys_for_write();
+  blender::MutableSpan<int> poly_offsets = me->poly_offsets_for_write();
   blender::MutableSpan<int> corner_verts = me->corner_verts_for_write();
 
-  const bool is_sharp = orgmesh->attributes().lookup_or_default<bool>(
-      "sharp_face", ATTR_DOMAIN_FACE, false)[0];
+  const bool is_sharp = orgmesh->attributes()
+                            .lookup_or_default<bool>("sharp_face", ATTR_DOMAIN_FACE, false)
+                            .varray[0];
   BKE_mesh_smooth_flag_set(me, !is_sharp);
 
   /* Get size (dimension) but considering scaling. */
@@ -3325,12 +3326,11 @@ static Mesh *create_liquid_geometry(FluidDomainSettings *fds,
   int *material_indices = BKE_mesh_material_indices_for_write(me);
 
   /* Loop for triangles. */
-  for (const int i : polys.index_range()) {
+  for (const int i : poly_offsets.index_range().drop_back(1)) {
     /* Initialize from existing face. */
     material_indices[i] = mp_mat_nr;
 
-    polys[i].loopstart = i * 3;
-    polys[i].totloop = 3;
+    poly_offsets[i] = i * 3;
 
     corner_verts[i * 3 + 0] = manta_liquid_get_triangle_x_at(fds->fluid, i);
     corner_verts[i * 3 + 1] = manta_liquid_get_triangle_y_at(fds->fluid, i);
@@ -3355,7 +3355,6 @@ static Mesh *create_smoke_geometry(FluidDomainSettings *fds, Mesh *orgmesh, Obje
   float min[3];
   float max[3];
   float *co;
-  MPoly *poly;
   int *corner_vert;
 
   int num_verts = 8;
@@ -3365,12 +3364,12 @@ static Mesh *create_smoke_geometry(FluidDomainSettings *fds, Mesh *orgmesh, Obje
 
   /* Just copy existing mesh if there is no content or if the adaptive domain is not being used. */
   if (fds->total_cells <= 1 || (fds->flags & FLUID_DOMAIN_USE_ADAPTIVE_DOMAIN) == 0) {
-    return BKE_mesh_copy_for_eval(orgmesh, false);
+    return BKE_mesh_copy_for_eval(orgmesh);
   }
 
-  result = BKE_mesh_new_nomain(num_verts, 0, num_faces * 4, num_faces);
+  result = BKE_mesh_new_nomain(num_verts, 0, num_faces, num_faces * 4);
   float(*positions)[3] = BKE_mesh_vert_positions_for_write(result);
-  blender::MutableSpan<MPoly> polys = result->polys_for_write();
+  blender::MutableSpan<int> poly_offsets = result->poly_offsets_for_write();
   blender::MutableSpan<int> corner_verts = result->corner_verts_for_write();
 
   if (num_verts) {
@@ -3414,57 +3413,42 @@ static Mesh *create_smoke_geometry(FluidDomainSettings *fds, Mesh *orgmesh, Obje
     co[1] = max[1];
     co[2] = min[2];
 
+    poly_offsets.fill(4);
+    blender::offset_indices::accumulate_counts_to_offsets(poly_offsets);
+
     /* Create faces. */
     /* Top side. */
-    poly = &polys[0];
     corner_vert = &corner_verts[0 * 4];
-    poly->loopstart = 0 * 4;
-    poly->totloop = 4;
     corner_vert[0] = 0;
     corner_vert[1] = 1;
     corner_vert[2] = 2;
     corner_vert[3] = 3;
     /* Right side. */
-    poly = &polys[1];
     corner_vert = &corner_verts[1 * 4];
-    poly->loopstart = 1 * 4;
-    poly->totloop = 4;
     corner_vert[0] = 2;
     corner_vert[1] = 1;
     corner_vert[2] = 5;
     corner_vert[3] = 6;
     /* Bottom side. */
-    poly = &polys[2];
     corner_vert = &corner_verts[2 * 4];
-    poly->loopstart = 2 * 4;
-    poly->totloop = 4;
     corner_vert[0] = 7;
     corner_vert[1] = 6;
     corner_vert[2] = 5;
     corner_vert[3] = 4;
     /* Left side. */
-    poly = &polys[3];
     corner_vert = &corner_verts[3 * 4];
-    poly->loopstart = 3 * 4;
-    poly->totloop = 4;
     corner_vert[0] = 0;
     corner_vert[1] = 3;
     corner_vert[2] = 7;
     corner_vert[3] = 4;
     /* Front side. */
-    poly = &polys[4];
     corner_vert = &corner_verts[4 * 4];
-    poly->loopstart = 4 * 4;
-    poly->totloop = 4;
     corner_vert[0] = 3;
     corner_vert[1] = 2;
     corner_vert[2] = 6;
     corner_vert[3] = 7;
     /* Back side. */
-    poly = &polys[5];
     corner_vert = &corner_verts[5 * 4];
-    poly->loopstart = 5 * 4;
-    poly->totloop = 4;
     corner_vert[0] = 1;
     corner_vert[1] = 0;
     corner_vert[2] = 4;
@@ -3606,7 +3590,7 @@ static void fluid_modifier_processFlow(FluidModifierData *fmd,
     if (fmd->flow->mesh) {
       BKE_id_free(nullptr, fmd->flow->mesh);
     }
-    fmd->flow->mesh = BKE_mesh_copy_for_eval(me, false);
+    fmd->flow->mesh = BKE_mesh_copy_for_eval(me);
   }
 
   if (scene_framenr > fmd->time) {
@@ -3633,7 +3617,7 @@ static void fluid_modifier_processEffector(FluidModifierData *fmd,
     if (fmd->effector->mesh) {
       BKE_id_free(nullptr, fmd->effector->mesh);
     }
-    fmd->effector->mesh = BKE_mesh_copy_for_eval(me, false);
+    fmd->effector->mesh = BKE_mesh_copy_for_eval(me);
   }
 
   if (scene_framenr > fmd->time) {
@@ -4141,7 +4125,7 @@ Mesh *BKE_fluid_modifier_do(
   }
 
   if (!result) {
-    result = BKE_mesh_copy_for_eval(me, false);
+    result = BKE_mesh_copy_for_eval(me);
   }
   else {
     BKE_mesh_copy_parameters_for_eval(result, me);

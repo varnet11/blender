@@ -463,11 +463,11 @@ static TriTessFace *mesh_calc_tri_tessface(Mesh *me, bool tangent, Mesh *me_eval
   blender::float3 no;
 
   const blender::Span<blender::float3> positions = me->vert_positions();
-  const blender::Span<MPoly> polys = me->polys();
+  const blender::OffsetIndices polys = me->polys();
   const blender::Span<int> corner_verts = me->corner_verts();
   const bke::AttributeAccessor attributes = me->attributes();
-  const VArray<bool> sharp_faces = attributes.lookup_or_default<bool>(
-      "sharp_face", ATTR_DOMAIN_FACE, false);
+  const VArray<bool> sharp_faces =
+      attributes.lookup_or_default<bool>("sharp_face", ATTR_DOMAIN_FACE, false).varray;
 
   looptri = static_cast<MLoopTri *>(MEM_mallocN(sizeof(*looptri) * tottri, __func__));
   triangles = static_cast<TriTessFace *>(MEM_callocN(sizeof(TriTessFace) * tottri, __func__));
@@ -503,7 +503,6 @@ static TriTessFace *mesh_calc_tri_tessface(Mesh *me, bool tangent, Mesh *me_eval
   const blender::Span<blender::float3> vert_normals = me->vert_normals();
   for (i = 0; i < tottri; i++) {
     const MLoopTri *lt = &looptri[i];
-    const MPoly &poly = polys[lt->poly];
 
     triangles[i].positions[0] = positions[corner_verts[lt->tri[0]]];
     triangles[i].positions[1] = positions[corner_verts[lt->tri[1]]];
@@ -527,8 +526,7 @@ static TriTessFace *mesh_calc_tri_tessface(Mesh *me, bool tangent, Mesh *me_eval
 
     if (calculate_normal) {
       if (lt->poly != mpoly_prev) {
-        no = blender::bke::mesh::poly_normal_calc(
-            positions, corner_verts.slice(poly.loopstart, poly.totloop));
+        no = blender::bke::mesh::poly_normal_calc(positions, corner_verts.slice(polys[lt->poly]));
         mpoly_prev = lt->poly;
       }
       copy_v3_v3(triangles[i].normal, no);
@@ -581,7 +579,7 @@ bool RE_bake_pixels_populate_from_objects(Mesh *me_low,
   treeData = MEM_cnew_array<BVHTreeFromMesh>(tot_highpoly, "Highpoly BVH Trees");
 
   if (!is_cage) {
-    me_eval_low = BKE_mesh_copy_for_eval(me_low, false);
+    me_eval_low = BKE_mesh_copy_for_eval(me_low);
     tris_low = mesh_calc_tri_tessface(me_low, true, me_eval_low);
   }
   else if (is_custom_cage) {
@@ -856,7 +854,7 @@ void RE_bake_normal_world_to_tangent(const BakePixel pixel_array[],
 
   TriTessFace *triangles;
 
-  Mesh *me_eval = BKE_mesh_copy_for_eval(me, false);
+  Mesh *me_eval = BKE_mesh_copy_for_eval(me);
 
   triangles = mesh_calc_tri_tessface(me, true, me_eval);
 

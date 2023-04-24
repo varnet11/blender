@@ -34,7 +34,7 @@
 #include "BKE_paint.h"
 #include "BKE_volume.h"
 
-#include "ED_gpencil.h"
+#include "ED_gpencil_legacy.h"
 #include "ED_object.h"
 #include "ED_uvedit.h"
 
@@ -132,7 +132,8 @@ const EnumPropertyItem rna_enum_proportional_falloff_curve_only_items[] = {
     {0, NULL, 0, NULL, NULL},
 };
 
-/* keep for operators, not used here */
+/* Keep for operators, not used here. */
+
 const EnumPropertyItem rna_enum_mesh_select_mode_items[] = {
     {SCE_SELECT_VERTEX, "VERT", ICON_VERTEXSEL, "Vertex", "Vertex selection mode"},
     {SCE_SELECT_EDGE, "EDGE", ICON_EDGESEL, "Edge", "Edge selection mode"},
@@ -279,12 +280,8 @@ const EnumPropertyItem rna_enum_curve_fit_method_items[] = {
    "Output image in uncompressed Targa format"},
 
 #if 0 /* UNUSED (so far) */
-#  ifdef WITH_DDS
-#    define R_IMF_ENUM_DDS \
-      {R_IMF_IMTYPE_DDS, "DDS", ICON_FILE_IMAGE, "DDS", "Output image in DDS format"},
-#  else
-#    define R_IMF_ENUM_DDS
-#  endif
+#  define R_IMF_ENUM_DDS \
+    {R_IMF_IMTYPE_DDS, "DDS", ICON_FILE_IMAGE, "DDS", "Output image in DDS format"},
 #endif
 
 #ifdef WITH_OPENJPEG
@@ -326,23 +323,15 @@ const EnumPropertyItem rna_enum_curve_fit_method_items[] = {
 #  define R_IMF_ENUM_EXR
 #endif
 
-#ifdef WITH_HDR
-#  define R_IMF_ENUM_HDR \
-    {R_IMF_IMTYPE_RADHDR, \
-     "HDR", \
-     ICON_FILE_IMAGE, \
-     "Radiance HDR", \
-     "Output image in Radiance HDR format"},
-#else
-#  define R_IMF_ENUM_HDR
-#endif
+#define R_IMF_ENUM_HDR \
+  {R_IMF_IMTYPE_RADHDR, \
+   "HDR", \
+   ICON_FILE_IMAGE, \
+   "Radiance HDR", \
+   "Output image in Radiance HDR format"},
 
-#ifdef WITH_TIFF
-#  define R_IMF_ENUM_TIFF \
-    {R_IMF_IMTYPE_TIFF, "TIFF", ICON_FILE_IMAGE, "TIFF", "Output image in TIFF format"},
-#else
-#  define R_IMF_ENUM_TIFF
-#endif
+#define R_IMF_ENUM_TIFF \
+  {R_IMF_IMTYPE_TIFF, "TIFF", ICON_FILE_IMAGE, "TIFF", "Output image in TIFF format"},
 
 #ifdef WITH_WEBP
 #  define R_IMF_ENUM_WEBP \
@@ -639,6 +628,11 @@ const EnumPropertyItem rna_enum_transform_orientation_items[] = {
      ICON_ORIENTATION_CURSOR,
      "Cursor",
      "Align the transformation axes to the 3D cursor"},
+    {V3D_ORIENT_PARENT,
+     "PARENT",
+     ICON_BLANK1,
+     "Parent",
+     "Align the transformation axes to the object's parent space"},
     // {V3D_ORIENT_CUSTOM, "CUSTOM", 0, "Custom", "Use a custom transform orientation"},
     {0, NULL, 0, NULL, NULL},
 };
@@ -2798,7 +2792,7 @@ static void rna_def_gpencil_interpolate(BlenderRNA *brna)
                          "Grease Pencil Interpolate Settings",
                          "Settings for Grease Pencil interpolation tools");
 
-  /* custom curvemap */
+  /* Custom curve-map. */
   prop = RNA_def_property(srna, "interpolation_curve", PROP_POINTER, PROP_NONE);
   RNA_def_property_pointer_sdna(prop, NULL, "custom_ipo");
   RNA_def_property_struct_type(prop, "CurveMapping");
@@ -3413,7 +3407,8 @@ static void rna_def_tool_settings(BlenderRNA *brna)
   RNA_def_property_boolean_sdna(prop, NULL, "snap_flag", SCE_SNAP_PROJECT);
   RNA_def_property_ui_text(prop,
                            "Project Individual Elements",
-                           "Project individual elements on the surface of other objects");
+                           "Project individual elements on the surface of other objects (Always "
+                           "enabled with Face Nearest)");
   RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, NULL); /* header redraw */
 
   prop = RNA_def_property(srna, "use_snap_backface_culling", PROP_BOOLEAN, PROP_NONE);
@@ -3782,7 +3777,7 @@ static void rna_def_sequencer_tool_settings(BlenderRNA *brna)
   };
 
   static const EnumPropertyItem scale_overlap_modes[] = {
-      {SEQ_OVERLAP_EXPAND, "EXPAND", 0, "Expand", "Move strips so transformed strips fits"},
+      {SEQ_OVERLAP_EXPAND, "EXPAND", 0, "Expand", "Move strips so transformed strips fit"},
       {SEQ_OVERLAP_OVERWRITE,
        "OVERWRITE",
        0,
@@ -4221,7 +4216,7 @@ static void rna_def_unit_settings(BlenderRNA *brna)
   RNA_def_property_ui_text(
       prop,
       "Unit Scale",
-      "Scale to use when converting between blender units and dimensions."
+      "Scale to use when converting between Blender units and dimensions."
       " When working at microscopic or astronomical scale, a small or large unit scale"
       " respectively can be used to avoid numerical precision problems");
   RNA_def_property_range(prop, 1e-9f, 1e+9f);
@@ -5724,7 +5719,6 @@ static void rna_def_scene_image_format_data(BlenderRNA *brna)
   };
 #  endif
 
-#  ifdef WITH_TIFF
   static const EnumPropertyItem tiff_codec_items[] = {
       {R_IMF_TIFF_CODEC_NONE, "NONE", 0, "None", ""},
       {R_IMF_TIFF_CODEC_DEFLATE, "DEFLATE", 0, "Deflate", ""},
@@ -5732,7 +5726,6 @@ static void rna_def_scene_image_format_data(BlenderRNA *brna)
       {R_IMF_TIFF_CODEC_PACKBITS, "PACKBITS", 0, "Pack Bits", ""},
       {0, NULL, 0, NULL, NULL},
   };
-#  endif
 
   static const EnumPropertyItem color_management_items[] = {
       {R_IMF_COLOR_MANAGEMENT_FOLLOW_SCENE, "FOLLOW_SCENE", 0, "Follow Scene", ""},
@@ -5849,14 +5842,12 @@ static void rna_def_scene_image_format_data(BlenderRNA *brna)
   RNA_def_property_update(prop, NC_SCENE | ND_RENDER_OPTIONS, NULL);
 #  endif
 
-#  ifdef WITH_TIFF
   /* TIFF */
   prop = RNA_def_property(srna, "tiff_codec", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "tiff_codec");
   RNA_def_property_enum_items(prop, tiff_codec_items);
   RNA_def_property_ui_text(prop, "Compression", "Compression mode for TIFF");
   RNA_def_property_update(prop, NC_SCENE | ND_RENDER_OPTIONS, NULL);
-#  endif
 
   /* Cineon and DPX */
 
@@ -6642,7 +6633,7 @@ static void rna_def_scene_render_data(BlenderRNA *brna)
   RNA_def_property_float_sdna(prop, NULL, "bake_biasdist");
   RNA_def_property_range(prop, 0.0, 1000.0);
   RNA_def_property_ui_text(
-      prop, "Bias", "Bias towards faces further away from the object (in blender units)");
+      prop, "Bias", "Bias towards faces further away from the object (in Blender units)");
   RNA_def_property_update(prop, NC_SCENE | ND_RENDER_OPTIONS, NULL);
 
   prop = RNA_def_property(srna, "use_bake_multires", PROP_BOOLEAN, PROP_NONE);
@@ -7335,7 +7326,7 @@ static void rna_def_scene_eevee(BlenderRNA *brna)
   prop = RNA_def_property(srna, "gi_diffuse_bounces", PROP_INT, PROP_NONE);
   RNA_def_property_ui_text(prop,
                            "Diffuse Bounces",
-                           "Number of time the light is reinjected inside light grids, "
+                           "Number of times the light is reinjected inside light grids, "
                            "0 disable indirect diffuse light");
   RNA_def_property_range(prop, 0, INT_MAX);
   RNA_def_property_override_flag(prop, PROPOVERRIDE_OVERRIDABLE_LIBRARY);
@@ -7799,8 +7790,8 @@ static void rna_def_scene_eevee(BlenderRNA *brna)
   RNA_def_property_ui_text(prop,
                            "Shadow Pool Size",
                            "Size of the shadow pool, "
-                           "bigger pool size allows for more shadows in the scene "
-                           "but might not fits into GPU memory");
+                           "a bigger pool size allows for more shadows in the scene "
+                           "but might not fit into GPU memory");
   RNA_def_property_override_flag(prop, PROPOVERRIDE_OVERRIDABLE_LIBRARY);
   RNA_def_property_update(prop, NC_SCENE | ND_RENDER_OPTIONS, NULL);
 

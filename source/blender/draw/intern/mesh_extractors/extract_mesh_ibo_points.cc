@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright 2021 Blender Foundation. All rights reserved. */
+ * Copyright 2021 Blender Foundation */
 
 /** \file
  * \ingroup draw
@@ -69,13 +69,11 @@ static void extract_points_iter_poly_bm(const MeshRenderData * /*mr*/,
 }
 
 static void extract_points_iter_poly_mesh(const MeshRenderData *mr,
-                                          const MPoly *poly,
-                                          const int /*poly_index*/,
+                                          const int poly_index,
                                           void *_userdata)
 {
   GPUIndexBufBuilder *elb = static_cast<GPUIndexBufBuilder *>(_userdata);
-  const int ml_index_end = poly->loopstart + poly->totloop;
-  for (int ml_index = poly->loopstart; ml_index < ml_index_end; ml_index += 1) {
+  for (const int ml_index : mr->polys[poly_index]) {
     vert_set_mesh(elb, mr, mr->corner_verts[ml_index], ml_index);
   }
 }
@@ -91,13 +89,13 @@ static void extract_points_iter_loose_edge_bm(const MeshRenderData *mr,
 }
 
 static void extract_points_iter_loose_edge_mesh(const MeshRenderData *mr,
-                                                const MEdge *edge,
+                                                const int2 edge,
                                                 const int ledge_index,
                                                 void *_userdata)
 {
   GPUIndexBufBuilder *elb = static_cast<GPUIndexBufBuilder *>(_userdata);
-  vert_set_mesh(elb, mr, edge->v1, mr->loop_len + (ledge_index * 2));
-  vert_set_mesh(elb, mr, edge->v2, mr->loop_len + (ledge_index * 2) + 1);
+  vert_set_mesh(elb, mr, edge[0], mr->loop_len + (ledge_index * 2));
+  vert_set_mesh(elb, mr, edge[1], mr->loop_len + (ledge_index * 2) + 1);
 }
 
 static void extract_points_iter_loose_vert_bm(const MeshRenderData *mr,
@@ -201,7 +199,7 @@ static void extract_points_iter_subdiv_mesh(const DRWSubdivCache *subdiv_cache,
                                             const MeshRenderData *mr,
                                             void *_data,
                                             uint subdiv_quad_index,
-                                            const MPoly * /*coarse_quad*/)
+                                            const int /*coarse_quad_index*/)
 {
   GPUIndexBufBuilder *elb = static_cast<GPUIndexBufBuilder *>(_data);
   extract_points_iter_subdiv_common(elb, mr, subdiv_cache, subdiv_quad_index, false);

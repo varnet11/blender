@@ -57,6 +57,10 @@ int BLI_delete(const char *file, bool dir, bool recursive) ATTR_NONNULL();
  * \return zero on success (matching 'remove' behavior).
  */
 int BLI_delete_soft(const char *file, const char **error_message) ATTR_NONNULL();
+/**
+ * When `path` points to a directory, moves all its contents into `to`,
+ * else rename `path` itself to `to`.
+ */
 int BLI_path_move(const char *path, const char *to) ATTR_NONNULL();
 #if 0 /* Unused */
 int BLI_create_symlink(const char *path, const char *to) ATTR_NONNULL();
@@ -106,6 +110,34 @@ ENUM_OPERATORS(eFileAttributes, FILE_ATTR_HARDLINK);
 #define FILE_ATTR_ANY_LINK \
   (FILE_ATTR_ALIAS | FILE_ATTR_REPARSE_POINT | FILE_ATTR_SYMLINK | FILE_ATTR_JUNCTION_POINT | \
    FILE_ATTR_MOUNT_POINT | FILE_ATTR_HARDLINK)
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name External File Operations
+ * \{ */
+
+typedef enum FileExternalOperation {
+  FILE_EXTERNAL_OPERATION_OPEN = 1,
+  FILE_EXTERNAL_OPERATION_FOLDER_OPEN,
+  /* Following are Windows-only: */
+  FILE_EXTERNAL_OPERATION_EDIT,
+  FILE_EXTERNAL_OPERATION_NEW,
+  FILE_EXTERNAL_OPERATION_FIND,
+  FILE_EXTERNAL_OPERATION_SHOW,
+  FILE_EXTERNAL_OPERATION_PLAY,
+  FILE_EXTERNAL_OPERATION_BROWSE,
+  FILE_EXTERNAL_OPERATION_PREVIEW,
+  FILE_EXTERNAL_OPERATION_PRINT,
+  FILE_EXTERNAL_OPERATION_INSTALL,
+  FILE_EXTERNAL_OPERATION_RUNAS,
+  FILE_EXTERNAL_OPERATION_PROPERTIES,
+  FILE_EXTERNAL_OPERATION_FOLDER_FIND,
+  FILE_EXTERNAL_OPERATION_FOLDER_CMD,
+} FileExternalOperation;
+
+bool BLI_file_external_operation_supported(const char *filepath, FileExternalOperation operation);
+bool BLI_file_external_operation_execute(const char *filepath, FileExternalOperation operation);
 
 /** \} */
 

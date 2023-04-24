@@ -92,7 +92,7 @@
 
 #include "ED_armature.h"
 #include "ED_curve.h"
-#include "ED_gpencil.h"
+#include "ED_gpencil_legacy.h"
 #include "ED_keyframing.h"
 #include "ED_mesh.h"
 #include "ED_object.h"
@@ -483,7 +483,6 @@ void ED_object_parent(Object *ob, Object *par, const int type, const char *subst
   BLI_strncpy(ob->parsubstr, substr, sizeof(ob->parsubstr));
 }
 
-/* Operator Property */
 EnumPropertyItem prop_make_parent_types[] = {
     {PAR_OBJECT, "OBJECT", 0, "Object", ""},
     {PAR_ARMATURE, "ARMATURE", 0, "Armature Deform", ""},
@@ -2955,8 +2954,6 @@ static int drop_geometry_nodes_invoke(bContext *C, wmOperator *op, const wmEvent
 
   return OPERATOR_FINISHED;
 }
-
-/** \} */
 
 void OBJECT_OT_drop_geometry_nodes(wmOperatorType *ot)
 {

@@ -117,13 +117,12 @@ float BKE_mesh_calc_poly_area(const int *poly_verts,
 float BKE_mesh_calc_area(const Mesh *me)
 {
   const Span<float3> positions = me->vert_positions();
-  const Span<MPoly> polys = me->polys();
+  const blender::OffsetIndices polys = me->polys();
   const Span<int> corner_verts = me->corner_verts();
 
   float total_area = 0.0f;
-  for (const MPoly &poly : polys) {
-    total_area += blender::bke::mesh::poly_area_calc(
-        positions, corner_verts.slice(poly.loopstart, poly.totloop));
+  for (const int i : polys.index_range()) {
+    total_area += blender::bke::mesh::poly_area_calc(positions, corner_verts.slice(polys[i]));
   }
   return total_area;
 }
@@ -285,15 +284,14 @@ bool BKE_mesh_center_median_from_polys(const Mesh *me, float r_cent[3])
 {
   int tot = 0;
   const Span<float3> positions = me->vert_positions();
-  const Span<MPoly> polys = me->polys();
+  const blender::OffsetIndices polys = me->polys();
   const Span<int> corner_verts = me->corner_verts();
   zero_v3(r_cent);
-  for (const MPoly &poly : polys) {
-    int loopend = poly.loopstart + poly.totloop;
-    for (int j = poly.loopstart; j < loopend; j++) {
-      add_v3_v3(r_cent, positions[corner_verts[j]]);
+  for (const int i : polys.index_range()) {
+    for (const int vert : corner_verts.slice(polys[i])) {
+      add_v3_v3(r_cent, positions[vert]);
     }
-    tot += poly.totloop;
+    tot += polys[i].size();
   }
   /* otherwise we get NAN for 0 verts */
   if (me->totpoly) {
@@ -320,7 +318,7 @@ bool BKE_mesh_center_of_surface(const Mesh *me, float r_cent[3])
   float total_area = 0.0f;
   float poly_cent[3];
   const Span<float3> positions = me->vert_positions();
-  const blender::Span<MPoly> polys = me->polys();
+  const blender::OffsetIndices polys = me->polys();
   const Span<int> corner_verts = me->corner_verts();
 
   zero_v3(r_cent);
@@ -328,7 +326,7 @@ bool BKE_mesh_center_of_surface(const Mesh *me, float r_cent[3])
   /* calculate a weighted average of polygon centroids */
   for (const int i : polys.index_range()) {
     poly_area = blender::bke::mesh::poly_area_centroid_calc(
-        positions, corner_verts.slice(polys[i].loopstart, polys[i].totloop), poly_cent);
+        positions, corner_verts.slice(polys[i]), poly_cent);
 
     madd_v3_v3fl(r_cent, poly_cent, poly_area);
     total_area += poly_area;
@@ -352,7 +350,7 @@ bool BKE_mesh_center_of_volume(const Mesh *me, float r_cent[3])
   float total_volume = 0.0f;
   float poly_cent[3];
   const Span<float3> positions = me->vert_positions();
-  const blender::Span<MPoly> polys = me->polys();
+  const blender::OffsetIndices polys = me->polys();
   const Span<int> corner_verts = me->corner_verts();
 
   /* Use an initial center to avoid numeric instability of geometry far away from the center. */
@@ -364,7 +362,7 @@ bool BKE_mesh_center_of_volume(const Mesh *me, float r_cent[3])
   /* calculate a weighted average of polyhedron centroids */
   for (const int i : polys.index_range()) {
     poly_volume = blender::bke::mesh::mesh_calc_poly_volume_centroid_with_reference_center(
-        positions, corner_verts.slice(polys[i].loopstart, polys[i].totloop), init_cent, poly_cent);
+        positions, corner_verts.slice(polys[i]), init_cent, poly_cent);
 
     /* poly_cent is already volume-weighted, so no need to multiply by the volume */
     add_v3_v3(r_cent, poly_cent);
@@ -535,7 +533,8 @@ void BKE_mesh_mdisp_flip(MDisps *md, const bool use_loop_mdisp_flip)
   }
 }
 
-void BKE_mesh_polygon_flip_ex(const MPoly *poly,
+void BKE_mesh_polygon_flip_ex(const int poly_offset,
+                              const int poly_size,
                               int *corner_verts,
                               int *corner_edges,
                               CustomData *ldata,
@@ -543,8 +542,8 @@ void BKE_mesh_polygon_flip_ex(const MPoly *poly,
                               MDisps *mdisp,
                               const bool use_loop_mdisp_flip)
 {
-  int loopstart = poly->loopstart;
-  int loopend = loopstart + poly->totloop - 1;
+  int loopstart = poly_offset;
+  int loopend = loopstart + poly_size - 1;
   const bool corner_verts_in_data = (CustomData_get_layer_named(
                                          ldata, CD_PROP_INT32, ".corner_vert") == corner_verts);
   const bool corner_edges_in_data = (CustomData_get_layer_named(
@@ -585,19 +584,32 @@ void BKE_mesh_polygon_flip_ex(const MPoly *poly,
   }
 }
 
-void BKE_mesh_polygon_flip(
-    const MPoly *poly, int *corner_verts, int *corner_edges, CustomData *ldata, const int totloop)
+void BKE_mesh_polygon_flip(const int poly_offset,
+                           const int poly_size,
+                           int *corner_verts,
+                           int *corner_edges,
+                           CustomData *ldata,
+                           const int totloop)
 {
   MDisps *mdisp = (MDisps *)CustomData_get_layer_for_write(ldata, CD_MDISPS, totloop);
-  BKE_mesh_polygon_flip_ex(poly, corner_verts, corner_edges, ldata, nullptr, mdisp, true);
+  BKE_mesh_polygon_flip_ex(
+      poly_offset, poly_size, corner_verts, corner_edges, ldata, nullptr, mdisp, true);
 }
 
 void BKE_mesh_polys_flip(
-    const MPoly *polys, int *corner_verts, int *corner_edges, CustomData *ldata, int totpoly)
+    const int *poly_offsets, int *corner_verts, int *corner_edges, CustomData *ldata, int totpoly)
 {
+  const blender::OffsetIndices polys(blender::Span(poly_offsets, totpoly + 1));
   MDisps *mdisp = (MDisps *)CustomData_get_layer_for_write(ldata, CD_MDISPS, totpoly);
-  for (const int i : blender::IndexRange(totpoly)) {
-    BKE_mesh_polygon_flip_ex(&polys[i], corner_verts, corner_edges, ldata, nullptr, mdisp, true);
+  for (const int i : polys.index_range()) {
+    BKE_mesh_polygon_flip_ex(polys[i].start(),
+                             polys[i].size(),
+                             corner_verts,
+                             corner_edges,
+                             ldata,
+                             nullptr,
+                             mdisp,
+                             true);
   }
 }
 
@@ -611,7 +623,7 @@ void BKE_mesh_flush_hidden_from_verts(Mesh *me)
   using namespace blender::bke;
   MutableAttributeAccessor attributes = me->attributes_for_write();
 
-  const VArray<bool> hide_vert = attributes.lookup_or_default<bool>(
+  const VArray<bool> hide_vert = *attributes.lookup_or_default<bool>(
       ".hide_vert", ATTR_DOMAIN_POINT, false);
   if (hide_vert.is_single() && !hide_vert.get_internal_single()) {
     attributes.remove(".hide_edge");
@@ -619,16 +631,16 @@ void BKE_mesh_flush_hidden_from_verts(Mesh *me)
     return;
   }
   const VArraySpan<bool> hide_vert_span{hide_vert};
-  const Span<MEdge> edges = me->edges();
-  const Span<MPoly> polys = me->polys();
+  const Span<int2> edges = me->edges();
+  const OffsetIndices polys = me->polys();
   const Span<int> corner_verts = me->corner_verts();
 
   /* Hide edges when either of their vertices are hidden. */
   SpanAttributeWriter<bool> hide_edge = attributes.lookup_or_add_for_write_only_span<bool>(
       ".hide_edge", ATTR_DOMAIN_EDGE);
   for (const int i : edges.index_range()) {
-    const MEdge &edge = edges[i];
-    hide_edge.span[i] = hide_vert_span[edge.v1] || hide_vert_span[edge.v2];
+    const int2 &edge = edges[i];
+    hide_edge.span[i] = hide_vert_span[edge[0]] || hide_vert_span[edge[1]];
   }
   hide_edge.finish();
 
@@ -636,8 +648,7 @@ void BKE_mesh_flush_hidden_from_verts(Mesh *me)
   SpanAttributeWriter<bool> hide_poly = attributes.lookup_or_add_for_write_only_span<bool>(
       ".hide_poly", ATTR_DOMAIN_FACE);
   for (const int i : polys.index_range()) {
-    const MPoly &poly = polys[i];
-    const Span<int> poly_verts = corner_verts.slice(poly.loopstart, poly.totloop);
+    const Span<int> poly_verts = corner_verts.slice(polys[i]);
     hide_poly.span[i] = std::any_of(poly_verts.begin(), poly_verts.end(), [&](const int vert) {
       return hide_vert_span[vert];
     });
@@ -651,7 +662,7 @@ void BKE_mesh_flush_hidden_from_polys(Mesh *me)
   using namespace blender::bke;
   MutableAttributeAccessor attributes = me->attributes_for_write();
 
-  const VArray<bool> hide_poly = attributes.lookup_or_default<bool>(
+  const VArray<bool> hide_poly = *attributes.lookup_or_default<bool>(
       ".hide_poly", ATTR_DOMAIN_FACE, false);
   if (hide_poly.is_single() && !hide_poly.get_internal_single()) {
     attributes.remove(".hide_vert");
@@ -659,7 +670,7 @@ void BKE_mesh_flush_hidden_from_polys(Mesh *me)
     return;
   }
   const VArraySpan<bool> hide_poly_span{hide_poly};
-  const Span<MPoly> polys = me->polys();
+  const OffsetIndices polys = me->polys();
   const Span<int> corner_verts = me->corner_verts();
   const Span<int> corner_edges = me->corner_edges();
   SpanAttributeWriter<bool> hide_vert = attributes.lookup_or_add_for_write_only_span<bool>(
@@ -670,8 +681,7 @@ void BKE_mesh_flush_hidden_from_polys(Mesh *me)
   /* Hide all edges or vertices connected to hidden polygons. */
   for (const int i : polys.index_range()) {
     if (hide_poly_span[i]) {
-      const MPoly &poly = polys[i];
-      for (const int corner : IndexRange(poly.loopstart, poly.totloop)) {
+      for (const int corner : polys[i]) {
         hide_vert.span[corner_verts[corner]] = true;
         hide_edge.span[corner_edges[corner]] = true;
       }
@@ -680,8 +690,7 @@ void BKE_mesh_flush_hidden_from_polys(Mesh *me)
   /* Unhide vertices and edges connected to visible polygons. */
   for (const int i : polys.index_range()) {
     if (!hide_poly_span[i]) {
-      const MPoly &poly = polys[i];
-      for (const int corner : IndexRange(poly.loopstart, poly.totloop)) {
+      for (const int corner : polys[i]) {
         hide_vert.span[corner_verts[corner]] = false;
         hide_edge.span[corner_edges[corner]] = false;
       }
@@ -696,7 +705,7 @@ void BKE_mesh_flush_select_from_polys(Mesh *me)
 {
   using namespace blender::bke;
   MutableAttributeAccessor attributes = me->attributes_for_write();
-  const VArray<bool> select_poly = attributes.lookup_or_default<bool>(
+  const VArray<bool> select_poly = *attributes.lookup_or_default<bool>(
       ".select_poly", ATTR_DOMAIN_FACE, false);
   if (select_poly.is_single() && !select_poly.get_internal_single()) {
     attributes.remove(".select_vert");
@@ -711,16 +720,16 @@ void BKE_mesh_flush_select_from_polys(Mesh *me)
   /* Use generic domain interpolation to read the polygon attribute on the other domains.
    * Assume selected faces are not hidden and none of their vertices/edges are hidden. */
   attributes.lookup_or_default<bool>(".select_poly", ATTR_DOMAIN_POINT, false)
-      .materialize(select_vert.span);
+      .varray.materialize(select_vert.span);
   attributes.lookup_or_default<bool>(".select_poly", ATTR_DOMAIN_EDGE, false)
-      .materialize(select_edge.span);
+      .varray.materialize(select_edge.span);
 
   select_vert.finish();
   select_edge.finish();
 }
 
-static void mesh_flush_select_from_verts(const Span<MEdge> edges,
-                                         const Span<MPoly> polys,
+static void mesh_flush_select_from_verts(const Span<blender::int2> edges,
+                                         const blender::OffsetIndices<int> polys,
                                          const Span<int> corner_verts,
                                          const VArray<bool> &hide_edge,
                                          const VArray<bool> &hide_poly,
@@ -731,16 +740,15 @@ static void mesh_flush_select_from_verts(const Span<MEdge> edges,
   /* Select visible edges that have both of their vertices selected. */
   for (const int i : edges.index_range()) {
     if (!hide_edge[i]) {
-      const MEdge &edge = edges[i];
-      select_edge[i] = select_vert[edge.v1] && select_vert[edge.v2];
+      const blender::int2 &edge = edges[i];
+      select_edge[i] = select_vert[edge[0]] && select_vert[edge[1]];
     }
   }
 
   /* Select visible faces that have all of their vertices selected. */
   for (const int i : polys.index_range()) {
     if (!hide_poly[i]) {
-      const MPoly &poly = polys[i];
-      const Span<int> poly_verts = corner_verts.slice(poly.loopstart, poly.totloop);
+      const Span<int> poly_verts = corner_verts.slice(polys[i]);
       select_poly[i] = std::all_of(
           poly_verts.begin(), poly_verts.end(), [&](const int vert) { return select_vert[vert]; });
     }
@@ -751,7 +759,7 @@ void BKE_mesh_flush_select_from_verts(Mesh *me)
 {
   using namespace blender::bke;
   MutableAttributeAccessor attributes = me->attributes_for_write();
-  const VArray<bool> select_vert = attributes.lookup_or_default<bool>(
+  const VArray<bool> select_vert = *attributes.lookup_or_default<bool>(
       ".select_vert", ATTR_DOMAIN_POINT, false);
   if (select_vert.is_single() && !select_vert.get_internal_single()) {
     attributes.remove(".select_edge");
@@ -766,8 +774,8 @@ void BKE_mesh_flush_select_from_verts(Mesh *me)
       me->edges(),
       me->polys(),
       me->corner_verts(),
-      attributes.lookup_or_default<bool>(".hide_edge", ATTR_DOMAIN_EDGE, false),
-      attributes.lookup_or_default<bool>(".hide_poly", ATTR_DOMAIN_FACE, false),
+      *attributes.lookup_or_default<bool>(".hide_edge", ATTR_DOMAIN_EDGE, false),
+      *attributes.lookup_or_default<bool>(".hide_poly", ATTR_DOMAIN_FACE, false),
       select_vert,
       select_edge.span,
       select_poly.span);
@@ -781,7 +789,7 @@ void BKE_mesh_flush_select_from_verts(Mesh *me)
 /** \name Mesh Spatial Calculation
  * \{ */
 
-void BKE_mesh_calc_relative_deform(const MPoly *polys,
+void BKE_mesh_calc_relative_deform(const int *poly_offsets,
                                    const int totpoly,
                                    const int *corner_verts,
                                    const int totvert,
@@ -792,18 +800,20 @@ void BKE_mesh_calc_relative_deform(const MPoly *polys,
                                    const float (*vert_cos_org)[3],
                                    float (*vert_cos_new)[3])
 {
+  const blender::OffsetIndices<int> polys({poly_offsets, totpoly + 1});
+
   int *vert_accum = (int *)MEM_calloc_arrayN(size_t(totvert), sizeof(*vert_accum), __func__);
 
   memset(vert_cos_new, '\0', sizeof(*vert_cos_new) * size_t(totvert));
 
-  for (const int i : blender::IndexRange(totpoly)) {
-    const MPoly &poly = polys[i];
-    const int *poly_verts = &corner_verts[poly.loopstart];
+  for (const int i : polys.index_range()) {
+    const blender::IndexRange poly = polys[i];
+    const int *poly_verts = &corner_verts[poly.start()];
 
-    for (int j = 0; j < poly.totloop; j++) {
-      const int v_prev = poly_verts[(poly.totloop + (j - 1)) % poly.totloop];
+    for (int j = 0; j < poly.size(); j++) {
+      const int v_prev = poly_verts[(poly.size() + (j - 1)) % poly.size()];
       const int v_curr = poly_verts[j];
-      const int v_next = poly_verts[(j + 1) % poly.totloop];
+      const int v_next = poly_verts[(j + 1) % poly.size()];
 
       float tvec[3];
 

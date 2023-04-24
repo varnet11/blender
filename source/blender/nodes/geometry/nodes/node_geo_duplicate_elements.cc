@@ -57,7 +57,7 @@ static void node_layout(uiLayout *layout, bContext * /*C*/, PointerRNA *ptr)
 }
 
 struct IndexAttributes {
-  AutoAnonymousAttributeID duplicate_index;
+  AnonymousAttributeIDPtr duplicate_index;
 };
 
 /* -------------------------------------------------------------------- */
@@ -389,12 +389,12 @@ static void copy_face_attributes_without_id(
     const bke::AttributeAccessor src_attributes,
     bke::MutableAttributeAccessor dst_attributes)
 {
-  for (auto &attribute :
-       bke::retrieve_attributes_for_transfer(src_attributes,
-                                             dst_attributes,
-                                             ATTR_DOMAIN_MASK_ALL,
-                                             propagation_info,
-                                             {"id", ".corner_vert", ".corner_edge"})) {
+  for (auto &attribute : bke::retrieve_attributes_for_transfer(
+           src_attributes,
+           dst_attributes,
+           ATTR_DOMAIN_MASK_ALL,
+           propagation_info,
+           {"id", ".corner_vert", ".corner_edge", ".edge_verts"})) {
     attribute_math::convert_to_static_type(attribute.src.type(), [&](auto dummy) {
       using T = decltype(dummy);
       const Span<T> src = attribute.src.typed<T>();
@@ -449,16 +449,16 @@ static void copy_stable_id_faces(const Mesh &mesh,
   VArraySpan<int> src{src_attribute.varray.typed<int>()};
   MutableSpan<int> dst = dst_attribute.span.typed<int>();
 
-  const Span<MPoly> polys = mesh.polys();
+  const OffsetIndices polys = mesh.polys();
   int loop_index = 0;
   for (const int i_poly : selection.index_range()) {
     const IndexRange range = poly_offsets[i_poly];
     if (range.size() == 0) {
       continue;
     }
-    const MPoly &source = polys[i_poly];
+    const IndexRange source = polys[i_poly];
     for ([[maybe_unused]] const int i_duplicate : IndexRange(range.size())) {
-      for ([[maybe_unused]] const int i_loops : IndexRange(source.totloop)) {
+      for ([[maybe_unused]] const int i_loops : IndexRange(source.size())) {
         if (i_duplicate == 0) {
           dst[loop_index] = src[vert_mapping[loop_index]];
         }
@@ -486,8 +486,8 @@ static void duplicate_faces(GeometrySet &geometry_set,
   geometry_set.keep_only_during_modify({GEO_COMPONENT_TYPE_MESH});
 
   const Mesh &mesh = *geometry_set.get_mesh_for_read();
-  const Span<MEdge> edges = mesh.edges();
-  const Span<MPoly> polys = mesh.polys();
+  const Span<int2> edges = mesh.edges();
+  const OffsetIndices polys = mesh.polys();
   const Span<int> corner_verts = mesh.corner_verts();
   const Span<int> corner_edges = mesh.corner_edges();
 
@@ -506,15 +506,15 @@ static void duplicate_faces(GeometrySet &geometry_set,
     const int count = counts[selection[i_selection]];
     offset_data[i_selection] = total_polys;
     total_polys += count;
-    total_loops += count * polys[selection[i_selection]].totloop;
+    total_loops += count * polys[selection[i_selection]].size();
   }
   offset_data[selection.size()] = total_polys;
 
   const OffsetIndices<int> duplicates(offset_data);
 
-  Mesh *new_mesh = BKE_mesh_new_nomain(total_loops, total_loops, total_loops, total_polys);
-  MutableSpan<MEdge> new_edges = new_mesh->edges_for_write();
-  MutableSpan<MPoly> new_polys = new_mesh->polys_for_write();
+  Mesh *new_mesh = BKE_mesh_new_nomain(total_loops, total_loops, total_polys, total_loops);
+  MutableSpan<int2> new_edges = new_mesh->edges_for_write();
+  MutableSpan<int> new_poly_offsets = new_mesh->poly_offsets_for_write();
   MutableSpan<int> new_corner_verts = new_mesh->corner_verts_for_write();
   MutableSpan<int> new_corner_edges = new_mesh->corner_edges_for_write();
 
@@ -527,22 +527,21 @@ static void duplicate_faces(GeometrySet &geometry_set,
   for (const int i_selection : selection.index_range()) {
     const IndexRange poly_range = duplicates[i_selection];
 
-    const MPoly &source = polys[selection[i_selection]];
+    const IndexRange source = polys[selection[i_selection]];
     for ([[maybe_unused]] const int i_duplicate : IndexRange(poly_range.size())) {
-      new_polys[poly_index] = source;
-      new_polys[poly_index].loopstart = loop_index;
-      for (const int i_loops : IndexRange(source.totloop)) {
-        const int src_corner = source.loopstart + i_loops;
+      new_poly_offsets[poly_index] = loop_index;
+      for (const int i_loops : IndexRange(source.size())) {
+        const int src_corner = source[i_loops];
         loop_mapping[loop_index] = src_corner;
         vert_mapping[loop_index] = corner_verts[src_corner];
         new_edges[loop_index] = edges[corner_edges[src_corner]];
         edge_mapping[loop_index] = corner_edges[src_corner];
-        new_edges[loop_index].v1 = loop_index;
-        if (i_loops + 1 != source.totloop) {
-          new_edges[loop_index].v2 = loop_index + 1;
+        new_edges[loop_index][0] = loop_index;
+        if (i_loops + 1 != source.size()) {
+          new_edges[loop_index][1] = loop_index + 1;
         }
         else {
-          new_edges[loop_index].v2 = new_polys[poly_index].loopstart;
+          new_edges[loop_index][1] = new_poly_offsets[poly_index];
         }
         new_corner_verts[loop_index] = loop_index;
         new_corner_edges[loop_index] = loop_index;
@@ -552,6 +551,7 @@ static void duplicate_faces(GeometrySet &geometry_set,
     }
   }
 
+  new_mesh->tag_loose_verts_none();
   new_mesh->loose_edges_tag_none();
 
   copy_face_attributes_without_id(edge_mapping,
@@ -604,7 +604,7 @@ static void copy_edge_attributes_without_id(
                                              dst_attributes,
                                              ATTR_DOMAIN_MASK_POINT | ATTR_DOMAIN_MASK_EDGE,
                                              propagation_info,
-                                             {"id"})) {
+                                             {"id", ".edge_verts"})) {
     attribute_math::convert_to_static_type(attribute.src.type(), [&](auto dummy) {
       using T = decltype(dummy);
       const Span<T> src = attribute.src.typed<T>();
@@ -646,7 +646,7 @@ static void copy_stable_id_edges(const Mesh &mesh,
     return;
   }
 
-  const Span<MEdge> edges = mesh.edges();
+  const Span<int2> edges = mesh.edges();
 
   VArraySpan<int> src{src_attribute.varray.typed<int>()};
   MutableSpan<int> dst = dst_attribute.span.typed<int>();
@@ -656,14 +656,14 @@ static void copy_stable_id_edges(const Mesh &mesh,
       if (edge_range.size() == 0) {
         continue;
       }
-      const MEdge &edge = edges[selection[i_selection]];
+      const int2 &edge = edges[selection[i_selection]];
       const IndexRange vert_range = {edge_range.start() * 2, edge_range.size() * 2};
 
-      dst[vert_range[0]] = src[edge.v1];
-      dst[vert_range[1]] = src[edge.v2];
+      dst[vert_range[0]] = src[edge[0]];
+      dst[vert_range[1]] = src[edge[1]];
       for (const int i_duplicate : IndexRange(1, edge_range.size() - 1)) {
-        dst[vert_range[i_duplicate * 2]] = noise::hash(src[edge.v1], i_duplicate);
-        dst[vert_range[i_duplicate * 2 + 1]] = noise::hash(src[edge.v2], i_duplicate);
+        dst[vert_range[i_duplicate * 2]] = noise::hash(src[edge[0]], i_duplicate);
+        dst[vert_range[i_duplicate * 2 + 1]] = noise::hash(src[edge[1]], i_duplicate);
       }
     }
   });
@@ -681,7 +681,7 @@ static void duplicate_edges(GeometrySet &geometry_set,
     return;
   };
   const Mesh &mesh = *geometry_set.get_mesh_for_read();
-  const Span<MEdge> edges = mesh.edges();
+  const Span<int2> edges = mesh.edges();
 
   bke::MeshFieldContext field_context{mesh, ATTR_DOMAIN_EDGE};
   FieldEvaluator evaluator{field_context, edges.size()};
@@ -697,18 +697,18 @@ static void duplicate_edges(GeometrySet &geometry_set,
   const int output_edges_num = duplicates.total_size();
 
   Mesh *new_mesh = BKE_mesh_new_nomain(output_edges_num * 2, output_edges_num, 0, 0);
-  MutableSpan<MEdge> new_edges = new_mesh->edges_for_write();
+  MutableSpan<int2> new_edges = new_mesh->edges_for_write();
 
   Array<int> vert_orig_indices(output_edges_num * 2);
   threading::parallel_for(selection.index_range(), 1024, [&](IndexRange range) {
     for (const int i_selection : range) {
-      const MEdge &edge = edges[selection[i_selection]];
+      const int2 &edge = edges[selection[i_selection]];
       const IndexRange edge_range = duplicates[i_selection];
       const IndexRange vert_range(edge_range.start() * 2, edge_range.size() * 2);
 
       for (const int i_duplicate : IndexRange(edge_range.size())) {
-        vert_orig_indices[vert_range[i_duplicate * 2]] = edge.v1;
-        vert_orig_indices[vert_range[i_duplicate * 2 + 1]] = edge.v2;
+        vert_orig_indices[vert_range[i_duplicate * 2]] = edge[0];
+        vert_orig_indices[vert_range[i_duplicate * 2 + 1]] = edge[1];
       }
     }
   });
@@ -718,9 +718,9 @@ static void duplicate_edges(GeometrySet &geometry_set,
       const IndexRange edge_range = duplicates[i_selection];
       const IndexRange vert_range(edge_range.start() * 2, edge_range.size() * 2);
       for (const int i_duplicate : IndexRange(edge_range.size())) {
-        MEdge &new_edge = new_edges[edge_range[i_duplicate]];
-        new_edge.v1 = vert_range[i_duplicate * 2];
-        new_edge.v2 = vert_range[i_duplicate * 2] + 1;
+        int2 &new_edge = new_edges[edge_range[i_duplicate]];
+        new_edge[0] = vert_range[i_duplicate * 2];
+        new_edge[1] = vert_range[i_duplicate * 2] + 1;
       }
     }
   });
@@ -1098,12 +1098,6 @@ static void node_geo_exec(GeoNodeExecParams params)
     return;
   }
 
-  if (attribute_outputs.duplicate_index) {
-    params.set_output(
-        "Duplicate Index",
-        AnonymousAttributeFieldInput::Create<int>(std::move(attribute_outputs.duplicate_index),
-                                                  params.attribute_producer_name()));
-  }
   params.set_output("Geometry", std::move(geometry_set));
 }
 

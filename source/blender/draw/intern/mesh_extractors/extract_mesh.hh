@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright 2021 Blender Foundation. All rights reserved. */
+ * Copyright 2021 Blender Foundation */
 
 /** \file
  * \ingroup draw
@@ -76,8 +76,8 @@ struct MeshRenderData {
   /** Mesh */
   Mesh *me;
   blender::Span<blender::float3> vert_positions;
-  blender::Span<MEdge> edges;
-  blender::Span<MPoly> polys;
+  blender::Span<blender::int2> edges;
+  blender::OffsetIndices<int> polys;
   blender::Span<int> corner_verts;
   blender::Span<int> corner_edges;
   BMVert *eve_act;
@@ -253,16 +253,13 @@ using ExtractPolyBMeshFn = void(const MeshRenderData *mr,
                                 const BMFace *f,
                                 int f_index,
                                 void *data);
-using ExtractPolyMeshFn = void(const MeshRenderData *mr,
-                               const MPoly *poly,
-                               int poly_index,
-                               void *data);
+using ExtractPolyMeshFn = void(const MeshRenderData *mr, int poly_index, void *data);
 using ExtractLEdgeBMeshFn = void(const MeshRenderData *mr,
                                  const BMEdge *eed,
                                  int ledge_index,
                                  void *data);
 using ExtractLEdgeMeshFn = void(const MeshRenderData *mr,
-                                const MEdge *edge,
+                                blender::int2 edge,
                                 int ledge_index,
                                 void *data);
 using ExtractLVertBMeshFn = void(const MeshRenderData *mr,
@@ -298,7 +295,7 @@ using ExtractIterSubdivMeshFn = void(const DRWSubdivCache *subdiv_cache,
                                      const MeshRenderData *mr,
                                      void *data,
                                      uint subdiv_quad_index,
-                                     const MPoly *coarse_quad);
+                                     int coarse_quad_index);
 using ExtractFinishSubdivFn = void(const DRWSubdivCache *subdiv_cache,
                                    const MeshRenderData *mr,
                                    MeshBatchCache *cache,

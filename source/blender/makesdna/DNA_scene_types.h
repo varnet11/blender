@@ -177,6 +177,8 @@ typedef struct AudioData {
   char _pad2[4];
 } AudioData;
 
+/** \} */
+
 /* -------------------------------------------------------------------- */
 /** \name Render Layers
  * \{ */
@@ -670,8 +672,7 @@ typedef struct RenderData {
   /** Frames to jump during render/playback. */
   int frame_step;
 
-  /** Standalone player stereo settings. */ /* XXX deprecated since .2.5 */
-  short stereomode DNA_DEPRECATED;
+  char _pad10[2];
 
   /** For the dimensions presets menu. */
   short dimensionspreset;
@@ -1980,6 +1981,7 @@ typedef struct Scene {
 
   struct PreviewImage *preview;
 
+  /** ViewLayer, defined in DNA_layer_types.h */
   ListBase view_layers;
   /** Not an actual data-block, but memory owned by scene. */
   struct Collection *master_collection;
@@ -2307,7 +2309,7 @@ typedef enum eSnapMode {
 /* Due to dependency conflicts with Cycles, header cannot directly include `BLI_utildefines.h`. */
 /* TODO: move this macro to a more general place. */
 #ifdef ENUM_OPERATORS
-ENUM_OPERATORS(eSnapMode, SCE_SNAP_MODE_GRID)
+ENUM_OPERATORS(eSnapMode, SCE_SNAP_MODE_FACE_NEAREST)
 #endif
 
 #define SCE_SNAP_MODE_GEOM \

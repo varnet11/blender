@@ -2483,7 +2483,7 @@ void SEQUENCER_OT_copy(wmOperatorType *ot)
   /* Identifiers. */
   ot->name = "Copy";
   ot->idname = "SEQUENCER_OT_copy";
-  ot->description = "Copy selected strips to clipboard";
+  ot->description = "Copy the selected strips to the internal clipboard";
 
   /* Api callbacks. */
   ot->exec = sequencer_copy_exec;
@@ -2630,7 +2630,7 @@ void SEQUENCER_OT_paste(wmOperatorType *ot)
   /* Identifiers. */
   ot->name = "Paste";
   ot->idname = "SEQUENCER_OT_paste";
-  ot->description = "Paste strips from clipboard";
+  ot->description = "Paste strips from the internal clipboard";
 
   /* Api callbacks. */
   ot->exec = sequencer_paste_exec;
@@ -3277,6 +3277,9 @@ static int sequencer_set_range_to_strips_exec(bContext *C, wmOperator *op)
     if (seq->flag & SELECT) {
       selected = true;
       sfra = min_ii(sfra, SEQ_time_left_handle_frame_get(scene, seq));
+      /* Offset of -1 is needed because in VSE every frame has width. Range from 1 to 1 is drawn
+       * as range 1 to 2, because 1 frame long strip starts at frame 1 and ends at frame 2.
+       * See #106480. */
       efra = max_ii(efra, SEQ_time_right_handle_frame_get(scene, seq) - 1);
     }
   }

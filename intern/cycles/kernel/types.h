@@ -3,9 +3,15 @@
 
 #pragma once
 
-#if !defined(__KERNEL_GPU__) && defined(WITH_EMBREE)
-#  include <embree3/rtcore.h>
-#  include <embree3/rtcore_scene.h>
+#if (!defined(__KERNEL_GPU__) || (defined(__KERNEL_ONEAPI__) && defined(WITH_EMBREE_GPU))) && \
+    defined(WITH_EMBREE)
+#  if EMBREE_MAJOR_VERSION == 4
+#    include <embree4/rtcore.h>
+#    include <embree4/rtcore_scene.h>
+#  else
+#    include <embree3/rtcore.h>
+#    include <embree3/rtcore_scene.h>
+#  endif
 #  define __EMBREE__
 #endif
 
@@ -73,9 +79,8 @@ CCL_NAMESPACE_BEGIN
 #define __VISIBILITY_FLAG__
 #define __VOLUME__
 
-/* TODO: solve internal compiler errors and enable light tree on HIP. */
 /* TODO: solve internal compiler perf issue and enable light tree on Metal/AMD. */
-#if defined(__KERNEL_HIP__) || defined(__KERNEL_METAL_AMD__)
+#if defined(__KERNEL_METAL_AMD__)
 #  undef __LIGHT_TREE__
 #endif
 
@@ -829,7 +834,7 @@ enum ShaderDataFlag {
   SD_NEED_VOLUME_ATTRIBUTES = (1 << 28),
   /* Shader has emission */
   SD_HAS_EMISSION = (1 << 29),
-  /* Shader has raytracing */
+  /* Shader has ray-tracing. */
   SD_HAS_RAYTRACE = (1 << 30),
   /* Use back side for direct light sampling. */
   SD_MIS_BACK = (1 << 31),
@@ -1365,6 +1370,13 @@ using BoundingCone = struct BoundingCone {
   float theta_e;
 };
 
+enum LightTreeNodeType : uint8_t {
+  LIGHT_TREE_INSTANCE = (1 << 0),
+  LIGHT_TREE_INNER = (1 << 1),
+  LIGHT_TREE_LEAF = (1 << 2),
+  LIGHT_TREE_DISTANT = (1 << 3),
+};
+
 typedef struct KernelLightTreeNode {
   /* Bounding box. */
   BoundingBox bbox;
@@ -1375,17 +1387,25 @@ typedef struct KernelLightTreeNode {
   /* Energy. */
   float energy;
 
-  /* If this is 0 or less, we're at a leaf node
-   * and the negative value indexes into the first child of the light array.
-   * Otherwise, it's an index to the node's second child. */
-  int child_index;
-  int num_prims; /* leaf nodes need to know the number of primitives stored. */
+  LightTreeNodeType type;
+
+  /* Leaf nodes need to know the number of emitters stored. */
+  int num_emitters;
+
+  union {
+    struct {
+      int first_emitter; /* The index of the first emitter. */
+    } leaf;
+    struct {
+      int right_child; /* The index of the right child. */
+    } inner;
+    struct {
+      int reference; /* A reference to the node with the subtree. */
+    } instance;
+  };
 
   /* Bit trail. */
   uint bit_trail;
-
-  /* Padding. */
-  int pad;
 } KernelLightTreeNode;
 static_assert_align(KernelLightTreeNode, 16);
 
@@ -1397,10 +1417,23 @@ typedef struct KernelLightTreeEmitter {
   /* Energy. */
   float energy;
 
-  /* prim_id denotes the location in the lights or triangles array. */
-  int prim;
+  union {
+    struct {
+      int id; /* The location in the triangles array. */
+      EmissionSampling emission_sampling;
+    } triangle;
+
+    struct {
+      int id; /* The location in the lights array. */
+    } light;
+
+    struct {
+      int object_id;
+      int node_id;
+    } mesh;
+  };
+
   MeshLight mesh_light;
-  EmissionSampling emission_sampling;
 
   /* Parent. */
   int parent_index;

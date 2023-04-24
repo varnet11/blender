@@ -67,9 +67,7 @@ BlenderSync::BlenderSync(BL::RenderEngine &b_engine,
   max_subdivisions = RNA_int_get(&cscene, "max_subdivisions");
 }
 
-BlenderSync::~BlenderSync()
-{
-}
+BlenderSync::~BlenderSync() {}
 
 void BlenderSync::reset(BL::BlendData &b_data, BL::Scene &b_scene)
 {
@@ -636,6 +634,10 @@ static bool get_known_pass_type(BL::RenderPass &b_pass, PassType &type, PassMode
   MAP_PASS("AdaptiveAuxBuffer", PASS_ADAPTIVE_AUX_BUFFER, false);
   MAP_PASS("Debug Sample Count", PASS_SAMPLE_COUNT, false);
 
+  MAP_PASS("Guiding Color", PASS_GUIDING_COLOR, false);
+  MAP_PASS("Guiding Probability", PASS_GUIDING_PROBABILITY, false);
+  MAP_PASS("Guiding Average Roughness", PASS_GUIDING_AVG_ROUGHNESS, false);
+
   if (string_startswith(name, cryptomatte_prefix)) {
     type = PASS_CRYPTOMATTE;
     mode = PassMode::DENOISED;
@@ -685,18 +687,6 @@ void BlenderSync::sync_render_passes(BL::RenderLayer &b_rlay, BL::ViewLayer &b_v
     cryptomatte_passes = (CryptomatteType)(cryptomatte_passes | CRYPT_ASSET);
   }
   scene->film->set_cryptomatte_passes(cryptomatte_passes);
-
-  /* Path guiding debug passes. */
-#ifdef WITH_CYCLES_DEBUG
-  b_engine.add_pass("Guiding Color", 3, "RGB", b_view_layer.name().c_str());
-  pass_add(scene, PASS_GUIDING_COLOR, "Guiding Color", PassMode::NOISY);
-
-  b_engine.add_pass("Guiding Probability", 1, "X", b_view_layer.name().c_str());
-  pass_add(scene, PASS_GUIDING_PROBABILITY, "Guiding Probability", PassMode::NOISY);
-
-  b_engine.add_pass("Guiding Average Roughness", 1, "X", b_view_layer.name().c_str());
-  pass_add(scene, PASS_GUIDING_AVG_ROUGHNESS, "Guiding Average Roughness", PassMode::NOISY);
-#endif
 
   unordered_set<string> expected_passes;
 

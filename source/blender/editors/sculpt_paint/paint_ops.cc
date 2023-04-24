@@ -132,7 +132,19 @@ static eGPBrush_Presets gpencil_get_brush_preset_from_tool(bToolRef *tool,
       break;
     }
     case CTX_MODE_WEIGHT_GPENCIL: {
-      return GP_BRUSH_PRESET_DRAW_WEIGHT;
+      if (STREQ(tool->runtime->data_block, "DRAW")) {
+        return GP_BRUSH_PRESET_WEIGHT_DRAW;
+      }
+      if (STREQ(tool->runtime->data_block, "BLUR")) {
+        return GP_BRUSH_PRESET_WEIGHT_BLUR;
+      }
+      if (STREQ(tool->runtime->data_block, "AVERAGE")) {
+        return GP_BRUSH_PRESET_WEIGHT_AVERAGE;
+      }
+      if (STREQ(tool->runtime->data_block, "SMEAR")) {
+        return GP_BRUSH_PRESET_WEIGHT_SMEAR;
+      }
+      break;
     }
     case CTX_MODE_VERTEX_GPENCIL: {
       if (STREQ(tool->runtime->data_block, "DRAW")) {
@@ -1501,6 +1513,8 @@ void ED_operatortypes_paint(void)
   WM_operatortype_append(PAINT_OT_vert_select_hide);
   WM_operatortype_append(PAINT_OT_vert_select_linked);
   WM_operatortype_append(PAINT_OT_vert_select_linked_pick);
+  WM_operatortype_append(PAINT_OT_vert_select_more);
+  WM_operatortype_append(PAINT_OT_vert_select_less);
 
   /* vertex */
   WM_operatortype_append(PAINT_OT_vertex_paint_toggle);
@@ -1518,6 +1532,8 @@ void ED_operatortypes_paint(void)
   WM_operatortype_append(PAINT_OT_face_select_linked);
   WM_operatortype_append(PAINT_OT_face_select_linked_pick);
   WM_operatortype_append(PAINT_OT_face_select_all);
+  WM_operatortype_append(PAINT_OT_face_select_more);
+  WM_operatortype_append(PAINT_OT_face_select_less);
   WM_operatortype_append(PAINT_OT_face_select_hide);
 
   WM_operatortype_append(PAINT_OT_face_vert_reveal);

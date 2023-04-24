@@ -142,7 +142,7 @@ static float seq_cache_timeline_frame_to_frame_index(Scene *scene,
    * images or extended frame range of movies will only generate one cache entry. No special
    * treatment in converting frame index to timeline_frame is needed. */
   if (ELEM(type, SEQ_CACHE_STORE_RAW, SEQ_CACHE_STORE_THUMBNAIL)) {
-    return seq_give_frame_index(scene, seq, timeline_frame);
+    return SEQ_give_frame_index(scene, seq, timeline_frame);
   }
 
   return timeline_frame - SEQ_time_start_frame_get(seq);
@@ -437,6 +437,7 @@ static SeqCacheKey *seq_cache_get_item_for_removal(Scene *scene)
       rkey = key;
     }
   }
+  (void)total_count; /* Quiet set-but-unused warning (may be removed). */
 
   finalkey = seq_cache_choose_key(scene, lkey, rkey);
 

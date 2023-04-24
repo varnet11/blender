@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright 2022 Blender Foundation. All rights reserved. */
+ * Copyright 2022 Blender Foundation. */
 
 /** \file
  * \ingroup spseq
@@ -104,5 +104,3 @@ void SEQUENCER_GGT_gizmo_retime(wmGizmoGroupType *gzgt)
   gzgt->poll = gizmogroup_retime_poll;
   gzgt->setup = gizmogroup_retime_setup;
 }
-
-/** \} */

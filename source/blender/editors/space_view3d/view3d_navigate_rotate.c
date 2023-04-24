@@ -430,6 +430,10 @@ static int viewrotate_invoke(bContext *C, wmOperator *op, const wmEvent *event)
       viewops_flag_from_prefs() | VIEWOPS_FLAG_PERSP_ENSURE |
           (use_cursor_init ? VIEWOPS_FLAG_USE_MOUSE_INIT : 0));
 
+  if (vod->use_dyn_ofs && (vod->rv3d->is_persp == false)) {
+    vod->use_dyn_ofs_ortho_correction = true;
+  }
+
   ED_view3d_smooth_view_force_finish(C, vod->v3d, vod->region);
 
   if (ELEM(event->type, MOUSEPAN, MOUSEROTATE)) {
@@ -464,12 +468,6 @@ static int viewrotate_invoke(bContext *C, wmOperator *op, const wmEvent *event)
   return OPERATOR_RUNNING_MODAL;
 }
 
-static void viewrotate_cancel(bContext *C, wmOperator *op)
-{
-  viewops_data_free(C, op->customdata);
-  op->customdata = NULL;
-}
-
 void VIEW3D_OT_rotate(wmOperatorType *ot)
 {
   /* identifiers */
@@ -481,7 +479,7 @@ void VIEW3D_OT_rotate(wmOperatorType *ot)
   ot->invoke = viewrotate_invoke;
   ot->modal = viewrotate_modal;
   ot->poll = view3d_rotation_poll;
-  ot->cancel = viewrotate_cancel;
+  ot->cancel = view3d_navigate_cancel_fn;
 
   /* flags */
   ot->flag = OPTYPE_BLOCKING | OPTYPE_GRAB_CURSOR_XY;

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright 2013 Blender Foundation. All rights reserved. */
+ * Copyright 2013 Blender Foundation */
 
 /** \file
  * \ingroup depsgraph
@@ -195,6 +195,9 @@ struct PersistentOperationKey : public OperationKey {
 
 struct RNAPathKey {
   RNAPathKey(ID *id, const char *path, RNAPointerSource source);
+  RNAPathKey(const PointerRNA &target_prop,
+             const char *rna_path_from_target_prop,
+             RNAPointerSource source);
   RNAPathKey(ID *id, const PointerRNA &ptr, PropertyRNA *prop, RNAPointerSource source);
 
   string identifier() const;

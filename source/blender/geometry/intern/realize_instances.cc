@@ -64,9 +64,7 @@ struct AttributeFallbacksArray {
    */
   Array<const void *> array;
 
-  AttributeFallbacksArray(int size) : array(size, nullptr)
-  {
-  }
+  AttributeFallbacksArray(int size) : array(size, nullptr) {}
 };
 
 struct PointCloudRealizeInfo {
@@ -102,8 +100,8 @@ struct MeshElementStartIndices {
 struct MeshRealizeInfo {
   const Mesh *mesh = nullptr;
   Span<float3> positions;
-  Span<MEdge> edges;
-  Span<MPoly> polys;
+  Span<int2> edges;
+  OffsetIndices<int> polys;
   Span<int> corner_verts;
   Span<int> corner_edges;
 
@@ -202,6 +200,10 @@ struct AllMeshesInfo {
   VectorSet<Material *> materials;
   bool create_id_attribute = false;
   bool create_material_index_attribute = false;
+
+  /** True if we know that there are no loose edges in any of the input meshes. */
+  bool no_loose_edges_hint = false;
+  bool no_loose_verts_hint = false;
 };
 
 struct AllCurvesInfo {
@@ -226,8 +228,8 @@ struct GatherTasks {
 
   /* Volumes only have very simple support currently. Only the first found volume is put into the
    * output. */
-  UserCounter<const VolumeComponent> first_volume;
-  UserCounter<const GeometryComponentEditData> first_edit_data;
+  ImplicitSharingPtr<const VolumeComponent> first_volume;
+  ImplicitSharingPtr<const GeometryComponentEditData> first_edit_data;
 };
 
 /** Current offsets while during the gather operation. */
@@ -608,7 +610,7 @@ static void gather_realize_tasks_recursive(GatherTasksInfo &gather_info,
       case GEO_COMPONENT_TYPE_VOLUME: {
         const VolumeComponent *volume_component = static_cast<const VolumeComponent *>(component);
         if (!gather_info.r_tasks.first_volume) {
-          volume_component->user_add();
+          volume_component->add_user();
           gather_info.r_tasks.first_volume = volume_component;
         }
         break;
@@ -617,7 +619,7 @@ static void gather_realize_tasks_recursive(GatherTasksInfo &gather_info,
         const GeometryComponentEditData *edit_component =
             static_cast<const GeometryComponentEditData *>(component);
         if (!gather_info.r_tasks.first_edit_data) {
-          edit_component->user_add();
+          edit_component->add_user();
           gather_info.r_tasks.first_edit_data = edit_component;
         }
         break;
@@ -698,7 +700,7 @@ static AllPointCloudsInfo preprocess_pointclouds(const GeometrySet &geometry_set
       const eCustomDataType data_type = info.attributes.kinds[attribute_index].data_type;
       const eAttrDomain domain = info.attributes.kinds[attribute_index].domain;
       if (attributes.contains(attribute_id)) {
-        GVArray attribute = attributes.lookup_or_default(attribute_id, domain, data_type);
+        GVArray attribute = *attributes.lookup_or_default(attribute_id, domain, data_type);
         pointcloud_info.attributes[attribute_index].emplace(std::move(attribute));
       }
     }
@@ -709,9 +711,9 @@ static AllPointCloudsInfo preprocess_pointclouds(const GeometrySet &geometry_set
       }
     }
     if (info.create_radius_attribute) {
-      pointcloud_info.radii = attributes.lookup_or_default("radius", ATTR_DOMAIN_POINT, 0.01f);
+      pointcloud_info.radii = *attributes.lookup_or_default("radius", ATTR_DOMAIN_POINT, 0.01f);
     }
-    const VArray<float3> position_attribute = attributes.lookup_or_default<float3>(
+    const VArray<float3> position_attribute = *attributes.lookup_or_default<float3>(
         "position", ATTR_DOMAIN_POINT, float3(0));
     pointcloud_info.positions = position_attribute.get_internal_span();
   }
@@ -847,6 +849,7 @@ static OrderedAttributes gather_generic_mesh_attributes_to_propagate(
                                                     options.propagation_info,
                                                     attributes_to_propagate);
   attributes_to_propagate.remove("position");
+  attributes_to_propagate.remove(".edge_verts");
   attributes_to_propagate.remove(".corner_vert");
   attributes_to_propagate.remove(".corner_edge");
   r_create_id = attributes_to_propagate.pop_try("id").has_value();
@@ -927,7 +930,7 @@ static AllMeshesInfo preprocess_meshes(const GeometrySet &geometry_set,
       const eCustomDataType data_type = info.attributes.kinds[attribute_index].data_type;
       const eAttrDomain domain = info.attributes.kinds[attribute_index].domain;
       if (attributes.contains(attribute_id)) {
-        GVArray attribute = attributes.lookup_or_default(attribute_id, domain, data_type);
+        GVArray attribute = *attributes.lookup_or_default(attribute_id, domain, data_type);
         mesh_info.attributes[attribute_index].emplace(std::move(attribute));
       }
     }
@@ -937,9 +940,19 @@ static AllMeshesInfo preprocess_meshes(const GeometrySet &geometry_set,
         mesh_info.stored_vertex_ids = ids_attribute.varray.get_internal_span().typed<int>();
       }
     }
-    mesh_info.material_indices = attributes.lookup_or_default<int>(
+    mesh_info.material_indices = *attributes.lookup_or_default<int>(
         "material_index", ATTR_DOMAIN_FACE, 0);
   }
+
+  info.no_loose_edges_hint = std::all_of(
+      info.order.begin(), info.order.end(), [](const Mesh *mesh) {
+        return mesh->runtime->loose_edges_cache.is_cached() && mesh->loose_edges().count == 0;
+      });
+  info.no_loose_verts_hint = std::all_of(
+      info.order.begin(), info.order.end(), [](const Mesh *mesh) {
+        return mesh->runtime->loose_verts_cache.is_cached() && mesh->loose_verts().count == 0;
+      });
+
   return info;
 }
 
@@ -948,8 +961,8 @@ static void execute_realize_mesh_task(const RealizeInstancesOptions &options,
                                       const OrderedAttributes &ordered_attributes,
                                       MutableSpan<GSpanAttributeWriter> dst_attribute_writers,
                                       MutableSpan<float3> all_dst_positions,
-                                      MutableSpan<MEdge> all_dst_edges,
-                                      MutableSpan<MPoly> all_dst_polys,
+                                      MutableSpan<int2> all_dst_edges,
+                                      MutableSpan<int> all_dst_poly_offsets,
                                       MutableSpan<int> all_dst_corner_verts,
                                       MutableSpan<int> all_dst_corner_edges,
                                       MutableSpan<int> all_dst_vertex_ids,
@@ -959,8 +972,8 @@ static void execute_realize_mesh_task(const RealizeInstancesOptions &options,
   const Mesh &mesh = *mesh_info.mesh;
 
   const Span<float3> src_positions = mesh_info.positions;
-  const Span<MEdge> src_edges = mesh_info.edges;
-  const Span<MPoly> src_polys = mesh_info.polys;
+  const Span<int2> src_edges = mesh_info.edges;
+  const OffsetIndices src_polys = mesh_info.polys;
   const Span<int> src_corner_verts = mesh_info.corner_verts;
   const Span<int> src_corner_edges = mesh_info.corner_edges;
 
@@ -970,8 +983,8 @@ static void execute_realize_mesh_task(const RealizeInstancesOptions &options,
   const IndexRange dst_loop_range(task.start_indices.loop, src_corner_verts.size());
 
   MutableSpan<float3> dst_positions = all_dst_positions.slice(dst_vert_range);
-  MutableSpan<MEdge> dst_edges = all_dst_edges.slice(dst_edge_range);
-  MutableSpan<MPoly> dst_polys = all_dst_polys.slice(dst_poly_range);
+  MutableSpan<int2> dst_edges = all_dst_edges.slice(dst_edge_range);
+  MutableSpan<int> dst_poly_offsets = all_dst_poly_offsets.slice(dst_poly_range);
   MutableSpan<int> dst_corner_verts = all_dst_corner_verts.slice(dst_loop_range);
   MutableSpan<int> dst_corner_edges = all_dst_corner_edges.slice(dst_loop_range);
 
@@ -982,11 +995,7 @@ static void execute_realize_mesh_task(const RealizeInstancesOptions &options,
   });
   threading::parallel_for(src_edges.index_range(), 1024, [&](const IndexRange edge_range) {
     for (const int i : edge_range) {
-      const MEdge &src_edge = src_edges[i];
-      MEdge &dst_edge = dst_edges[i];
-      dst_edge = src_edge;
-      dst_edge.v1 += task.start_indices.vertex;
-      dst_edge.v2 += task.start_indices.vertex;
+      dst_edges[i] = src_edges[i] + task.start_indices.vertex;
     }
   });
   threading::parallel_for(src_corner_verts.index_range(), 1024, [&](const IndexRange loop_range) {
@@ -1001,10 +1010,7 @@ static void execute_realize_mesh_task(const RealizeInstancesOptions &options,
   });
   threading::parallel_for(src_polys.index_range(), 1024, [&](const IndexRange poly_range) {
     for (const int i : poly_range) {
-      const MPoly &src_poly = src_polys[i];
-      MPoly &dst_poly = dst_polys[i];
-      dst_poly = src_poly;
-      dst_poly.loopstart += task.start_indices.loop;
+      dst_poly_offsets[i] = src_polys[i].start() + task.start_indices.loop;
     }
   });
   if (!all_dst_material_indices.is_empty()) {
@@ -1080,13 +1086,13 @@ static void execute_realize_mesh_tasks(const RealizeInstancesOptions &options,
   const int tot_loops = last_task.start_indices.loop + last_mesh.totloop;
   const int tot_poly = last_task.start_indices.poly + last_mesh.totpoly;
 
-  Mesh *dst_mesh = BKE_mesh_new_nomain(tot_vertices, tot_edges, tot_loops, tot_poly);
+  Mesh *dst_mesh = BKE_mesh_new_nomain(tot_vertices, tot_edges, tot_poly, tot_loops);
   MeshComponent &dst_component = r_realized_geometry.get_component_for_write<MeshComponent>();
   dst_component.replace(dst_mesh);
   bke::MutableAttributeAccessor dst_attributes = dst_mesh->attributes_for_write();
   MutableSpan<float3> dst_positions = dst_mesh->vert_positions_for_write();
-  MutableSpan<MEdge> dst_edges = dst_mesh->edges_for_write();
-  MutableSpan<MPoly> dst_polys = dst_mesh->polys_for_write();
+  MutableSpan<int2> dst_edges = dst_mesh->edges_for_write();
+  MutableSpan<int> dst_poly_offsets = dst_mesh->poly_offsets_for_write();
   MutableSpan<int> dst_corner_verts = dst_mesh->corner_verts_for_write();
   MutableSpan<int> dst_corner_edges = dst_mesh->corner_edges_for_write();
 
@@ -1136,7 +1142,7 @@ static void execute_realize_mesh_tasks(const RealizeInstancesOptions &options,
                                 dst_attribute_writers,
                                 dst_positions,
                                 dst_edges,
-                                dst_polys,
+                                dst_poly_offsets,
                                 dst_corner_verts,
                                 dst_corner_edges,
                                 vertex_ids.span,
@@ -1150,6 +1156,13 @@ static void execute_realize_mesh_tasks(const RealizeInstancesOptions &options,
   }
   vertex_ids.finish();
   material_indices.finish();
+
+  if (all_meshes_info.no_loose_edges_hint) {
+    dst_mesh->loose_edges_tag_none();
+  }
+  if (all_meshes_info.no_loose_verts_hint) {
+    dst_mesh->tag_loose_verts_none();
+  }
 }
 
 /** \} */
@@ -1226,7 +1239,7 @@ static AllCurvesInfo preprocess_curves(const GeometrySet &geometry_set,
       const AttributeIDRef &attribute_id = info.attributes.ids[attribute_index];
       const eCustomDataType data_type = info.attributes.kinds[attribute_index].data_type;
       if (attributes.contains(attribute_id)) {
-        GVArray attribute = attributes.lookup_or_default(attribute_id, domain, data_type);
+        GVArray attribute = *attributes.lookup_or_default(attribute_id, domain, data_type);
         curve_info.attributes[attribute_index].emplace(std::move(attribute));
       }
     }
@@ -1239,12 +1252,12 @@ static AllCurvesInfo preprocess_curves(const GeometrySet &geometry_set,
 
     if (attributes.contains("radius")) {
       curve_info.radius =
-          attributes.lookup<float>("radius", ATTR_DOMAIN_POINT).get_internal_span();
+          attributes.lookup<float>("radius", ATTR_DOMAIN_POINT).varray.get_internal_span();
       info.create_radius_attribute = true;
     }
     if (attributes.contains("nurbs_weight")) {
       curve_info.nurbs_weight =
-          attributes.lookup<float>("nurbs_weight", ATTR_DOMAIN_POINT).get_internal_span();
+          attributes.lookup<float>("nurbs_weight", ATTR_DOMAIN_POINT).varray.get_internal_span();
       info.create_nurbs_weight_attribute = true;
     }
     curve_info.resolution = curves.resolution();
@@ -1253,9 +1266,9 @@ static AllCurvesInfo preprocess_curves(const GeometrySet &geometry_set,
     }
     if (attributes.contains("handle_right")) {
       curve_info.handle_left =
-          attributes.lookup<float3>("handle_left", ATTR_DOMAIN_POINT).get_internal_span();
+          attributes.lookup<float3>("handle_left", ATTR_DOMAIN_POINT).varray.get_internal_span();
       curve_info.handle_right =
-          attributes.lookup<float3>("handle_right", ATTR_DOMAIN_POINT).get_internal_span();
+          attributes.lookup<float3>("handle_right", ATTR_DOMAIN_POINT).varray.get_internal_span();
       info.create_handle_postion_attributes = true;
     }
   }

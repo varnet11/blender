@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright 2020 Blender Foundation. All rights reserved. */
+ * Copyright 2020 Blender Foundation */
 
 /** \file
  * \ingroup bke
@@ -648,8 +648,7 @@ static void foreach_vertex(const SubdivForeachContext *foreach_context,
   const int face_index = multires_reshape_grid_to_face_index(reshape_context,
                                                              grid_coord.grid_index);
 
-  const MPoly &base_poly = reshape_context->base_polys[face_index];
-  const int num_corners = base_poly.totloop;
+  const int num_corners = reshape_context->base_polys[face_index].size();
   const int start_grid_index = reshape_context->face_start_grid_index[face_index];
   const int corner = grid_coord.grid_index - start_grid_index;
 
@@ -796,7 +795,7 @@ static void foreach_vertex_of_loose_edge(const SubdivForeachContext *foreach_con
 static void store_edge(MultiresReshapeSmoothContext *reshape_smooth_context,
                        const int subdiv_v1,
                        const int subdiv_v2,
-                       const char crease)
+                       const float crease)
 {
   /* This is a bit overhead to use atomics in such a simple function called from many threads,
    * but this allows to save quite measurable amount of memory. */
@@ -806,7 +805,7 @@ static void store_edge(MultiresReshapeSmoothContext *reshape_smooth_context,
   Edge *edge = &reshape_smooth_context->geometry.edges[edge_index];
   edge->v1 = subdiv_v1;
   edge->v2 = subdiv_v2;
-  edge->sharpness = BKE_subdiv_crease_to_sharpness_char(crease);
+  edge->sharpness = BKE_subdiv_crease_to_sharpness_f(crease);
 }
 
 static void foreach_edge(const SubdivForeachContext *foreach_context,
@@ -822,7 +821,7 @@ static void foreach_edge(const SubdivForeachContext *foreach_context,
 
   if (reshape_smooth_context->smoothing_type == MULTIRES_SUBDIVIDE_LINEAR) {
     if (!is_loose) {
-      store_edge(reshape_smooth_context, subdiv_v1, subdiv_v2, char(255));
+      store_edge(reshape_smooth_context, subdiv_v1, subdiv_v2, 1.0f);
     }
     return;
   }
@@ -838,8 +837,8 @@ static void foreach_edge(const SubdivForeachContext *foreach_context,
     return;
   }
   /* Edges without crease are to be ignored as well. */
-  const char crease = get_effective_crease(reshape_smooth_context, coarse_edge_index);
-  if (crease == 0) {
+  const float crease = get_effective_crease(reshape_smooth_context, coarse_edge_index);
+  if (crease == 0.0f) {
     return;
   }
   store_edge(reshape_smooth_context, subdiv_v1, subdiv_v2, crease);
@@ -849,7 +848,7 @@ static void geometry_init_loose_information(MultiresReshapeSmoothContext *reshap
 {
   const MultiresReshapeContext *reshape_context = reshape_smooth_context->reshape_context;
   const Mesh *base_mesh = reshape_context->base_mesh;
-  const blender::Span<MPoly> base_polys = reshape_context->base_polys;
+  const blender::OffsetIndices base_polys = reshape_context->base_polys;
   const blender::Span<int> base_corner_edges = reshape_context->base_corner_edges;
 
   reshape_smooth_context->non_loose_base_edge_map = BLI_BITMAP_NEW(base_mesh->totedge,
@@ -857,8 +856,7 @@ static void geometry_init_loose_information(MultiresReshapeSmoothContext *reshap
 
   int num_used_edges = 0;
   for (const int poly_index : base_polys.index_range()) {
-    const MPoly &base_poly = base_polys[poly_index];
-    for (const int edge : base_corner_edges.slice(base_poly.loopstart, base_poly.totloop)) {
+    for (const int edge : base_corner_edges.slice(base_polys[poly_index])) {
       if (!BLI_BITMAP_TEST_BOOL(reshape_smooth_context->non_loose_base_edge_map, edge)) {
         BLI_BITMAP_ENABLE(reshape_smooth_context->non_loose_base_edge_map, edge);
 

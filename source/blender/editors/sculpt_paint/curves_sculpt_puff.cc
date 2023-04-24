@@ -79,9 +79,7 @@ struct PuffOperationExecutor {
   Span<float3> corner_normals_su_;
   BVHTreeFromMesh surface_bvh_;
 
-  PuffOperationExecutor(const bContext &C) : ctx_(C)
-  {
-  }
+  PuffOperationExecutor(const bContext &C) : ctx_(C) {}
 
   void execute(PuffOperation &self, const bContext &C, const StrokeExtension &stroke_extension)
   {
@@ -106,7 +104,7 @@ struct PuffOperationExecutor {
     brush_strength_ = brush_strength_get(*ctx_.scene, *brush_, stroke_extension);
     brush_pos_re_ = stroke_extension.mouse_position;
 
-    point_factors_ = curves_->attributes().lookup_or_default<float>(
+    point_factors_ = *curves_->attributes().lookup_or_default<float>(
         ".selection", ATTR_DOMAIN_POINT, 1.0f);
     curve_selection_ = curves::retrieve_selected_curves(*curves_id_, selected_curve_indices_);
 

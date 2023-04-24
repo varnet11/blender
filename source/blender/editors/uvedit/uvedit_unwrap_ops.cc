@@ -439,13 +439,7 @@ static ParamHandle *construct_param_handle(const Scene *scene,
   ParamHandle *handle = blender::geometry::uv_parametrizer_construct_begin();
 
   if (options->correct_aspect) {
-    float aspx, aspy;
-
-    ED_uvedit_get_aspect(ob, &aspx, &aspy);
-
-    if (aspx != aspy) {
-      blender::geometry::uv_parametrizer_aspect_ratio(handle, aspx, aspy);
-    }
+    blender::geometry::uv_parametrizer_aspect_ratio(handle, ED_uvedit_get_aspect_y(ob));
   }
 
   /* we need the vert indices */
@@ -488,12 +482,7 @@ static ParamHandle *construct_param_handle_multi(const Scene *scene,
 
   if (options->correct_aspect) {
     Object *ob = objects[0];
-    float aspx, aspy;
-
-    ED_uvedit_get_aspect(ob, &aspx, &aspy);
-    if (aspx != aspy) {
-      blender::geometry::uv_parametrizer_aspect_ratio(handle, aspx, aspy);
-    }
+    blender::geometry::uv_parametrizer_aspect_ratio(handle, ED_uvedit_get_aspect_y(ob));
   }
 
   /* we need the vert indices */
@@ -582,7 +571,7 @@ static Mesh *subdivide_edit_mesh(const Object *object,
   mesh_settings.resolution = (1 << smd->levels) + 1;
   mesh_settings.use_optimal_display = (smd->flags & eSubsurfModifierFlag_ControlEdges);
 
-  Subdiv *subdiv = BKE_subdiv_update_from_mesh(nullptr, &settings, me_from_em);
+  Subdiv *subdiv = BKE_subdiv_new_from_mesh(&settings, me_from_em);
   Mesh *result = BKE_subdiv_to_mesh(subdiv, &mesh_settings, me_from_em);
   BKE_id_free(nullptr, me_from_em);
   BKE_subdiv_free(subdiv);
@@ -616,13 +605,7 @@ static ParamHandle *construct_param_handle_subsurfed(const Scene *scene,
   ParamHandle *handle = blender::geometry::uv_parametrizer_construct_begin();
 
   if (options->correct_aspect) {
-    float aspx, aspy;
-
-    ED_uvedit_get_aspect(ob, &aspx, &aspy);
-
-    if (aspx != aspy) {
-      blender::geometry::uv_parametrizer_aspect_ratio(handle, aspx, aspy);
-    }
+    blender::geometry::uv_parametrizer_aspect_ratio(handle, ED_uvedit_get_aspect_y(ob));
   }
 
   /* number of subdivisions to perform */
@@ -637,8 +620,8 @@ static ParamHandle *construct_param_handle_subsurfed(const Scene *scene,
   Mesh *subdiv_mesh = subdivide_edit_mesh(ob, em, &smd);
 
   const float(*subsurfedPositions)[3] = BKE_mesh_vert_positions(subdiv_mesh);
-  const blender::Span<MEdge> subsurf_edges = subdiv_mesh->edges();
-  const blender::Span<MPoly> subsurf_polys = subdiv_mesh->polys();
+  const blender::Span<blender::int2> subsurf_edges = subdiv_mesh->edges();
+  const blender::OffsetIndices subsurf_polys = subdiv_mesh->polys();
   const blender::Span<int> subsurf_corner_verts = subdiv_mesh->corner_verts();
 
   const int *origVertIndices = static_cast<const int *>(
@@ -671,8 +654,7 @@ static ParamHandle *construct_param_handle_subsurfed(const Scene *scene,
   }
 
   /* Prepare and feed faces to the solver. */
-  for (const int64_t i : subsurf_polys.index_range()) {
-    const MPoly &poly = subsurf_polys[i];
+  for (const int i : subsurf_polys.index_range()) {
     ParamKey key, vkeys[4];
     bool pin[4], select[4];
     const float *co[4];
@@ -691,10 +673,10 @@ static ParamHandle *construct_param_handle_subsurfed(const Scene *scene,
       }
     }
 
-    const int *poly_corner_verts = &subsurf_corner_verts[poly.loopstart];
+    const blender::Span<int> poly_corner_verts = subsurf_corner_verts.slice(subsurf_polys[i]);
 
     /* We will not check for v4 here. Sub-surface faces always have 4 vertices. */
-    BLI_assert(poly.totloop == 4);
+    BLI_assert(poly_corner_verts.size() == 4);
     key = (ParamKey)i;
     vkeys[0] = (ParamKey)poly_corner_verts[0];
     vkeys[1] = (ParamKey)poly_corner_verts[1];
@@ -744,10 +726,10 @@ static ParamHandle *construct_param_handle_subsurfed(const Scene *scene,
   /* These are calculated from original mesh too. */
   for (const int64_t i : subsurf_edges.index_range()) {
     if ((edgeMap[i] != nullptr) && BM_elem_flag_test(edgeMap[i], BM_ELEM_SEAM)) {
-      const MEdge *edge = &subsurf_edges[i];
+      const blender::int2 &edge = subsurf_edges[i];
       ParamKey vkeys[2];
-      vkeys[0] = (ParamKey)edge->v1;
-      vkeys[1] = (ParamKey)edge->v2;
+      vkeys[0] = (ParamKey)edge[0];
+      vkeys[1] = (ParamKey)edge[1];
       blender::geometry::uv_parametrizer_edge_set_seam(handle, vkeys);
     }
   }
@@ -1069,154 +1051,6 @@ static void island_uv_transform(FaceIsland *island,
   }
 }
 
-static void bm_face_array_calc_bounds(BMFace **faces,
-                                      const int faces_len,
-                                      const int cd_loop_uv_offset,
-                                      rctf *r_bounds_rect)
-{
-  BLI_assert(cd_loop_uv_offset >= 0);
-  float bounds_min[2], bounds_max[2];
-  INIT_MINMAX2(bounds_min, bounds_max);
-  for (int i = 0; i < faces_len; i++) {
-    BMFace *f = faces[i];
-    BM_face_uv_minmax(f, bounds_min, bounds_max, cd_loop_uv_offset);
-  }
-  r_bounds_rect->xmin = bounds_min[0];
-  r_bounds_rect->ymin = bounds_min[1];
-  r_bounds_rect->xmax = bounds_max[0];
-  r_bounds_rect->ymax = bounds_max[1];
-}
-
-/**
- * Return an array of un-ordered UV coordinates,
- * without duplicating coordinates for loops that share a vertex.
- */
-static float (*bm_face_array_calc_unique_uv_coords(
-    BMFace **faces, int faces_len, const int cd_loop_uv_offset, int *r_coords_len))[2]
-{
-  BLI_assert(cd_loop_uv_offset >= 0);
-  int coords_len_alloc = 0;
-  for (int i = 0; i < faces_len; i++) {
-    BMFace *f = faces[i];
-    BMLoop *l_iter, *l_first;
-    l_iter = l_first = BM_FACE_FIRST_LOOP(f);
-    do {
-      BM_elem_flag_enable(l_iter, BM_ELEM_TAG);
-    } while ((l_iter = l_iter->next) != l_first);
-    coords_len_alloc += f->len;
-  }
-
-  float(*coords)[2] = static_cast<float(*)[2]>(
-      MEM_mallocN(sizeof(*coords) * coords_len_alloc, __func__));
-  int coords_len = 0;
-
-  for (int i = 0; i < faces_len; i++) {
-    BMFace *f = faces[i];
-    BMLoop *l_iter, *l_first;
-    l_iter = l_first = BM_FACE_FIRST_LOOP(f);
-    do {
-      if (!BM_elem_flag_test(l_iter, BM_ELEM_TAG)) {
-        /* Already walked over, continue. */
-        continue;
-      }
-
-      BM_elem_flag_disable(l_iter, BM_ELEM_TAG);
-      const float *luv = BM_ELEM_CD_GET_FLOAT_P(l_iter, cd_loop_uv_offset);
-      copy_v2_v2(coords[coords_len++], luv);
-
-      /* Un tag all connected so we don't add them twice.
-       * Note that we will tag other loops not part of `faces` but this is harmless,
-       * since we're only turning off a tag. */
-      BMVert *v_pivot = l_iter->v;
-      BMEdge *e_first = v_pivot->e;
-      const BMEdge *e = e_first;
-      do {
-        if (e->l != nullptr) {
-          const BMLoop *l_radial = e->l;
-          do {
-            if (l_radial->v == l_iter->v) {
-              if (BM_elem_flag_test(l_radial, BM_ELEM_TAG)) {
-                const float *luv_radial = BM_ELEM_CD_GET_FLOAT_P(l_radial, cd_loop_uv_offset);
-                if (equals_v2v2(luv, luv_radial)) {
-                  /* Don't add this UV when met in another face in `faces`. */
-                  BM_elem_flag_disable(l_iter, BM_ELEM_TAG);
-                }
-              }
-            }
-          } while ((l_radial = l_radial->radial_next) != e->l);
-        }
-      } while ((e = BM_DISK_EDGE_NEXT(e, v_pivot)) != e_first);
-    } while ((l_iter = l_iter->next) != l_first);
-  }
-  *r_coords_len = coords_len;
-  return coords;
-}
-
-static void face_island_uv_rotate_fit_aabb(FaceIsland *island)
-{
-  BMFace **faces = island->faces;
-  const int faces_len = island->faces_len;
-  const float aspect_y = island->aspect_y;
-  const int cd_loop_uv_offset = island->offsets.uv;
-
-  /* Calculate unique coordinates since calculating a convex hull can be an expensive operation. */
-  int coords_len;
-  float(*coords)[2] = bm_face_array_calc_unique_uv_coords(
-      faces, faces_len, cd_loop_uv_offset, &coords_len);
-
-  /* Correct aspect ratio. */
-  if (aspect_y != 1.0f) {
-    for (int i = 0; i < coords_len; i++) {
-      coords[i][1] /= aspect_y;
-    }
-  }
-
-  /* As the UV Packing API doesn't yet support rotation, we need
-   * to pre-rotate each island into the smallest AABB. */
-  float angle = BLI_convexhull_aabb_fit_points_2d(coords, coords_len);
-
-  /* Rotate coords by `angle` before computing bounding box. */
-  if (angle != 0.0f) {
-    float matrix[2][2];
-    angle_to_mat2(matrix, angle);
-    matrix[0][1] *= aspect_y;
-    matrix[1][1] *= aspect_y;
-    for (int i = 0; i < coords_len; i++) {
-      mul_m2_v2(matrix, coords[i]);
-    }
-  }
-
-  /* Compute new AABB. */
-  float bounds_min[2], bounds_max[2];
-  INIT_MINMAX2(bounds_min, bounds_max);
-  for (int i = 0; i < coords_len; i++) {
-    minmax_v2v2_v2(bounds_min, bounds_max, coords[i]);
-  }
-
-  /* "Stand-up" islands.
-   * If we rotate the AABB by 90 degrees, the aspect ratio correction for the X axis will be
-   * `aspect_y` and for the Y axis will be `1.0f / aspect_y`. Applying both corrections gives
-   * a combined factor of `aspect_y / (1.0f / aspect_y) == aspect_y * aspect_y`. */
-  float size[2];
-  sub_v2_v2v2(size, bounds_max, bounds_min);
-  if (size[1] < size[0] * (aspect_y * aspect_y)) {
-    angle += DEG2RADF(90.0f);
-  }
-
-  MEM_freeN(coords);
-
-  /* Apply rotation back to BMesh. */
-  if (angle != 0.0f) {
-    float matrix[2][2];
-    float pre_translate[2] = {0, 0};
-    angle_to_mat2(matrix, angle);
-    matrix[1][0] *= 1.0f / aspect_y;
-    /* matrix[1][1] *= aspect_y / aspect_y; */
-    matrix[0][1] *= aspect_y;
-    island_uv_transform(island, matrix, pre_translate);
-  }
-}
-
 /**
  * Calculates distance to nearest UDIM image tile in UV space and its UDIM tile number.
  */
@@ -1304,15 +1138,17 @@ static bool island_has_pins(const Scene *scene,
  * \param bmesh_override: BMesh array aligned with `objects`.
  * Optional, when non-null this overrides object's BMesh.
  * This is needed to perform UV packing on objects that aren't in edit-mode.
- * \param udim_params: Parameters to specify UDIM target and UDIM source image.
+ * \param udim_source_closest: UDIM source SpaceImage.
+ * \param original_selection: Pack to original selection.
  * \param params: Parameters and options to pass to the packing engine.
  */
 static void uvedit_pack_islands_multi(const Scene *scene,
                                       Object **objects,
                                       const int objects_len,
                                       BMesh **bmesh_override,
-                                      const UVMapUDIM_Params *closest_udim,
-                                      const blender::geometry::UVPackIsland_Params *params)
+                                      const SpaceImage *udim_source_closest,
+                                      const bool original_selection,
+                                      blender::geometry::UVPackIsland_Params *params)
 {
   blender::Vector<FaceIsland *> island_vector;
 
@@ -1374,27 +1210,24 @@ static void uvedit_pack_islands_multi(const Scene *scene,
 
   for (int index = 0; index < island_vector.size(); index++) {
     FaceIsland *island = island_vector[index];
-    if (closest_udim) {
-      /* Only calculate selection bounding box if using closest_udim. */
-      for (int i = 0; i < island->faces_len; i++) {
-        BMFace *f = island->faces[i];
-        BM_face_uv_minmax(f, selection_min_co, selection_max_co, island->offsets.uv);
-      }
-    }
 
-    if (params->rotate) {
-      face_island_uv_rotate_fit_aabb(island);
+    for (int i = 0; i < island->faces_len; i++) {
+      BMFace *f = island->faces[i];
+      BM_face_uv_minmax(f, selection_min_co, selection_max_co, island->offsets.uv);
     }
-
-    bm_face_array_calc_bounds(
-        island->faces, island->faces_len, island->offsets.uv, &island->bounds_rect);
   }
 
   /* Center of bounding box containing all selected UVs. */
   float selection_center[2];
-  if (closest_udim) {
-    selection_center[0] = (selection_min_co[0] + selection_max_co[0]) / 2.0f;
-    selection_center[1] = (selection_min_co[1] + selection_max_co[1]) / 2.0f;
+  mid_v2_v2v2(selection_center, selection_min_co, selection_max_co);
+
+  if (original_selection) {
+    /* Protect against degenerate source AABB. */
+    if ((selection_max_co[0] - selection_min_co[0]) * (selection_max_co[1] - selection_min_co[1]) >
+        1e-40f) {
+      params->target_aspect_y = (selection_max_co[0] - selection_min_co[0]) /
+                                (selection_max_co[1] - selection_min_co[1]);
+    }
   }
 
   MemArena *arena = BLI_memarena_new(BLI_MEMARENA_STD_BUFSIZE, __func__);
@@ -1405,8 +1238,8 @@ static void uvedit_pack_islands_multi(const Scene *scene,
   for (int i = 0; i < island_vector.size(); i++) {
     FaceIsland *face_island = island_vector[i];
     blender::geometry::PackIsland *pack_island = new blender::geometry::PackIsland();
-    pack_island->bounds_rect = face_island->bounds_rect;
     pack_island->caller_index = i;
+    pack_island->aspect_y = face_island->aspect_y;
     pack_island_vector.append(pack_island);
 
     for (int i = 0; i < face_island->faces_len; i++) {
@@ -1427,18 +1260,18 @@ static void uvedit_pack_islands_multi(const Scene *scene,
 
       BLI_memarena_clear(arena);
     }
-    pack_island->finalize_geometry(*params, arena, heap);
   }
   BLI_heap_free(heap, nullptr);
   BLI_memarena_free(arena);
+
   pack_islands(pack_island_vector, *params, scale);
 
   float base_offset[2] = {0.0f, 0.0f};
   copy_v2_v2(base_offset, params->udim_base_offset);
 
-  if (closest_udim) {
-    const Image *image = closest_udim->image;
-    const int *udim_grid = closest_udim->grid_shape;
+  if (udim_source_closest) {
+    const Image *image = udim_source_closest->image;
+    const int *udim_grid = udim_source_closest->tile_grid_shape;
     /* Check if selection lies on a valid UDIM grid tile. */
     bool is_valid_udim = uv_coords_isect_udim(image, udim_grid, selection_center);
     if (is_valid_udim) {
@@ -1473,10 +1306,7 @@ static void uvedit_pack_islands_multi(const Scene *scene,
   for (int64_t i : pack_island_vector.index_range()) {
     blender::geometry::PackIsland *pack_island = pack_island_vector[i];
     FaceIsland *island = island_vector[pack_island->caller_index];
-    matrix[0][0] = scale[0];
-    matrix[0][1] = 0.0f;
-    matrix[1][0] = 0.0f;
-    matrix[1][1] = scale[1];
+    pack_island->build_transformation(scale[0], pack_island->angle, matrix);
     invert_m2_m2(matrix_inverse, matrix);
 
     /* Add base_offset, post transform. */
@@ -1488,6 +1318,20 @@ static void uvedit_pack_islands_multi(const Scene *scene,
 
     /* Perform the transformation. */
     island_uv_transform(island, matrix, pre_translate);
+
+    if (original_selection) {
+      const float rescale_x = (selection_max_co[0] - selection_min_co[0]) /
+                              params->target_aspect_y;
+      const float rescale_y = (selection_max_co[1] - selection_min_co[1]);
+      const float rescale = std::min(rescale_x, rescale_y);
+      matrix[0][0] = rescale;
+      matrix[0][1] = 0.0f;
+      matrix[1][0] = 0.0f;
+      matrix[1][1] = rescale;
+      pre_translate[0] = selection_min_co[0] / rescale;
+      pre_translate[1] = selection_min_co[1] / rescale;
+      island_uv_transform(island, matrix, pre_translate);
+    }
 
     /* Cleanup memory. */
     pack_island_vector[i] = nullptr;
@@ -1513,7 +1357,8 @@ static void uvedit_pack_islands_multi(const Scene *scene,
 /* Packing targets. */
 enum {
   PACK_UDIM_SRC_CLOSEST = 0,
-  PACK_UDIM_SRC_ACTIVE = 1,
+  PACK_UDIM_SRC_ACTIVE,
+  PACK_ORIGINAL_AABB,
 };
 
 static int pack_islands_exec(bContext *C, wmOperator *op)
@@ -1551,6 +1396,7 @@ static int pack_islands_exec(bContext *C, wmOperator *op)
   blender::geometry::UVPackIsland_Params pack_island_params;
   pack_island_params.setFromUnwrapOptions(options);
   pack_island_params.rotate = RNA_boolean_get(op->ptr, "rotate");
+  pack_island_params.merge_overlap = RNA_boolean_get(op->ptr, "merge_overlap");
   pack_island_params.ignore_pinned = false;
   pack_island_params.margin_method = eUVPackIsland_MarginMethod(
       RNA_enum_get(op->ptr, "margin_method"));
@@ -1558,21 +1404,17 @@ static int pack_islands_exec(bContext *C, wmOperator *op)
   pack_island_params.shape_method = eUVPackIsland_ShapeMethod(
       RNA_enum_get(op->ptr, "shape_method"));
 
-  UVMapUDIM_Params closest_udim_buf;
-  UVMapUDIM_Params *closest_udim = nullptr;
   if (udim_source == PACK_UDIM_SRC_ACTIVE) {
     pack_island_params.setUDIMOffsetFromSpaceImage(sima);
   }
-  else if (sima) {
-    BLI_assert(udim_source == PACK_UDIM_SRC_CLOSEST);
-    closest_udim = &closest_udim_buf;
-    closest_udim->image = sima->image;
-    closest_udim->grid_shape[0] = sima->tile_grid_shape[0];
-    closest_udim->grid_shape[1] = sima->tile_grid_shape[1];
-  }
 
-  uvedit_pack_islands_multi(
-      scene, objects, objects_len, nullptr, closest_udim, &pack_island_params);
+  uvedit_pack_islands_multi(scene,
+                            objects,
+                            objects_len,
+                            nullptr,
+                            (udim_source == PACK_UDIM_SRC_CLOSEST) ? sima : nullptr,
+                            (udim_source == PACK_ORIGINAL_AABB),
+                            &pack_island_params);
 
   MEM_freeN(objects);
   return OPERATOR_FINISHED;
@@ -1610,6 +1452,11 @@ void UV_OT_pack_islands(wmOperatorType *ot)
        0,
        "Active UDIM",
        "Pack islands to active UDIM image tile or UDIM grid tile where 2D cursor is located"},
+      {PACK_ORIGINAL_AABB,
+       "ORIGINAL_AABB",
+       0,
+       "Original bounding box",
+       "Pack to starting bounding box of islands"},
       {0, nullptr, 0, nullptr, nullptr},
   };
   /* identifiers */
@@ -1627,6 +1474,8 @@ void UV_OT_pack_islands(wmOperatorType *ot)
   /* properties */
   RNA_def_enum(ot->srna, "udim_source", pack_target, PACK_UDIM_SRC_CLOSEST, "Pack to", "");
   RNA_def_boolean(ot->srna, "rotate", true, "Rotate", "Rotate islands for best fit");
+  RNA_def_boolean(
+      ot->srna, "merge_overlap", false, "Merge Overlapped", "Overlapping islands stick together");
   RNA_def_enum(ot->srna,
                "margin_method",
                pack_margin_method_items,
@@ -2355,7 +2204,8 @@ void ED_uvedit_live_unwrap(const Scene *scene, Object **objects, int objects_len
     pack_island_params.margin_method = ED_UVPACK_MARGIN_SCALED;
     pack_island_params.margin = scene->toolsettings->uvcalc_margin;
 
-    uvedit_pack_islands_multi(scene, objects, objects_len, nullptr, nullptr, &pack_island_params);
+    uvedit_pack_islands_multi(
+        scene, objects, objects_len, nullptr, nullptr, false, &pack_island_params);
   }
 }
 
@@ -2497,7 +2347,8 @@ static int unwrap_exec(bContext *C, wmOperator *op)
       RNA_enum_get(op->ptr, "margin_method"));
   pack_island_params.margin = RNA_float_get(op->ptr, "margin");
 
-  uvedit_pack_islands_multi(scene, objects, objects_len, nullptr, nullptr, &pack_island_params);
+  uvedit_pack_islands_multi(
+      scene, objects, objects_len, nullptr, nullptr, false, &pack_island_params);
 
   MEM_freeN(objects);
 
@@ -2878,7 +2729,7 @@ static int smart_project_exec(bContext *C, wmOperator *op)
     params.margin = RNA_float_get(op->ptr, "island_margin");
 
     uvedit_pack_islands_multi(
-        scene, objects_changed, object_changed_len, nullptr, nullptr, &params);
+        scene, objects_changed, object_changed_len, nullptr, nullptr, false, &params);
 
     /* #uvedit_pack_islands_multi only supports `per_face_aspect = false`. */
     const bool per_face_aspect = false;
@@ -3330,7 +3181,7 @@ static float uv_sphere_project(const Scene *scene,
                                const float branch_init)
 {
   float max_u = 0.0f;
-  if (BM_elem_flag_test(efa_init, BM_ELEM_TAG)) {
+  if (use_seams && BM_elem_flag_test(efa_init, BM_ELEM_TAG)) {
     return max_u;
   }
 
@@ -3507,7 +3358,7 @@ static float uv_cylinder_project(const Scene *scene,
                                  const float branch_init)
 {
   float max_u = 0.0f;
-  if (BM_elem_flag_test(efa_init, BM_ELEM_TAG)) {
+  if (use_seams && BM_elem_flag_test(efa_init, BM_ELEM_TAG)) {
     return max_u;
   }
 
@@ -3866,7 +3717,7 @@ void ED_uvedit_add_simple_uvs(Main *bmain, const Scene *scene, Object *ob)
   params.margin_method = ED_UVPACK_MARGIN_SCALED;
   params.margin = 0.001f;
 
-  uvedit_pack_islands_multi(scene, &ob, 1, &bm, nullptr, &params);
+  uvedit_pack_islands_multi(scene, &ob, 1, &bm, nullptr, false, &params);
 
   /* Write back from BMesh to Mesh. */
   BMeshToMeshParams bm_to_me_params{};

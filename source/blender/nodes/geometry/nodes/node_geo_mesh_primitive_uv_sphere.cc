@@ -105,7 +105,7 @@ BLI_NOINLINE static void calculate_sphere_vertex_data(MutableSpan<float3> positi
   vert_normals.last() = float3(0.0f, 0.0f, -1.0f);
 }
 
-BLI_NOINLINE static void calculate_sphere_edge_indices(MutableSpan<MEdge> edges,
+BLI_NOINLINE static void calculate_sphere_edge_indices(MutableSpan<int2> edges,
                                                        const int segments,
                                                        const int rings)
 {
@@ -114,9 +114,9 @@ BLI_NOINLINE static void calculate_sphere_edge_indices(MutableSpan<MEdge> edges,
   /* Add the edges connecting the top vertex to the first ring. */
   const int first_vert_ring_index_start = 1;
   for (const int segment : IndexRange(segments)) {
-    MEdge &edge = edges[edge_index++];
-    edge.v1 = 0;
-    edge.v2 = first_vert_ring_index_start + segment;
+    int2 &edge = edges[edge_index++];
+    edge[0] = 0;
+    edge[1] = first_vert_ring_index_start + segment;
   }
 
   int ring_vert_index_start = 1;
@@ -125,17 +125,17 @@ BLI_NOINLINE static void calculate_sphere_edge_indices(MutableSpan<MEdge> edges,
 
     /* Add the edges running along each ring. */
     for (const int segment : IndexRange(segments)) {
-      MEdge &edge = edges[edge_index++];
-      edge.v1 = ring_vert_index_start + segment;
-      edge.v2 = ring_vert_index_start + ((segment + 1) % segments);
+      int2 &edge = edges[edge_index++];
+      edge[0] = ring_vert_index_start + segment;
+      edge[1] = ring_vert_index_start + ((segment + 1) % segments);
     }
 
     /* Add the edges connecting to the next ring. */
     if (ring < rings - 2) {
       for (const int segment : IndexRange(segments)) {
-        MEdge &edge = edges[edge_index++];
-        edge.v1 = ring_vert_index_start + segment;
-        edge.v2 = next_ring_vert_index_start + segment;
+        int2 &edge = edges[edge_index++];
+        edge[0] = ring_vert_index_start + segment;
+        edge[1] = next_ring_vert_index_start + segment;
       }
     }
     ring_vert_index_start += segments;
@@ -145,36 +145,23 @@ BLI_NOINLINE static void calculate_sphere_edge_indices(MutableSpan<MEdge> edges,
   const int last_vert_index = sphere_vert_total(segments, rings) - 1;
   const int last_vert_ring_start = last_vert_index - segments;
   for (const int segment : IndexRange(segments)) {
-    MEdge &edge = edges[edge_index++];
-    edge.v1 = last_vert_index;
-    edge.v2 = last_vert_ring_start + segment;
+    int2 &edge = edges[edge_index++];
+    edge[0] = last_vert_index;
+    edge[1] = last_vert_ring_start + segment;
   }
 }
 
-BLI_NOINLINE static void calculate_sphere_faces(MutableSpan<MPoly> polys, const int segments)
+BLI_NOINLINE static void calculate_sphere_faces(MutableSpan<int> poly_offsets, const int segments)
 {
-  int loop_index = 0;
-
+  MutableSpan<int> poly_sizes = poly_offsets.drop_back(1);
   /* Add the triangles connected to the top vertex. */
-  for (MPoly &poly : polys.take_front(segments)) {
-    poly.loopstart = loop_index;
-    poly.totloop = 3;
-    loop_index += 3;
-  }
-
+  poly_sizes.take_front(segments).fill(3);
   /* Add the middle quads. */
-  for (MPoly &poly : polys.drop_front(segments).drop_back(segments)) {
-    poly.loopstart = loop_index;
-    poly.totloop = 4;
-    loop_index += 4;
-  }
-
+  poly_sizes.drop_front(segments).drop_back(segments).fill(4);
   /* Add the triangles connected to the bottom vertex. */
-  for (MPoly &poly : polys.take_back(segments)) {
-    poly.loopstart = loop_index;
-    poly.totloop = 3;
-    loop_index += 3;
-  }
+  poly_sizes.take_back(segments).fill(3);
+
+  offset_indices::accumulate_counts_to_offsets(poly_offsets);
 }
 
 BLI_NOINLINE static void calculate_sphere_corners(MutableSpan<int> corner_verts,
@@ -319,12 +306,12 @@ static Mesh *create_uv_sphere_mesh(const float radius,
 {
   Mesh *mesh = BKE_mesh_new_nomain(sphere_vert_total(segments, rings),
                                    sphere_edge_total(segments, rings),
-                                   sphere_corner_total(segments, rings),
-                                   sphere_face_total(segments, rings));
+                                   sphere_face_total(segments, rings),
+                                   sphere_corner_total(segments, rings));
   BKE_id_material_eval_ensure_default_slot(&mesh->id);
   MutableSpan<float3> positions = mesh->vert_positions_for_write();
-  MutableSpan<MEdge> edges = mesh->edges_for_write();
-  MutableSpan<MPoly> polys = mesh->polys_for_write();
+  MutableSpan<int2> edges = mesh->edges_for_write();
+  MutableSpan<int> poly_offsets = mesh->poly_offsets_for_write();
   MutableSpan<int> corner_verts = mesh->corner_verts_for_write();
   MutableSpan<int> corner_edges = mesh->corner_edges_for_write();
   BKE_mesh_smooth_flag_set(mesh, false);
@@ -338,7 +325,7 @@ static Mesh *create_uv_sphere_mesh(const float radius,
         BKE_mesh_vert_normals_clear_dirty(mesh);
       },
       [&]() { calculate_sphere_edge_indices(edges, segments, rings); },
-      [&]() { calculate_sphere_faces(polys, segments); },
+      [&]() { calculate_sphere_faces(poly_offsets, segments); },
       [&]() { calculate_sphere_corners(corner_verts, corner_edges, segments, rings); },
       [&]() {
         if (uv_map_id) {
@@ -346,6 +333,7 @@ static Mesh *create_uv_sphere_mesh(const float radius,
         }
       });
 
+  mesh->tag_loose_verts_none();
   mesh->loose_edges_tag_none();
   mesh->bounds_set_eager(calculate_bounds_uv_sphere(radius, segments, rings));
 
@@ -371,16 +359,10 @@ static void node_geo_exec(GeoNodeExecParams params)
 
   const float radius = params.extract_input<float>("Radius");
 
-  AutoAnonymousAttributeID uv_map_id = params.get_output_anonymous_attribute_id_if_needed(
-      "UV Map");
+  AnonymousAttributeIDPtr uv_map_id = params.get_output_anonymous_attribute_id_if_needed("UV Map");
 
   Mesh *mesh = create_uv_sphere_mesh(radius, segments_num, rings_num, uv_map_id.get());
   params.set_output("Mesh", GeometrySet::create_with_mesh(mesh));
-  if (uv_map_id) {
-    params.set_output("UV Map",
-                      AnonymousAttributeFieldInput::Create<float3>(
-                          std::move(uv_map_id), params.attribute_producer_name()));
-  }
 }
 
 }  // namespace blender::nodes::node_geo_mesh_primitive_uv_sphere_cc

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright 2009 Blender Foundation. All rights reserved. */
+ * Copyright 2009 Blender Foundation */
 
 /** \file
  * \ingroup edinterface
@@ -245,8 +245,8 @@ static void UI_OT_copy_as_driver_button(wmOperatorType *ot)
   ot->idname = "UI_OT_copy_as_driver_button";
   ot->description =
       "Create a new driver with this property as input, and copy it to the "
-      "clipboard. Use Paste Driver to add it to the target property, or Paste "
-      "Driver Variables to extend an existing driver";
+      "internal clipboard. Use Paste Driver to add it to the target property, "
+      "or Paste Driver Variables to extend an existing driver";
 
   /* callbacks */
   ot->exec = copy_as_driver_button_exec;

@@ -468,7 +468,7 @@ void SEQUENCER_OT_scene_strip_add(struct wmOperatorType *ot)
   /* Identifiers. */
   ot->name = "Add Scene Strip";
   ot->idname = "SEQUENCER_OT_scene_strip_add";
-  ot->description = "Add a strip to the sequencer using a blender scene as a source";
+  ot->description = "Add a strip to the sequencer using a Blender scene as a source";
 
   /* Api callbacks. */
   ot->invoke = sequencer_add_scene_strip_invoke;
@@ -1242,7 +1242,7 @@ void sequencer_image_seq_reserve_frames(
     char ext[PATH_MAX];
     char filename_stripped[PATH_MAX];
     /* Strip the frame from filename and substitute with `#`. */
-    BLI_path_frame_strip(filename, ext);
+    BLI_path_frame_strip(filename, ext, sizeof(ext));
 
     for (int i = 0; i < len; i++, se++) {
       BLI_strncpy(filename_stripped, filename, sizeof(filename_stripped));

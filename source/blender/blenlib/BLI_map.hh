@@ -171,9 +171,7 @@ class Map {
   {
   }
 
-  Map(NoExceptConstructor, Allocator allocator = {}) noexcept : Map(allocator)
-  {
-  }
+  Map(NoExceptConstructor, Allocator allocator = {}) noexcept : Map(allocator) {}
 
   ~Map() = default;
 
@@ -887,12 +885,14 @@ class Map {
   }
 
   /**
-   * Remove all key-value-pairs for that the given predicate is true.
+   * Remove all key-value-pairs for that the given predicate is true and return the number of
+   * removed pairs.
    *
    * This is similar to std::erase_if.
    */
-  template<typename Predicate> void remove_if(Predicate &&predicate)
+  template<typename Predicate> int64_t remove_if(Predicate &&predicate)
   {
+    const int64_t prev_size = this->size();
     for (Slot &slot : slots_) {
       if (slot.is_occupied()) {
         const Key &key = *slot.key();
@@ -903,6 +903,7 @@ class Map {
         }
       }
     }
+    return prev_size - this->size();
   }
 
   /**
@@ -1341,9 +1342,7 @@ template<typename Key, typename Value> class StdUnorderedMapWrapper {
     map_.clear();
   }
 
-  void print_stats(StringRef /*name*/ = "") const
-  {
-  }
+  void print_stats(StringRef /*name*/ = "") const {}
 };
 
 }  // namespace blender

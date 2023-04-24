@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright 2021 Blender Foundation. All rights reserved. */
+ * Copyright 2021 Blender Foundation */
 
 /** \file
  * \ingroup draw
@@ -30,46 +30,32 @@
 /** \name Update Loose Geometry
  * \{ */
 
-static void mesh_render_data_loose_geom_mesh(const MeshRenderData *mr, MeshBufferCache *cache)
+static void extract_set_bits(const blender::BitSpan bits, blender::MutableSpan<int> indices)
 {
-  using namespace blender;
-  BLI_bitmap *lvert_map = BLI_BITMAP_NEW(mr->vert_len, __func__);
-
-  const bke::LooseEdgeCache &loose_edges = mr->me->loose_edges();
-  if (loose_edges.count > 0) {
-    cache->loose_geom.edges.reinitialize(loose_edges.count);
-
-    int count = 0;
-    for (const int64_t i : loose_edges.is_loose_bits.index_range()) {
-      if (loose_edges.is_loose_bits[i]) {
-        cache->loose_geom.edges[count] = int(i);
-        count++;
-      }
-    }
-  }
-
-  /* Tag verts as not loose. */
-  for (const MEdge &edge : mr->edges) {
-    BLI_BITMAP_ENABLE(lvert_map, edge.v1);
-    BLI_BITMAP_ENABLE(lvert_map, edge.v2);
-  }
-
   int count = 0;
-  Array<int> loose_verts(mr->vert_len);
-  for (int v = 0; v < mr->vert_len; v++) {
-    if (!BLI_BITMAP_TEST(lvert_map, v)) {
-      loose_verts[count] = v;
+  for (const int64_t i : bits.index_range()) {
+    if (bits[i]) {
+      indices[count] = int(i);
       count++;
     }
   }
-  if (count < mr->vert_len) {
-    cache->loose_geom.verts = loose_verts.as_span().take_front(count);
-  }
-  else {
-    cache->loose_geom.verts = std::move(loose_verts);
+  BLI_assert(count == indices.size());
+}
+
+static void mesh_render_data_loose_geom_mesh(const MeshRenderData *mr, MeshBufferCache *cache)
+{
+  using namespace blender;
+  const bke::LooseEdgeCache &loose_edges = mr->me->loose_edges();
+  if (loose_edges.count > 0) {
+    cache->loose_geom.edges.reinitialize(loose_edges.count);
+    extract_set_bits(loose_edges.is_loose_bits, cache->loose_geom.edges);
   }
 
-  MEM_freeN(lvert_map);
+  const bke::LooseVertCache &loose_verts = mr->me->loose_verts();
+  if (loose_verts.count > 0) {
+    cache->loose_geom.verts.reinitialize(loose_verts.count);
+    extract_set_bits(loose_verts.is_loose_bits, cache->loose_geom.verts);
+  }
 }
 
 static void mesh_render_data_loose_verts_bm(const MeshRenderData *mr,
@@ -191,12 +177,11 @@ static void mesh_render_data_mat_tri_len_mesh_range_fn(void *__restrict userdata
   MeshRenderData *mr = static_cast<MeshRenderData *>(userdata);
   int *mat_tri_len = static_cast<int *>(tls->userdata_chunk);
 
-  const MPoly &poly = mr->polys[iter];
   if (!(mr->use_hide && mr->hide_poly && mr->hide_poly[iter])) {
     const int mat = mr->material_indices ?
                         clamp_i(mr->material_indices[iter], 0, mr->mat_len - 1) :
                         0;
-    mat_tri_len[mat] += poly.totloop - 2;
+    mat_tri_len[mat] += mr->polys[iter].size() - 2;
   }
 }
 
@@ -282,10 +267,9 @@ static void mesh_render_data_polys_sorted_build(MeshRenderData *mr, MeshBufferCa
   else {
     for (int i = 0; i < mr->poly_len; i++) {
       if (!(mr->use_hide && mr->hide_poly && mr->hide_poly[i])) {
-        const MPoly &poly = mr->polys[i];
         const int mat = mr->material_indices ? clamp_i(mr->material_indices[i], 0, mat_last) : 0;
         tri_first_index[i] = mat_tri_offs[mat];
-        mat_tri_offs[mat] += poly.totloop - 2;
+        mat_tri_offs[mat] += mr->polys[i].size() - 2;
       }
       else {
         tri_first_index[i] = -1;

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Copyright 2020 Blender Foundation. All rights reserved. */
+ * Copyright 2020 Blender Foundation */
 
 /** \file
  * \ingroup bgpencil
@@ -17,7 +17,7 @@
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_query.h"
 
-#include "ED_gpencil.h"
+#include "ED_gpencil_legacy.h"
 
 #include "gpencil_io.h"
 #include "gpencil_io_import_svg.hh"

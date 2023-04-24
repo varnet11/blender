@@ -268,6 +268,7 @@ enum {
 
   TFM_MODAL_VERT_EDGE_SLIDE = 31,
   TFM_MODAL_TRACKBALL = 32,
+  TFM_MODAL_ROTATE_NORMALS = 33,
 };
 
 /** \} */
@@ -810,6 +811,10 @@ void calculateCenter2D(TransInfo *t);
 void calculateCenterLocal(TransInfo *t, const float center_global[3]);
 
 void calculateCenter(TransInfo *t);
+/**
+ * Called every time the view changes due to navigation.
+ * Adjusts the mouse position relative to the object.
+ */
 void tranformViewUpdate(TransInfo *t);
 
 /* API functions for getting center points */

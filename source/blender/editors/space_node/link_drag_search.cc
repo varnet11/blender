@@ -114,6 +114,9 @@ static void add_group_input_node_fn(nodes::LinkSearchOpParams &params)
   /* Unhide the socket for the new input in the new node and make a connection to it. */
   socket->flag &= ~SOCK_HIDDEN;
   nodeAddLink(&params.node_tree, &group_input, socket, &params.node, &params.socket);
+
+  bke::node_socket_move_default_value(
+      *CTX_data_main(&params.C), params.node_tree, params.socket, *socket);
 }
 
 static void add_existing_group_input_fn(nodes::LinkSearchOpParams &params,
@@ -282,7 +285,10 @@ static void gather_socket_link_operations(const bContext &C,
 {
   NODE_TYPES_BEGIN (node_type) {
     const char *disabled_hint;
-    if (!(node_type->poll && node_type->poll(node_type, &node_tree, &disabled_hint))) {
+    if (node_type->poll && !node_type->poll(node_type, &node_tree, &disabled_hint)) {
+      continue;
+    }
+    if (node_type->add_ui_poll && !node_type->add_ui_poll(&C)) {
       continue;
     }
     if (StringRefNull(node_type->ui_name).endswith("(Legacy)")) {

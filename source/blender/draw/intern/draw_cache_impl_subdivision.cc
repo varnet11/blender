@@ -754,7 +754,7 @@ static void draw_subdiv_cache_extra_coarse_face_data_mesh(const MeshRenderData *
                                                           Mesh *mesh,
                                                           uint32_t *flags_data)
 {
-  const Span<MPoly> polys = mesh->polys();
+  const blender::OffsetIndices polys = mesh->polys();
   for (const int i : polys.index_range()) {
     uint32_t flag = 0;
     if (!(mr->sharp_faces && mr->sharp_faces[i])) {
@@ -766,7 +766,7 @@ static void draw_subdiv_cache_extra_coarse_face_data_mesh(const MeshRenderData *
     if (mr->hide_poly && mr->hide_poly[i]) {
       flag |= SUBDIV_COARSE_FACE_FLAG_HIDDEN;
     }
-    flags_data[i] = uint(polys[i].loopstart) | (flag << SUBDIV_COARSE_FACE_FLAG_OFFSET);
+    flags_data[i] = uint(polys[i].start()) | (flag << SUBDIV_COARSE_FACE_FLAG_OFFSET);
   }
 }
 
@@ -780,7 +780,7 @@ static void draw_subdiv_cache_extra_coarse_face_data_mapped(Mesh *mesh,
     return;
   }
 
-  const Span<MPoly> polys = mesh->polys();
+  const blender::OffsetIndices polys = mesh->polys();
   for (const int i : polys.index_range()) {
     BMFace *f = bm_original_face_get(mr, i);
     /* Selection and hiding from bmesh. */
@@ -789,7 +789,7 @@ static void draw_subdiv_cache_extra_coarse_face_data_mapped(Mesh *mesh,
     if (!(mr->sharp_faces && mr->sharp_faces[i])) {
       flag |= SUBDIV_COARSE_FACE_FLAG_SMOOTH;
     }
-    flags_data[i] = uint(polys[i].loopstart) | (flag << SUBDIV_COARSE_FACE_FLAG_OFFSET);
+    flags_data[i] = uint(polys[i].start()) | (flag << SUBDIV_COARSE_FACE_FLAG_OFFSET);
   }
 }
 
@@ -1209,7 +1209,7 @@ static bool draw_subdiv_build_cache(DRWSubdivCache *cache,
   }
 
   /* Only build polygon related data if we have polygons. */
-  const Span<MPoly> polys = mesh_eval->polys();
+  const blender::OffsetIndices polys = mesh_eval->polys();
   if (cache->num_subdiv_loops != 0) {
     /* Build buffers for the PatchMap. */
     draw_patch_map_build(&cache->gpu_patch_map, subdiv);
@@ -1223,7 +1223,7 @@ static bool draw_subdiv_build_cache(DRWSubdivCache *cache,
         GPU_vertbuf_get_data(cache->fdots_patch_coords);
     for (int i = 0; i < mesh_eval->totpoly; i++) {
       const int ptex_face_index = cache->face_ptex_offset[i];
-      if (polys[i].totloop == 4) {
+      if (polys[i].size() == 4) {
         /* For quads, the center coordinate of the coarse face has `u = v = 0.5`. */
         blender_fdots_patch_coords[i] = make_patch_coord(ptex_face_index, 0.5f, 0.5f);
       }
@@ -1881,6 +1881,7 @@ void draw_subdiv_build_lines_loose_buffer(const DRWSubdivCache *cache,
 void draw_subdiv_build_edge_fac_buffer(const DRWSubdivCache *cache,
                                        GPUVertBuf *pos_nor,
                                        GPUVertBuf *edge_draw_flag,
+                                       GPUVertBuf *poly_other_map,
                                        GPUVertBuf *edge_fac)
 {
   GPUShader *shader = get_subdiv_shader(SHADER_BUFFER_EDGE_FAC);
@@ -1889,6 +1890,7 @@ void draw_subdiv_build_edge_fac_buffer(const DRWSubdivCache *cache,
   int binding_point = 0;
   GPU_vertbuf_bind_as_ssbo(pos_nor, binding_point++);
   GPU_vertbuf_bind_as_ssbo(edge_draw_flag, binding_point++);
+  GPU_vertbuf_bind_as_ssbo(poly_other_map, binding_point++);
   GPU_vertbuf_bind_as_ssbo(edge_fac, binding_point++);
   BLI_assert(binding_point <= MAX_GPU_SUBDIV_SSBOS);
 
@@ -2038,7 +2040,8 @@ static void draw_subdiv_cache_ensure_mat_offsets(DRWSubdivCache *cache,
     return;
   }
 
-  const blender::VArraySpan<int> material_indices = mesh_eval->attributes().lookup_or_default<int>(
+  const blender::bke::AttributeAccessor attributes = mesh_eval->attributes();
+  const blender::VArraySpan<int> material_indices = *attributes.lookup_or_default<int>(
       "material_index", ATTR_DOMAIN_FACE, 0);
 
   /* Count number of subdivided polygons for each material. */
@@ -2228,7 +2231,7 @@ void DRW_subdivide_loose_geom(DRWSubdivCache *subdiv_cache, MeshBufferCache *cac
 
   /* Subdivide each loose coarse edge. */
   const Span<float3> coarse_positions = coarse_mesh->vert_positions();
-  const Span<MEdge> coarse_edges = coarse_mesh->edges();
+  const Span<int2> coarse_edges = coarse_mesh->edges();
 
   int *vert_to_edge_buffer;
   MeshElemMap *vert_to_edge_map;
@@ -2240,7 +2243,7 @@ void DRW_subdivide_loose_geom(DRWSubdivCache *subdiv_cache, MeshBufferCache *cac
 
   for (int i = 0; i < coarse_loose_edge_len; i++) {
     const int coarse_edge_index = cache->loose_geom.edges[i];
-    const MEdge *coarse_edge = &coarse_edges[cache->loose_geom.edges[i]];
+    const blender::int2 &coarse_edge = coarse_edges[cache->loose_geom.edges[i]];
 
     /* Perform interpolation of each vertex. */
     for (int i = 0; i < resolution - 1; i++, subd_edge_offset++) {
@@ -2249,7 +2252,7 @@ void DRW_subdivide_loose_geom(DRWSubdivCache *subdiv_cache, MeshBufferCache *cac
 
       /* First vert. */
       DRWSubdivLooseVertex &subd_v1 = loose_subd_verts[subd_vert_offset];
-      subd_v1.coarse_vertex_index = (i == 0) ? coarse_edge->v1 : -1u;
+      subd_v1.coarse_vertex_index = (i == 0) ? coarse_edge[0] : -1u;
       const float u1 = i * inv_resolution_1;
       BKE_subdiv_mesh_interpolate_position_on_edge(
           reinterpret_cast<const float(*)[3]>(coarse_positions.data()),
@@ -2264,7 +2267,7 @@ void DRW_subdivide_loose_geom(DRWSubdivCache *subdiv_cache, MeshBufferCache *cac
 
       /* Second vert. */
       DRWSubdivLooseVertex &subd_v2 = loose_subd_verts[subd_vert_offset];
-      subd_v2.coarse_vertex_index = ((i + 1) == resolution - 1) ? coarse_edge->v2 : -1u;
+      subd_v2.coarse_vertex_index = ((i + 1) == resolution - 1) ? coarse_edge[1] : -1u;
       const float u2 = (i + 1) * inv_resolution_1;
       BKE_subdiv_mesh_interpolate_position_on_edge(
           reinterpret_cast<const float(*)[3]>(coarse_positions.data()),
