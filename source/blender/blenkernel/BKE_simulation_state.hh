@@ -30,9 +30,42 @@ class GeometrySimulationStateItem : public SimulationStateItem {
   }
 };
 
+class PrimitiveSimulationStateItem : public SimulationStateItem {
+ private:
+  const CPPType &type_;
+  void *value_;
+
+ public:
+  PrimitiveSimulationStateItem(const CPPType &type, const void *value);
+  ~PrimitiveSimulationStateItem();
+
+  const void *value() const
+  {
+    return value_;
+  }
+
+  const CPPType &type() const
+  {
+    return type_;
+  }
+};
+
+class StringSimulationStateItem : public SimulationStateItem {
+ private:
+  std::string value_;
+
+ public:
+  StringSimulationStateItem(std::string value);
+
+  StringRefNull value() const
+  {
+    return value_;
+  }
+};
+
 class SimulationZoneState {
  public:
-  Vector<std::unique_ptr<SimulationStateItem>> items;
+  Map<int, std::unique_ptr<SimulationStateItem>> item_by_identifier;
 };
 
 struct SimulationZoneID {

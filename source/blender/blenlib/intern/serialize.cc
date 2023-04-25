@@ -203,6 +203,11 @@ void ArrayValue::append_int(const int value)
   this->append(std::make_shared<IntValue>(value));
 }
 
+void ArrayValue::append_double(const double value)
+{
+  this->append(std::make_shared<DoubleValue>(value));
+}
+
 void ArrayValue::append_str(std::string value)
 {
   this->append(std::make_shared<StringValue>(std::move(value)));
@@ -230,6 +235,11 @@ std::shared_ptr<ArrayValue> ArrayValue::append_array()
 void DictionaryValue::append_int(std::string key, const int64_t value)
 {
   this->append(std::move(key), std::make_shared<IntValue>(value));
+}
+
+void DictionaryValue::append_double(std::string key, const double value)
+{
+  this->append(std::move(key), std::make_shared<DoubleValue>(value));
 }
 
 void DictionaryValue::append_str(std::string key, const std::string value)

@@ -91,16 +91,25 @@ class LazyFunctionForSimulationInputNode final : public LazyFunction {
     }
     else {
       for (const int i : simulation_items_.index_range()) {
-        if (i >= prev_zone_state->items.size()) {
-          params.set_output(i + 1, GeometrySet());
+        const NodeSimulationItem &item = simulation_items_[i];
+
+        /* First output parameter is "Delta Time", state item parameters start at index 1. */
+        const int output_index = i + 1;
+
+        if (!prev_zone_state->item_by_identifier.contains(item.identifier)) {
+          void *data_ptr = params.get_output_data_ptr(output_index);
+          outputs_[output_index].type->value_initialize(data_ptr);
+          params.output_set(output_index);
           continue;
         }
-        const bke::sim::SimulationStateItem *state_item = prev_zone_state->items[i].get();
-        if (state_item != nullptr) {
-          /* First output parameter is "Delta Time", state item parameters start at index 1. */
-          copy_simulation_state_to_output_param(
-              params, i + 1, eNodeSocketDatatype(simulation_items_[i].socket_type), *state_item);
-        }
+
+        const bke::sim::SimulationStateItem &state_item =
+            *prev_zone_state->item_by_identifier.lookup(item.identifier);
+        copy_simulation_state_to_output_param(
+            params,
+            output_index,
+            eNodeSocketDatatype(simulation_items_[i].socket_type),
+            state_item);
       }
     }
   }

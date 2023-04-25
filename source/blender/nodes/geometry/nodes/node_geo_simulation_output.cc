@@ -12,6 +12,8 @@
 #include "NOD_common.h"
 #include "NOD_socket.h"
 
+#include "FN_field_cpp_type.hh"
+
 #include "node_geometry_util.hh"
 
 namespace blender::nodes {
@@ -120,18 +122,31 @@ const CPPType &get_simulation_item_cpp_type(const NodeSimulationItem &item)
 
 /** Create a simulation state item from parameter input data. */
 static std::unique_ptr<bke::sim::SimulationStateItem> make_simulation_state_item(
-    const eNodeSocketDatatype socket_type, void *input_data)
+    const NodeSimulationItem &item, const void *input_data)
 {
+  const eNodeSocketDatatype socket_type = eNodeSocketDatatype(item.socket_type);
   if (socket_type == SOCK_GEOMETRY) {
-    GeometrySet *input_geometry = static_cast<GeometrySet *>(input_data);
-    input_geometry->ensure_owns_direct_data();
-    return std::make_unique<bke::sim::GeometrySimulationStateItem>(*input_geometry);
+    GeometrySet input_geometry = *static_cast<const GeometrySet *>(input_data);
+    input_geometry.ensure_owns_direct_data();
+    return std::make_unique<bke::sim::GeometrySimulationStateItem>(std::move(input_geometry));
   }
-  else {
-    /* TODO: Implement for non-geometry state items. */
-    GeometrySet geometry;
-    return std::make_unique<bke::sim::GeometrySimulationStateItem>(geometry);
+  if (ELEM(socket_type, SOCK_FLOAT, SOCK_VECTOR, SOCK_INT, SOCK_BOOLEAN, SOCK_RGBA)) {
+    const CPPType &type = get_simulation_item_cpp_type(item);
+    const fn::ValueOrFieldCPPType &value_or_field_type = *fn::ValueOrFieldCPPType::get_from_self(
+        type);
+    if (!value_or_field_type.is_field(input_data)) {
+      const void *value = value_or_field_type.get_value_ptr(input_data);
+      return std::make_unique<bke::sim::PrimitiveSimulationStateItem>(value_or_field_type.value,
+                                                                      value);
+    }
   }
+  if (socket_type == SOCK_STRING) {
+    const ValueOrField<std::string> &input_value = *static_cast<const ValueOrField<std::string> *>(
+        input_data);
+    return std::make_unique<bke::sim::StringSimulationStateItem>(input_value.as_value());
+  }
+  /* TODO: Implement remaining state items. */
+  return {};
 }
 
 /** Copy the current simulation state to the node output parameter. */
@@ -146,15 +161,31 @@ void copy_simulation_state_to_output_param(lf::Params &params,
     const bke::sim::GeometrySimulationStateItem &geo_state_item =
         static_cast<const bke::sim::GeometrySimulationStateItem &>(state_item);
     params.set_output(index, geo_state_item.geometry());
+    return;
   }
-  else {
-    /* TODO: Implement for non-geometry state items. */
-    if (const void *src = cpptype.default_value()) {
-      void *dst = params.get_output_data_ptr(index);
-      cpptype.copy_construct(src, dst);
-      params.output_set(index);
+  if (ELEM(socket_type, SOCK_FLOAT, SOCK_VECTOR, SOCK_INT, SOCK_BOOLEAN, SOCK_RGBA)) {
+    if (const auto *typed_state_item =
+            dynamic_cast<const bke::sim::PrimitiveSimulationStateItem *>(&state_item)) {
+      const fn::ValueOrFieldCPPType &value_or_field_type = *fn::ValueOrFieldCPPType::get_from_self(
+          cpptype);
+      if (typed_state_item->type() == value_or_field_type.value) {
+        void *r_value = params.get_output_data_ptr(index);
+        value_or_field_type.construct_from_value(r_value, typed_state_item->value());
+        params.output_set(index);
+        return;
+      }
     }
   }
+  if (socket_type == SOCK_STRING) {
+    if (const auto *typed_state_item = dynamic_cast<const bke::sim::StringSimulationStateItem *>(
+            &state_item)) {
+      params.set_output(index, ValueOrField<std::string>(typed_state_item->value()));
+      return;
+    }
+  }
+  void *dst = params.get_output_data_ptr(index);
+  cpptype.value_initialize(dst);
+  params.output_set(index);
 }
 
 }  // namespace blender::nodes
@@ -237,7 +268,9 @@ class LazyFunctionForSimulationOutputNode final : public LazyFunction {
 
     bke::sim::SimulationZoneState &new_zone_state =
         modifier_data.current_simulation_state_for_write->get_zone_state_for_write(zone_id);
-    new_zone_state.items.reinitialize(simulation_items_.size());
+    if (eval_data.is_first_evaluation) {
+      new_zone_state.item_by_identifier.clear();
+    }
 
     bool all_available = true;
     for (const int i : simulation_items_.index_range()) {
@@ -248,9 +281,15 @@ class LazyFunctionForSimulationOutputNode final : public LazyFunction {
         all_available = false;
         continue;
       }
-
-      new_zone_state.items[i] = make_simulation_state_item(eNodeSocketDatatype(item.socket_type),
-                                                           input_data);
+      if (new_zone_state.item_by_identifier.contains(item.identifier)) {
+        continue;
+      }
+      std::unique_ptr<bke::sim::SimulationStateItem> new_state_item = make_simulation_state_item(
+          item, input_data);
+      if (!new_state_item) {
+        continue;
+      }
+      new_zone_state.item_by_identifier.add_new(item.identifier, std::move(new_state_item));
     }
 
     if (all_available) {
@@ -262,16 +301,13 @@ class LazyFunctionForSimulationOutputNode final : public LazyFunction {
   {
     for (const int i : simulation_items_.index_range()) {
       const NodeSimulationItem &item = simulation_items_[i];
-
-      if (i >= state.items.size()) {
+      if (!state.item_by_identifier.contains(item.identifier)) {
         continue;
       }
-      const bke::sim::SimulationStateItem *state_item = state.items[i].get();
-      if (state_item == nullptr) {
-        continue;
-      }
+      const bke::sim::SimulationStateItem &state_item = *state.item_by_identifier.lookup(
+          item.identifier);
       copy_simulation_state_to_output_param(
-          params, i, eNodeSocketDatatype(item.socket_type), *state_item);
+          params, i, eNodeSocketDatatype(item.socket_type), state_item);
     }
     params.set_default_remaining_outputs();
   }

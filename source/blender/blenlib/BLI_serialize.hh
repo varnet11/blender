@@ -240,6 +240,7 @@ class ArrayValue : public ContainerValue<Vector<std::shared_ptr<Value>>, eValueT
   }
 
   void append_int(int value);
+  void append_double(double value);
   void append_str(std::string value);
   void append_null();
   std::shared_ptr<DictionaryValue> append_dict();
@@ -308,6 +309,16 @@ class DictionaryValue
     return std::nullopt;
   }
 
+  std::optional<double> lookup_double(const StringRef key) const
+  {
+    if (const std::shared_ptr<Value> *value = this->lookup_value(key)) {
+      if (const DoubleValue *double_value = (*value)->as_double_value()) {
+        return double_value->value();
+      }
+    }
+    return std::nullopt;
+  }
+
   const DictionaryValue *lookup_dict(const StringRef key) const
   {
     if (const std::shared_ptr<Value> *value = this->lookup_value(key)) {
@@ -330,6 +341,7 @@ class DictionaryValue
   }
 
   void append_int(std::string key, int64_t value);
+  void append_double(std::string key, double value);
   void append_str(std::string key, std::string value);
   std::shared_ptr<DictionaryValue> append_dict(std::string key);
   std::shared_ptr<ArrayValue> append_array(std::string key);

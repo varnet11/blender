@@ -732,6 +732,68 @@ static std::shared_ptr<DictionaryValue> serialize_geometry_set(const GeometrySet
   return io_geometry;
 }
 
+static std::shared_ptr<io::serialize::ArrayValue> serialize_float_array(const Span<float> values)
+{
+  auto io_value = std::make_shared<io::serialize::ArrayValue>();
+  for (const float value : values) {
+    io_value->append_double(value);
+  }
+  return io_value;
+}
+
+static std::shared_ptr<io::serialize::ArrayValue> serialize_int_array(const Span<int> values)
+{
+  auto io_value = std::make_shared<io::serialize::ArrayValue>();
+  for (const int value : values) {
+    io_value->append_int(value);
+  }
+  return io_value;
+}
+
+static std::shared_ptr<io::serialize::Value> serialize_primitive_value(
+    const eCustomDataType data_type, const void *value_ptr)
+{
+  switch (data_type) {
+    case CD_PROP_FLOAT: {
+      const float value = *static_cast<const float *>(value_ptr);
+      return std::make_shared<io::serialize::DoubleValue>(value);
+    }
+    case CD_PROP_FLOAT2: {
+      const float2 value = *static_cast<const float2 *>(value_ptr);
+      return serialize_float_array({&value.x, 2});
+    }
+    case CD_PROP_FLOAT3: {
+      const float3 value = *static_cast<const float3 *>(value_ptr);
+      return serialize_float_array({&value.x, 3});
+    }
+    case CD_PROP_BOOL: {
+      const bool value = *static_cast<const bool *>(value_ptr);
+      return std::make_shared<io::serialize::BooleanValue>(value);
+    }
+    case CD_PROP_INT32: {
+      const int value = *static_cast<const int *>(value_ptr);
+      return std::make_shared<io::serialize::IntValue>(value);
+    }
+    case CD_PROP_INT32_2D: {
+      const int2 value = *static_cast<const int2 *>(value_ptr);
+      return serialize_int_array({&value.x, 2});
+    }
+    case CD_PROP_BYTE_COLOR: {
+      const ColorGeometry4b value = *static_cast<const ColorGeometry4b *>(value_ptr);
+      const int4 value_int{&value.r};
+      return serialize_int_array({&value_int.x, 4});
+    }
+    case CD_PROP_COLOR: {
+      const ColorGeometry4f value = *static_cast<const ColorGeometry4f *>(value_ptr);
+      return serialize_float_array({&value.r, 4});
+    }
+    default:
+      break;
+  }
+  BLI_assert_unreachable();
+  return {};
+}
+
 void serialize_modifier_simulation_state(const ModifierSimulationState &state,
                                          BDataWriter &bdata_writer,
                                          BDataSharing &bdata_sharing,
@@ -753,25 +815,161 @@ void serialize_modifier_simulation_state(const ModifierSimulationState &state,
     }
 
     auto io_state_items = io_zone->append_array("state_items");
-    for (const std::unique_ptr<SimulationStateItem> &state_item : zone_state.items) {
-      /* TODO: Use better id. */
-      const std::string state_item_id = std::to_string(&state_item - zone_state.items.begin());
-
+    for (const MapItem<int, std::unique_ptr<SimulationStateItem>> &state_item_with_id :
+         zone_state.item_by_identifier.items()) {
       auto io_state_item = io_state_items->append_dict();
 
-      io_state_item->append_str("id", state_item_id);
+      io_state_item->append_int("id", state_item_with_id.key);
 
       if (const GeometrySimulationStateItem *geometry_state_item =
-              dynamic_cast<const GeometrySimulationStateItem *>(state_item.get())) {
-        io_state_item->append_str("type", "geometry");
+              dynamic_cast<const GeometrySimulationStateItem *>(state_item_with_id.value.get())) {
+        io_state_item->append_str("type", "GEOMETRY");
 
         const GeometrySet &geometry = geometry_state_item->geometry();
 
         auto io_geometry = serialize_geometry_set(geometry, bdata_writer, bdata_sharing);
         io_state_item->append("data", io_geometry);
       }
+      else if (const StringSimulationStateItem *string_state_item =
+                   dynamic_cast<const StringSimulationStateItem *>(
+                       state_item_with_id.value.get())) {
+        io_state_item->append_str("type", "STRING");
+        const StringRefNull str = string_state_item->value();
+        /* Small strings are inlined, larger strings are stored separately. */
+        const int64_t bdata_threshold = 100;
+        if (str.size() < bdata_threshold) {
+          io_state_item->append_str("data", string_state_item->value());
+        }
+        else {
+          io_state_item->append("data",
+                                write_bdata_raw_bytes(bdata_writer, str.data(), str.size()));
+        }
+      }
+      else if (const PrimitiveSimulationStateItem *primitive_state_item =
+                   dynamic_cast<const PrimitiveSimulationStateItem *>(
+                       state_item_with_id.value.get())) {
+        const eCustomDataType data_type = cpp_type_to_custom_data_type(
+            primitive_state_item->type());
+        io_state_item->append_str("type", get_data_type_io_name(data_type));
+        auto io_data = serialize_primitive_value(data_type, primitive_state_item->value());
+        io_state_item->append("data", std::move(io_data));
+      }
     }
   }
+}
+
+template<typename T>
+[[nodiscard]] static bool deserialize_typed_array(
+    const io::serialize::Value &io_value,
+    FunctionRef<std::optional<T>(const io::serialize::Value &io_element)> fn,
+    MutableSpan<T> r_values)
+{
+  const io::serialize::ArrayValue *io_array = io_value.as_array_value();
+  if (!io_array) {
+    return false;
+  }
+  if (io_array->elements().size() != r_values.size()) {
+    return false;
+  }
+  for (const int i : r_values.index_range()) {
+    const io::serialize::Value &io_element = *io_array->elements()[i];
+    std::optional<T> element = fn(io_element);
+    if (!element) {
+      return false;
+    }
+    r_values[i] = std::move(*element);
+  }
+  return true;
+}
+
+template<typename T> static std::optional<T> deserialize_int(const io::serialize::Value &io_value)
+{
+  const io::serialize::IntValue *io_int = io_value.as_int_value();
+  if (!io_int) {
+    return std::nullopt;
+  }
+  const int64_t value = io_int->value();
+  if (value < std::numeric_limits<T>::min()) {
+    return std::nullopt;
+  }
+  if (value > std::numeric_limits<T>::max()) {
+    return std::nullopt;
+  }
+  return value;
+}
+
+static std::optional<float> deserialize_float(const io::serialize::Value &io_value)
+{
+  if (const io::serialize::DoubleValue *io_double = io_value.as_double_value()) {
+    return io_double->value();
+  }
+  if (const io::serialize::IntValue *io_int = io_value.as_int_value()) {
+    return io_int->value();
+  }
+  return std::nullopt;
+}
+
+[[nodiscard]] static bool deserialize_float_array(const io::serialize::Value &io_value,
+                                                  MutableSpan<float> r_values)
+{
+  return deserialize_typed_array<float>(io_value, deserialize_float, r_values);
+}
+
+template<typename T>
+[[nodiscard]] static bool deserialize_int_array(const io::serialize::Value &io_value,
+                                                MutableSpan<T> r_values)
+{
+  static_assert(std::is_integral_v<T>);
+  return deserialize_typed_array<T>(io_value, deserialize_int<T>, r_values);
+}
+
+[[nodiscard]] static bool deserialize_primitive_value(const io::serialize::Value &io_value,
+                                                      const eCustomDataType type,
+                                                      void *r_value)
+{
+  switch (type) {
+    case CD_PROP_FLOAT: {
+      const std::optional<float> value = deserialize_float(io_value);
+      if (!value) {
+        return false;
+      }
+      *static_cast<float *>(r_value) = *value;
+      return true;
+    }
+    case CD_PROP_FLOAT2: {
+      return deserialize_float_array(io_value, {static_cast<float *>(r_value), 2});
+    }
+    case CD_PROP_FLOAT3: {
+      return deserialize_float_array(io_value, {static_cast<float *>(r_value), 3});
+    }
+    case CD_PROP_BOOL: {
+      if (const io::serialize::BooleanValue *io_value_boolean = io_value.as_boolean_value()) {
+        *static_cast<bool *>(r_value) = io_value_boolean->value();
+        return true;
+      }
+      return false;
+    }
+    case CD_PROP_INT32: {
+      const std::optional<int> value = deserialize_int<int>(io_value);
+      if (!value) {
+        return false;
+      }
+      *static_cast<int *>(r_value) = *value;
+      return true;
+    }
+    case CD_PROP_INT32_2D: {
+      return deserialize_int_array<int>(io_value, {static_cast<int *>(r_value), 2});
+    }
+    case CD_PROP_BYTE_COLOR: {
+      return deserialize_int_array<uint8_t>(io_value, {static_cast<uint8_t *>(r_value), 4});
+    }
+    case CD_PROP_COLOR: {
+      return deserialize_float_array(io_value, {static_cast<float *>(r_value), 4});
+    }
+    default:
+      break;
+  }
+  return false;
 }
 
 void deserialize_modifier_simulation_state(const DictionaryValue &io_root,
@@ -818,20 +1016,63 @@ void deserialize_modifier_simulation_state(const DictionaryValue &io_root,
       if (!io_state_item) {
         continue;
       }
+      const std::optional<int> state_item_id = io_state_item->lookup_int("id");
+      if (!state_item_id) {
+        continue;
+      }
       const std::optional<StringRefNull> state_item_type = io_state_item->lookup_str("type");
       if (!state_item_type) {
         continue;
       }
-      if (*state_item_type == StringRef("geometry")) {
-        const DictionaryValue *io_geometry = io_state_item->lookup_dict("data");
+      const std::shared_ptr<io::serialize::Value> *io_data = io_state_item->lookup_value("data");
+      if (!io_data) {
+        continue;
+      }
+      std::unique_ptr<SimulationStateItem> new_state_item;
+      if (*state_item_type == StringRef("GEOMETRY")) {
+        const DictionaryValue *io_geometry = io_data->get()->as_dictionary_value();
         if (!io_geometry) {
           continue;
         }
         GeometrySet geometry = load_geometry(*io_geometry, bdata_reader, bdata_sharing);
-        auto state_item = std::make_unique<bke::sim::GeometrySimulationStateItem>(
+        new_state_item = std::make_unique<bke::sim::GeometrySimulationStateItem>(
             std::move(geometry));
-        zone_state->items.append(std::move(state_item));
       }
+      else if (*state_item_type == StringRef("STRING")) {
+        if (io_data->get()->type() == io::serialize::eValueType::String) {
+          const io::serialize::StringValue &io_string = *io_data->get()->as_string_value();
+          new_state_item = std::make_unique<bke::sim::StringSimulationStateItem>(
+              io_string.value());
+        }
+        else if (const io::serialize::DictionaryValue *io_string =
+                     io_data->get()->as_dictionary_value()) {
+          const std::optional<int64_t> size = io_string->lookup_int("size");
+          if (!size) {
+            continue;
+          }
+          std::string str;
+          str.resize(*size);
+          if (!read_bdata_raw_bytes(bdata_reader, *io_string, *size, str.data())) {
+            continue;
+          }
+          new_state_item = std::make_unique<bke::sim::StringSimulationStateItem>(std::move(str));
+        }
+      }
+      else {
+        const std::optional<eCustomDataType> data_type = get_data_type_from_io_name(
+            *state_item_type);
+        if (data_type) {
+          const CPPType &cpp_type = *custom_data_type_to_cpp_type(*data_type);
+          BUFFER_FOR_CPP_TYPE_VALUE(cpp_type, buffer);
+          if (!deserialize_primitive_value(**io_data, *data_type, buffer)) {
+            continue;
+          }
+          BLI_SCOPED_DEFER([&]() { cpp_type.destruct(buffer); });
+          new_state_item = std::make_unique<PrimitiveSimulationStateItem>(cpp_type, buffer);
+        }
+      }
+      BLI_assert(new_state_item);
+      zone_state->item_by_identifier.add(*state_item_id, std::move(new_state_item));
     }
 
     r_state.zone_states_.add_overwrite(zone_id, std::move(zone_state));
