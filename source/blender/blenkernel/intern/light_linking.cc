@@ -156,7 +156,8 @@ static CollectionLightLinking *light_linking_collection_add_collection(Main *bma
 
 void BKE_light_linking_add_receiver_to_collection(Main *bmain,
                                                   Collection *collection,
-                                                  ID *receiver)
+                                                  ID *receiver,
+                                                  const eCollectionLightLinkingState link_state)
 {
   const ID_Type id_type = GS(receiver->name);
 
@@ -178,7 +179,7 @@ void BKE_light_linking_add_receiver_to_collection(Main *bmain,
     return;
   }
 
-  collection_light_linking->link_state = COLLECTION_LIGHT_LINKING_STATE_INCLUDE;
+  collection_light_linking->link_state = link_state;
 
   DEG_id_tag_update(&collection->id, ID_RECALC_HIERARCHY);
   DEG_id_tag_update(receiver, ID_RECALC_SHADING);
@@ -218,7 +219,8 @@ bool BKE_light_linking_unlink_id_from_collection(Main *bmain,
 void BKE_light_linking_link_receiver_to_emitter(Main *bmain,
                                                 Object *emitter,
                                                 Object *receiver,
-                                                const LightLinkingType link_type)
+                                                const LightLinkingType link_type,
+                                                const eCollectionLightLinkingState link_state)
 {
   Collection *collection = BKE_light_linking_collection_get(emitter, link_type);
 
@@ -226,7 +228,7 @@ void BKE_light_linking_link_receiver_to_emitter(Main *bmain,
     collection = BKE_light_linking_collection_new(bmain, emitter, link_type);
   }
 
-  BKE_light_linking_add_receiver_to_collection(bmain, collection, &receiver->id);
+  BKE_light_linking_add_receiver_to_collection(bmain, collection, &receiver->id, link_state);
 }
 
 void BKE_light_linking_select_receivers_of_emitter(Scene *scene,

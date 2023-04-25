@@ -9,6 +9,8 @@
  * API to manage light linking.
  */
 
+#include "DNA_collection_types.h" /* eCollectionLightLinkingState */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -63,7 +65,8 @@ void BKE_light_linking_collection_assign(struct Main *bmain,
  * effect */
 void BKE_light_linking_add_receiver_to_collection(struct Main *bmain,
                                                   struct Collection *collection,
-                                                  struct ID *receiver);
+                                                  struct ID *receiver,
+                                                  const eCollectionLightLinkingState link_state);
 
 /* Remove the given ID from the light or shadow linking collection of the given object.
  *
@@ -91,7 +94,8 @@ bool BKE_light_linking_unlink_id_from_collection(struct Main *bmain,
 void BKE_light_linking_link_receiver_to_emitter(struct Main *bmain,
                                                 struct Object *emitter,
                                                 struct Object *receiver,
-                                                LightLinkingType link_type);
+                                                LightLinkingType link_type,
+                                                eCollectionLightLinkingState link_state);
 
 /* Select all objects which are linked to the given emitter via the given light link type. */
 void BKE_light_linking_select_receivers_of_emitter(struct Scene *scene,

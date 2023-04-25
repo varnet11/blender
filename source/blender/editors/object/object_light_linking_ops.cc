@@ -16,6 +16,12 @@
 #include "WM_api.h"
 #include "WM_types.h"
 
+#include "UI_resources.h"
+
+#include "DNA_collection_types.h"
+
+#include "RNA_access.h"
+#include "RNA_define.h"
 #include "RNA_prototypes.h"
 
 #include "DEG_depsgraph.h"
@@ -122,18 +128,21 @@ void OBJECT_OT_light_linking_blockers_select(wmOperatorType *ot)
  * \{ */
 
 template<LightLinkingType link_type>
-static int light_linking_link_exec(bContext *C, wmOperator * /*op*/)
+static int light_linking_link_exec(bContext *C, wmOperator *op)
 {
   Main *bmain = CTX_data_main(C);
   Scene *scene = CTX_data_scene(C);
   Object *emitter = ED_object_active_context(C);
+
+  const eCollectionLightLinkingState link_state = eCollectionLightLinkingState(
+      RNA_enum_get(op->ptr, "link_state"));
 
   CTX_DATA_BEGIN (C, Object *, receiver, selected_objects) {
     if (receiver == emitter) {
       continue;
     }
 
-    BKE_light_linking_link_receiver_to_emitter(bmain, emitter, receiver, link_type);
+    BKE_light_linking_link_receiver_to_emitter(bmain, emitter, receiver, link_type, link_state);
   }
   CTX_DATA_END;
 
@@ -147,8 +156,22 @@ static int light_linking_link_exec(bContext *C, wmOperator * /*op*/)
 
 void OBJECT_OT_light_linking_receivers_link(wmOperatorType *ot)
 {
+  static const EnumPropertyItem link_state_items[] = {
+      {COLLECTION_LIGHT_LINKING_STATE_INCLUDE,
+       "INCLUDE",
+       ICON_NONE,
+       "Include",
+       "Include selected receivers to receive light from the active emitter"},
+      {COLLECTION_LIGHT_LINKING_STATE_EXCLUDE,
+       "EXCLUDE",
+       ICON_NONE,
+       "Exclude",
+       "Exclude selected receivers from receiving light from the active emitter"},
+      {0, nullptr, 0, nullptr, nullptr},
+  };
+
   /* identifiers */
-  ot->name = "Light Link Receivers to Emitter";
+  ot->name = "Link Receivers to Emitter";
   ot->description = "Light link selected receivers to the active emitter object";
   ot->idname = "OBJECT_OT_light_linking_receivers_link";
 
@@ -158,12 +181,33 @@ void OBJECT_OT_light_linking_receivers_link(wmOperatorType *ot)
 
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+  ot->prop = RNA_def_enum(ot->srna,
+                          "link_state",
+                          link_state_items,
+                          COLLECTION_LIGHT_LINKING_STATE_INCLUDE,
+                          "Link State",
+                          "State of the light linking");
 }
 
 void OBJECT_OT_light_linking_blockers_link(wmOperatorType *ot)
 {
+  static const EnumPropertyItem link_state_items[] = {
+      {COLLECTION_LIGHT_LINKING_STATE_INCLUDE,
+       "INCLUDE",
+       ICON_NONE,
+       "Include",
+       "Include selected blockers to cast shadows from the active emitter"},
+      {COLLECTION_LIGHT_LINKING_STATE_EXCLUDE,
+       "EXCLUDE",
+       ICON_NONE,
+       "Exclude",
+       "Exclude selected blockers from casting shadows from the active emitter"},
+      {0, nullptr, 0, nullptr, nullptr},
+  };
+
   /* identifiers */
-  ot->name = "Light Link Blockers to Emitter";
+  ot->name = "Link Blockers to Emitter";
   ot->description = "Light link selected blockers to the active emitter object";
   ot->idname = "OBJECT_OT_light_linking_blockers_link";
 
@@ -173,6 +217,13 @@ void OBJECT_OT_light_linking_blockers_link(wmOperatorType *ot)
 
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+  ot->prop = RNA_def_enum(ot->srna,
+                          "link_state",
+                          link_state_items,
+                          COLLECTION_LIGHT_LINKING_STATE_INCLUDE,
+                          "Link State",
+                          "State of the shadow linking");
 }
 
 /** \} */

@@ -74,7 +74,8 @@ class CollectionDropTarget : public AbstractViewItemDropTarget {
     Scene *scene = CTX_data_scene(C);
 
     LISTBASE_FOREACH (wmDragID *, drag_id, &drag.ids) {
-      BKE_light_linking_add_receiver_to_collection(bmain, &collection_, drag_id->id);
+      BKE_light_linking_add_receiver_to_collection(
+          bmain, &collection_, drag_id->id, COLLECTION_LIGHT_LINKING_STATE_INCLUDE);
     }
 
     /* It is possible that the light linking collection is also used by the view layer.
