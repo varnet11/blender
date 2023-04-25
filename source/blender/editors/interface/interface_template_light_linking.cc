@@ -108,26 +108,77 @@ class CollectionViewItem : public BasicTreeViewItem {
   {
     add_label(row);
 
+    uiLayout *sub = uiLayoutRow(&row, true);
+    uiLayoutSetPropDecorate(sub, false);
+
+    build_state_button(*sub);
+    build_remove_button(*sub);
+  }
+
+ private:
+  int get_state_icon() const
+  {
+    /* TODO(sergey): Use proper icons. */
+    switch (collection_light_linking_.link_state) {
+      case COLLECTION_LIGHT_LINKING_STATE_INCLUDE:
+        return ICON_OUTLINER_OB_LIGHT;
+      case COLLECTION_LIGHT_LINKING_STATE_EXCLUDE:
+        return ICON_LIGHT;
+    }
+    BLI_assert_unreachable();
+    return ICON_NONE;
+  }
+
+  static void link_state_toggle_cb(bContext * /*C*/,
+                                   void * /*collection_v*/,
+                                   void *collection_light_linking_v)
+  {
+    CollectionLightLinking &collection_light_linking = *static_cast<CollectionLightLinking *>(
+        collection_light_linking_v);
+
+    switch (collection_light_linking.link_state) {
+      case COLLECTION_LIGHT_LINKING_STATE_INCLUDE:
+        collection_light_linking.link_state = COLLECTION_LIGHT_LINKING_STATE_EXCLUDE;
+        return;
+      case COLLECTION_LIGHT_LINKING_STATE_EXCLUDE:
+        collection_light_linking.link_state = COLLECTION_LIGHT_LINKING_STATE_INCLUDE;
+        return;
+    }
+
+    BLI_assert_unreachable();
+  }
+
+  void build_state_button(uiLayout &row)
+  {
+    uiBlock *block = uiLayoutGetBlock(&row);
+    const int icon = get_state_icon();
+
     PointerRNA collection_light_linking_ptr;
     RNA_pointer_create(&collection_.id,
                        &RNA_CollectionLightLinking,
                        &collection_light_linking_,
                        &collection_light_linking_ptr);
 
-    uiLayout *sub = uiLayoutRow(&row, true);
-    uiLayoutSetPropDecorate(sub, false);
+    uiBut *button = uiDefIconButR(block,
+                                  UI_BTYPE_BUT,
+                                  0,
+                                  icon,
+                                  0,
+                                  0,
+                                  UI_UNIT_X,
+                                  UI_UNIT_Y,
+                                  &collection_light_linking_ptr,
+                                  "link_state",
+                                  0,
+                                  0.0f,
+                                  0.0f,
+                                  0.0f,
+                                  0.0f,
+                                  nullptr);
 
-    uiItemR(sub,
-            &collection_light_linking_ptr,
-            "link_state",
-            UI_ITEM_R_ICON_ONLY | UI_ITEM_R_COMPACT,
-            "",
-            ICON_NONE);
-
-    build_remove_button(*sub);
+    UI_but_func_set(button, link_state_toggle_cb, &collection_, &collection_light_linking_);
   }
 
- private:
   void build_remove_button(uiLayout &row)
   {
     PointerRNA id_ptr;
