@@ -379,7 +379,35 @@ static void node_declare_dynamic(const bNodeTree & /*node_tree*/,
 
 static void search_node_add_ops(GatherAddNodeSearchParams &params)
 {
-  // TODO
+  AddNodeItem item;
+  item.ui_name = IFACE_("Simulation Zone");
+  item.description = TIP_("Add a new simulation input and output nodes to the node tree");
+  item.add_fn = [](const bContext &C, bNodeTree &node_tree, float2 cursor) {
+    bNode *input = nodeAddNode(&C, &node_tree, "GeometryNodeSimulationInput");
+    bNode *output = nodeAddNode(&C, &node_tree, "GeometryNodeSimulationOutput");
+    static_cast<NodeGeometrySimulationInput *>(input->storage)->output_node_id =
+        output->identifier;
+
+    NodeSimulationItem &item = node_storage(*output).items[0];
+
+    update_node_declaration_and_sockets(node_tree, *input);
+    update_node_declaration_and_sockets(node_tree, *output);
+
+    nodeAddLink(
+        &node_tree,
+        input,
+        nodeFindSocket(input, SOCK_OUT, socket_identifier_for_simulation_item(item).c_str()),
+        output,
+        nodeFindSocket(output, SOCK_IN, socket_identifier_for_simulation_item(item).c_str()));
+
+    input->locx = cursor.x / UI_SCALE_FAC - 150;
+    input->locy = cursor.y / UI_SCALE_FAC + 20;
+    output->locx = cursor.x / UI_SCALE_FAC + 150;
+    output->locy = cursor.y / UI_SCALE_FAC + 20;
+
+    return Vector<bNode *>({input, output});
+  };
+  params.add_item(std::move(item));
 }
 
 static void node_init(bNodeTree * /*tree*/, bNode *node)
