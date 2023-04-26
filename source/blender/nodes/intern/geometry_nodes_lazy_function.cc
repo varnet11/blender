@@ -848,11 +848,15 @@ class LazyFunctionForSimulationInputsUsage : public LazyFunction {
     outputs_.append_as("Do Simulation Step", CPPType::get<bool>());
   }
 
-  void execute_impl(lf::Params &params, const lf::Context & /*context*/) const override
+  void execute_impl(lf::Params &params, const lf::Context &context) const override
   {
-    /* TODO. */
-    params.set_output(0, true);
-    params.set_output(1, true);
+    const GeoNodesLFUserData &user_data = *static_cast<GeoNodesLFUserData *>(context.user_data);
+    const GeoNodesModifierData &modifier_data = *user_data.modifier_data;
+
+    params.set_output(0,
+                      modifier_data.current_simulation_state_for_write != nullptr &&
+                          modifier_data.prev_simulation_state == nullptr);
+    params.set_output(1, modifier_data.current_simulation_state_for_write != nullptr);
   }
 };
 
