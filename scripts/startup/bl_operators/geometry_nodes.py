@@ -317,7 +317,7 @@ class SimulationZoneItemMoveOperator(SimulationZoneOperator, Operator):
     direction: EnumProperty(
         name="Direction",
         items=[('UP', "Up", ""), ('DOWN', "Down", "")],
-        default = 'UP',
+        default='UP',
     )
 
     def execute(self, context):

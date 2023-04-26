@@ -64,7 +64,6 @@ class NodeAddOperator:
         for n in tree.nodes:
             n.select = False
 
-
     def create_node(self, context, node_type):
         space = context.space_data
         tree = space.edit_tree

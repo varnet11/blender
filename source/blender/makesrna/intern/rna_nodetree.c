@@ -4101,7 +4101,8 @@ static void rna_SimulationStateItem_update(Main *bmain, Scene *UNUSED(scene), Po
 
 static bool rna_SimulationStateItem_socket_type_supported(const EnumPropertyItem *item)
 {
-  return NOD_geometry_simulation_output_item_socket_type_supported((eNodeSocketDatatype)item->value);
+  return NOD_geometry_simulation_output_item_socket_type_supported(
+      (eNodeSocketDatatype)item->value);
 }
 
 static const EnumPropertyItem *rna_SimulationStateItem_socket_type_itemf(bContext *UNUSED(C),
@@ -4110,7 +4111,8 @@ static const EnumPropertyItem *rna_SimulationStateItem_socket_type_itemf(bContex
                                                                          bool *r_free)
 {
   *r_free = true;
-  return itemf_function_check(node_socket_data_type_items, rna_SimulationStateItem_socket_type_supported);
+  return itemf_function_check(node_socket_data_type_items,
+                              rna_SimulationStateItem_socket_type_supported);
 }
 
 static void rna_SimulationStateItem_name_set(PointerRNA *ptr, const char *value)
@@ -4165,15 +4167,11 @@ static bool rna_GeometryNodeSimulationInput_pair_with_output(
 }
 
 static NodeSimulationItem *rna_NodeGeometrySimulationOutput_items_new(
-    ID *id,
-    bNode *node,
-    Main *bmain,
-    ReportList *reports,
-    int socket_type,
-    const char *name)
+    ID *id, bNode *node, Main *bmain, ReportList *reports, int socket_type, const char *name)
 {
   NodeGeometrySimulationOutput *sim = (NodeGeometrySimulationOutput *)node->storage;
-  NodeSimulationItem *item = NOD_geometry_simulation_output_add_item(sim, (short)socket_type, name);
+  NodeSimulationItem *item = NOD_geometry_simulation_output_add_item(
+      sim, (short)socket_type, name);
 
   if (item == NULL) {
     BKE_report(reports, RPT_ERROR, "Unable to create socket");
@@ -4188,11 +4186,8 @@ static NodeSimulationItem *rna_NodeGeometrySimulationOutput_items_new(
   return item;
 }
 
-static void rna_NodeGeometrySimulationOutput_items_remove(ID *id,
-                                                          bNode *node,
-                                                          Main *bmain,
-                                                          ReportList *reports,
-                                                          NodeSimulationItem *item)
+static void rna_NodeGeometrySimulationOutput_items_remove(
+    ID *id, bNode *node, Main *bmain, ReportList *reports, NodeSimulationItem *item)
 {
   NodeGeometrySimulationOutput *sim = (NodeGeometrySimulationOutput *)node->storage;
   if (!NOD_geometry_simulation_output_contains_item(sim, item)) {
@@ -4208,9 +4203,7 @@ static void rna_NodeGeometrySimulationOutput_items_remove(ID *id,
   }
 }
 
-static void rna_NodeGeometrySimulationOutput_items_clear(ID *id,
-                                                         bNode *node,
-                                                         Main *bmain)
+static void rna_NodeGeometrySimulationOutput_items_clear(ID *id, bNode *node, Main *bmain)
 {
   NodeGeometrySimulationOutput *sim = (NodeGeometrySimulationOutput *)node->storage;
   NOD_geometry_simulation_output_clear_items(sim);
@@ -4221,15 +4214,13 @@ static void rna_NodeGeometrySimulationOutput_items_clear(ID *id,
   WM_main_add_notifier(NC_NODE | NA_EDITED, ntree);
 }
 
-static void rna_NodeGeometrySimulationOutput_items_move(ID *id,
-                                                        bNode *node,
-                                                        Main *bmain,
-                                                        int from_index,
-                                                        int to_index)
+static void rna_NodeGeometrySimulationOutput_items_move(
+    ID *id, bNode *node, Main *bmain, int from_index, int to_index)
 {
   NodeGeometrySimulationOutput *sim = (NodeGeometrySimulationOutput *)node->storage;
 
-  if (from_index < 0 || from_index >= sim->items_num || to_index < 0 || to_index >= sim->items_num) {
+  if (from_index < 0 || from_index >= sim->items_num || to_index < 0 ||
+      to_index >= sim->items_num) {
     return;
   }
 
@@ -9920,7 +9911,8 @@ static void def_geo_simulation_input(StructRNA *srna)
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_pointer_funcs(
       prop, "rna_NodeGeometrySimulationInput_paired_output_get", NULL, NULL, NULL);
-  RNA_def_property_ui_text(prop, "Paired Output", "Simulation output node that this input node is paired with");
+  RNA_def_property_ui_text(
+      prop, "Paired Output", "Simulation output node that this input node is paired with");
 
   func = RNA_def_function(
       srna, "pair_with_output", "rna_GeometryNodeSimulationInput_pair_with_output");
@@ -9975,7 +9967,12 @@ static void rna_def_geo_simulation_output_items(BlenderRNA *brna)
   func = RNA_def_function(srna, "new", "rna_NodeGeometrySimulationOutput_items_new");
   RNA_def_function_ui_description(func, "Add a item to this simulation zone");
   RNA_def_function_flag(func, FUNC_USE_SELF_ID | FUNC_USE_MAIN | FUNC_USE_REPORTS);
-  parm = RNA_def_enum(func, "socket_type", node_socket_data_type_items, SOCK_GEOMETRY, "Socket Type", "Socket type of the item");
+  parm = RNA_def_enum(func,
+                      "socket_type",
+                      node_socket_data_type_items,
+                      SOCK_GEOMETRY,
+                      "Socket Type",
+                      "Socket type of the item");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_string(func, "name", NULL, MAX_NAME, "Name", "");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);

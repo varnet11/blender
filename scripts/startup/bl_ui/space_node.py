@@ -1003,7 +1003,13 @@ class NODE_PT_simulation_zone_items(Panel):
 
         split = layout.row()
 
-        split.template_list("NODE_UL_simulation_zone_items", "", output_node, "state_items", output_node, "active_index")
+        split.template_list(
+            "NODE_UL_simulation_zone_items",
+            "",
+            output_node,
+            "state_items",
+            output_node,
+            "active_index")
 
         ops_col = split.column()
 

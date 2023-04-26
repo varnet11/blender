@@ -574,7 +574,8 @@ class NodeTreeMainUpdater {
     }
     /* Check paired simulation zone nodes. */
     if (node.type == GEO_NODE_SIMULATION_INPUT) {
-      const NodeGeometrySimulationInput *data = static_cast<const NodeGeometrySimulationInput *>(node.storage);
+      const NodeGeometrySimulationInput *data = static_cast<const NodeGeometrySimulationInput *>(
+          node.storage);
       if (const bNode *output_node = ntree.node_by_id(data->output_node_id)) {
         if (output_node->runtime->changed_flag & NTREE_CHANGED_NODE_PROPERTY) {
           return true;

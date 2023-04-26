@@ -247,6 +247,7 @@ class OBJECT_PT_baking(ObjectButtonsPanel, Panel):
         col.operator("object.simulation_nodes_cache_bake", text="Bake").selected = True
         col.operator("object.simulation_nodes_cache_delete", text="Delete").selected = True
 
+
 class OBJECT_PT_instancing(ObjectButtonsPanel, Panel):
     bl_label = "Instancing"
     bl_options = {'DEFAULT_CLOSED'}
