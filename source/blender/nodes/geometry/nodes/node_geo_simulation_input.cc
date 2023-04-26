@@ -168,8 +168,8 @@ static void node_declare_dynamic(const bNodeTree &node_tree,
   }
 
   std::unique_ptr<decl::Float> delta_time = std::make_unique<decl::Float>();
-  delta_time->identifier = N_("Delta Time");
-  delta_time->name = delta_time->identifier;
+  delta_time->identifier = "Delta Time";
+  delta_time->name = DATA_("Delta Time");
   delta_time->in_out = SOCK_OUT;
   r_declaration.outputs.append(std::move(delta_time));
 
