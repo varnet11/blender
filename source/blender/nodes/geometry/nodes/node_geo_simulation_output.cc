@@ -14,6 +14,8 @@
 
 #include "FN_field_cpp_type.hh"
 
+#include "NOD_add_node_search.hh"
+
 #include "node_geometry_util.hh"
 
 namespace blender::nodes {
@@ -375,6 +377,11 @@ static void node_declare_dynamic(const bNodeTree & /*node_tree*/,
   socket_declarations_for_simulation_items({storage.items, storage.items_num}, r_declaration);
 }
 
+static void search_node_add_ops(GatherAddNodeSearchParams &params)
+{
+  // TODO
+}
+
 static void node_init(bNodeTree * /*tree*/, bNode *node)
 {
   NodeGeometrySimulationOutput *data = MEM_cnew<NodeGeometrySimulationOutput>(__func__);
@@ -468,6 +475,8 @@ void register_node_type_geo_simulation_output()
       &ntype, GEO_NODE_SIMULATION_OUTPUT, "Simulation Output", NODE_CLASS_INTERFACE);
   ntype.initfunc = file_ns::node_init;
   ntype.declare_dynamic = file_ns::node_declare_dynamic;
+  ntype.gather_add_node_search_ops = file_ns::search_node_add_ops;
+  ntype.gather_link_search_ops = nullptr;
   ntype.insert_link = file_ns::node_insert_link;
   node_type_storage(&ntype,
                     "NodeGeometrySimulationOutput",

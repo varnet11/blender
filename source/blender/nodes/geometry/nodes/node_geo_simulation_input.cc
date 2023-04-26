@@ -237,6 +237,8 @@ void register_node_type_geo_simulation_input()
   ntype.initfunc = file_ns::node_init;
   ntype.declare_dynamic = file_ns::node_declare_dynamic;
   ntype.insert_link = file_ns::node_insert_link;
+  ntype.gather_add_node_search_ops = nullptr;
+  ntype.gather_link_search_ops = nullptr;
   node_type_storage(&ntype,
                     "NodeGeometrySimulationInput",
                     node_free_standard_storage,
