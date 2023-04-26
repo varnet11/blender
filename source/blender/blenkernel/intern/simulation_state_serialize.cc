@@ -614,6 +614,7 @@ static std::shared_ptr<io::serialize::ArrayValue> serialize_attributes(
   auto io_attributes = std::make_shared<io::serialize::ArrayValue>();
   attributes.for_all(
       [&](const bke::AttributeIDRef &attribute_id, const bke::AttributeMetaData &meta_data) {
+        BLI_assert(!attribute_id.is_anonymous());
         if (attributes_to_ignore.contains_as(attribute_id.name())) {
           return true;
         }
@@ -830,6 +831,12 @@ void serialize_modifier_simulation_state(const ModifierSimulationState &state,
         auto io_geometry = serialize_geometry_set(geometry, bdata_writer, bdata_sharing);
         io_state_item->append("data", io_geometry);
       }
+      else if (const AttributeSimulationStateItem *attribute_state_item =
+                   dynamic_cast<const AttributeSimulationStateItem *>(
+                       state_item_with_id.value.get())) {
+        io_state_item->append_str("type", "ATTRIBUTE");
+        io_state_item->append_str("name", attribute_state_item->name());
+      }
       else if (const StringSimulationStateItem *string_state_item =
                    dynamic_cast<const StringSimulationStateItem *>(
                        state_item_with_id.value.get())) {
@@ -1024,13 +1031,9 @@ void deserialize_modifier_simulation_state(const DictionaryValue &io_root,
       if (!state_item_type) {
         continue;
       }
-      const std::shared_ptr<io::serialize::Value> *io_data = io_state_item->lookup_value("data");
-      if (!io_data) {
-        continue;
-      }
       std::unique_ptr<SimulationStateItem> new_state_item;
       if (*state_item_type == StringRef("GEOMETRY")) {
-        const DictionaryValue *io_geometry = io_data->get()->as_dictionary_value();
+        const DictionaryValue *io_geometry = io_state_item->lookup_dict("data");
         if (!io_geometry) {
           continue;
         }
@@ -1038,7 +1041,22 @@ void deserialize_modifier_simulation_state(const DictionaryValue &io_root,
         new_state_item = std::make_unique<bke::sim::GeometrySimulationStateItem>(
             std::move(geometry));
       }
+      else if (*state_item_type == StringRef("ATTRIBUTE")) {
+        const DictionaryValue *io_attribute = io_state_item;
+        if (!io_attribute) {
+          continue;
+        }
+        std::optional<StringRefNull> name = io_attribute->lookup_str("name");
+        if (!name) {
+          continue;
+        }
+        new_state_item = std::make_unique<AttributeSimulationStateItem>(std::move(*name));
+      }
       else if (*state_item_type == StringRef("STRING")) {
+        const std::shared_ptr<io::serialize::Value> *io_data = io_state_item->lookup_value("data");
+        if (!io_data) {
+          continue;
+        }
         if (io_data->get()->type() == io::serialize::eValueType::String) {
           const io::serialize::StringValue &io_string = *io_data->get()->as_string_value();
           new_state_item = std::make_unique<bke::sim::StringSimulationStateItem>(
@@ -1059,6 +1077,10 @@ void deserialize_modifier_simulation_state(const DictionaryValue &io_root,
         }
       }
       else {
+        const std::shared_ptr<io::serialize::Value> *io_data = io_state_item->lookup_value("data");
+        if (!io_data) {
+          continue;
+        }
         const std::optional<eCustomDataType> data_type = get_data_type_from_io_name(
             *state_item_type);
         if (data_type) {

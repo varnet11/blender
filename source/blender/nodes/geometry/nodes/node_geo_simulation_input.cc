@@ -13,26 +13,6 @@
 
 #include "node_geometry_util.hh"
 
-namespace blender::nodes {
-
-/** Copy a node input parameter to the matching output parameter. */
-static void copy_input_to_output_param(lf::Params &params,
-                                       const int lf_input_index,
-                                       const int lf_output_index,
-                                       const eNodeSocketDatatype socket_type)
-{
-  const CPPType &cpptype = get_simulation_item_cpp_type(socket_type);
-
-  void *src = params.try_get_input_data_ptr_or_request(lf_input_index);
-  if (src != nullptr) {
-    void *dst = params.get_output_data_ptr(lf_output_index);
-    cpptype.move_construct(src, dst);
-    params.output_set(lf_output_index);
-  }
-}
-
-}  // namespace blender::nodes
-
 namespace blender::nodes::node_geo_simulation_input_cc {
 
 NODE_STORAGE_FUNCS(NodeGeometrySimulationInput);
@@ -41,13 +21,12 @@ class LazyFunctionForSimulationInputNode final : public LazyFunction {
   const bNode &node_;
   int32_t output_node_id_;
   Span<NodeSimulationItem> simulation_items_;
-  const GeometryNodesLazyFunctionGraphInfo &own_lf_graph_info_;
 
  public:
   LazyFunctionForSimulationInputNode(const bNodeTree &node_tree,
                                      const bNode &node,
                                      GeometryNodesLazyFunctionGraphInfo &own_lf_graph_info)
-      : node_(node), own_lf_graph_info_(own_lf_graph_info)
+      : node_(node)
   {
     debug_name_ = "Simulation Input";
     output_node_id_ = node_storage(node).output_node_id;
@@ -96,45 +75,36 @@ class LazyFunctionForSimulationInputNode final : public LazyFunction {
         modifier_data.prev_simulation_state == nullptr ?
             nullptr :
             modifier_data.prev_simulation_state->get_zone_state(zone_id);
+
+    std::optional<bke::sim::SimulationZoneState> initial_prev_zone_state;
     if (prev_zone_state == nullptr) {
+      Array<void *> input_values(simulation_items_.size(), nullptr);
       for (const int i : simulation_items_.index_range()) {
-        const bNodeSocket &input_bsocket = node_.input_socket(i);
-        const bNodeSocket &output_bsocket = node_.output_socket(i + 1);
-        const int lf_input_index =
-            own_lf_graph_info_.mapping.lf_index_by_bsocket[input_bsocket.index_in_tree()];
-        const int lf_output_index =
-            own_lf_graph_info_.mapping.lf_index_by_bsocket[output_bsocket.index_in_tree()];
-        if (params.output_was_set(lf_output_index)) {
-          continue;
-        }
-        copy_input_to_output_param(params,
-                                   lf_input_index,
-                                   lf_output_index,
-                                   eNodeSocketDatatype(simulation_items_[i].socket_type));
+        input_values[i] = params.try_get_input_data_ptr_or_request(i);
       }
+      if (input_values.as_span().contains(nullptr)) {
+        /* Wait until all inputs are available. */
+        return;
+      }
+
+      initial_prev_zone_state.emplace();
+      values_to_simulation_state(simulation_items_, input_values, *initial_prev_zone_state);
+      prev_zone_state = &*initial_prev_zone_state;
     }
-    else {
-      for (const int i : simulation_items_.index_range()) {
-        const NodeSimulationItem &item = simulation_items_[i];
-        const bNodeSocket &output_bsocket = node_.output_socket(i + 1);
-        const int lf_output_index =
-            own_lf_graph_info_.mapping.lf_index_by_bsocket[output_bsocket.index_in_tree()];
 
-        if (!prev_zone_state->item_by_identifier.contains(item.identifier)) {
-          void *data_ptr = params.get_output_data_ptr(lf_output_index);
-          outputs_[lf_output_index].type->value_initialize(data_ptr);
-          params.output_set(lf_output_index);
-          continue;
-        }
-
-        const bke::sim::SimulationStateItem &state_item =
-            *prev_zone_state->item_by_identifier.lookup(item.identifier);
-        copy_simulation_state_to_output_param(
-            params,
-            lf_output_index,
-            eNodeSocketDatatype(simulation_items_[i].socket_type),
-            state_item);
-      }
+    Vector<int> lf_output_indices;
+    Array<void *> output_values(simulation_items_.size());
+    for (const int i : simulation_items_.index_range()) {
+      output_values[i] = params.get_output_data_ptr(i + 1);
+    }
+    simulation_state_to_values(simulation_items_,
+                               *prev_zone_state,
+                               *modifier_data.self_object,
+                               *user_data.compute_context,
+                               node_,
+                               output_values);
+    for (const int i : simulation_items_.index_range()) {
+      params.output_set(i + 1);
     }
   }
 };

@@ -251,6 +251,23 @@ bke::sim::SimulationZoneID get_simulation_zone_id(const ComputeContext &context,
                                                   const int output_node_id);
 
 /**
+ * An anonymous attribute created by a node.
+ */
+class NodeAnonymousAttributeID : public bke::AnonymousAttributeID {
+  std::string long_name_;
+  std::string socket_name_;
+
+ public:
+  NodeAnonymousAttributeID(const Object &object,
+                           const ComputeContext &compute_context,
+                           const bNode &bnode,
+                           const StringRef identifier,
+                           const StringRef name);
+
+  std::string user_name() const override;
+};
+
+/**
  * Tells the lazy-function graph evaluator which nodes have side effects based on the current
  * context. For example, the same viewer node can have side effects in one context, but not in
  * another (depending on e.g. which tree path is currently viewed in the node editor).

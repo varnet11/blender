@@ -9947,6 +9947,14 @@ static void rna_def_simulation_state_item(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Socket Type", "");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_SimulationStateItem_update");
 
+  prop = RNA_def_property(srna, "attribute_domain", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, rna_enum_attribute_domain_items);
+  RNA_def_property_ui_text(
+      prop,
+      "Attribute Domain",
+      "Attribute domain where the attribute domain is stored in the simulation state");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_SimulationStateItem_update");
+
   prop = RNA_def_property(srna, "color", PROP_FLOAT, PROP_COLOR_GAMMA);
   RNA_def_property_array(prop, 4);
   RNA_def_property_float_funcs(prop, "rna_SimulationStateItem_color_get", NULL, NULL);

@@ -105,42 +105,33 @@ static void lazy_function_interface_from_node(const bNode &node,
   }
 }
 
-/**
- * An anonymous attribute created by a node.
- */
-class NodeAnonymousAttributeID : public AnonymousAttributeID {
-  std::string long_name_;
-  std::string socket_name_;
-
- public:
-  NodeAnonymousAttributeID(const Object &object,
-                           const ComputeContext &compute_context,
-                           const bNode &bnode,
-                           const StringRef identifier,
-                           const StringRef name)
-      : socket_name_(name)
+NodeAnonymousAttributeID::NodeAnonymousAttributeID(const Object &object,
+                                                   const ComputeContext &compute_context,
+                                                   const bNode &bnode,
+                                                   const StringRef identifier,
+                                                   const StringRef name)
+    : socket_name_(name)
+{
+  const ComputeContextHash &hash = compute_context.hash();
   {
-    const ComputeContextHash &hash = compute_context.hash();
-    {
-      std::stringstream ss;
-      ss << hash << "_" << object.id.name << "_" << bnode.identifier << "_" << identifier;
-      long_name_ = ss.str();
-    }
-    {
-      uint64_t hash_result[2];
-      BLI_hash_md5_buffer(long_name_.data(), long_name_.size(), hash_result);
-      std::stringstream ss;
-      ss << ".a_" << std::hex << hash_result[0] << hash_result[1];
-      name_ = ss.str();
-      BLI_assert(name_.size() < MAX_CUSTOMDATA_LAYER_NAME);
-    }
+    std::stringstream ss;
+    ss << hash << "_" << object.id.name << "_" << bnode.identifier << "_" << identifier;
+    long_name_ = ss.str();
   }
-
-  std::string user_name() const override
   {
-    return socket_name_;
+    uint64_t hash_result[2];
+    BLI_hash_md5_buffer(long_name_.data(), long_name_.size(), hash_result);
+    std::stringstream ss;
+    ss << ".a_" << std::hex << hash_result[0] << hash_result[1];
+    name_ = ss.str();
+    BLI_assert(name_.size() < MAX_CUSTOMDATA_LAYER_NAME);
   }
-};
+}
+
+std::string NodeAnonymousAttributeID::user_name() const
+{
+  return socket_name_;
+}
 
 /**
  * Used for most normal geometry nodes like Subdivision Surface and Set Position.

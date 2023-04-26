@@ -1602,7 +1602,8 @@ typedef struct NodeSimulationItem {
   /* #eNodeSocketDatatype. */
   /* TODO: Use a different enum instead to support Byte colors, etc. */
   short socket_type;
-  short _pad;
+  /** #eAttrDomain. */
+  short attribute_domain;
   /* Generates unique identifier for sockets. */
   int identifier;
 } NodeSimulationItem;

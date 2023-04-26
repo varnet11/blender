@@ -1,12 +1,24 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 
+#include "BKE_curves.hh"
 #include "BKE_simulation_state.hh"
 #include "BKE_simulation_state_serialize.hh"
 
+#include "DNA_curves_types.h"
+#include "DNA_mesh_types.h"
+#include "DNA_node_types.h"
+#include "DNA_pointcloud_types.h"
+
 #include "BLI_fileops.hh"
+#include "BLI_hash_md5.h"
 #include "BLI_path_util.h"
 
 namespace blender::bke::sim {
+
+GeometrySimulationStateItem::GeometrySimulationStateItem(GeometrySet geometry)
+    : geometry_(std::move(geometry))
+{
+}
 
 PrimitiveSimulationStateItem::PrimitiveSimulationStateItem(const CPPType &type, const void *value)
     : type_(type)

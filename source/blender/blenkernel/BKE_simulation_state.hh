@@ -22,11 +22,29 @@ class GeometrySimulationStateItem : public SimulationStateItem {
   GeometrySet geometry_;
 
  public:
-  GeometrySimulationStateItem(GeometrySet geometry) : geometry_(std::move(geometry)) {}
+  GeometrySimulationStateItem(GeometrySet geometry);
 
   const GeometrySet &geometry() const
   {
     return geometry_;
+  }
+
+  GeometrySet &geometry()
+  {
+    return geometry_;
+  }
+};
+
+class AttributeSimulationStateItem : public SimulationStateItem {
+ private:
+  std::string name_;
+
+ public:
+  AttributeSimulationStateItem(std::string name) : name_(std::move(name)) {}
+
+  StringRefNull name() const
+  {
+    return name_;
   }
 };
 
