@@ -239,9 +239,12 @@ class GeometryNodesLazyFunctionLogger : public fn::lazy_function::GraphExecutor:
                                const lf::Context &context) const override;
 };
 
-std::unique_ptr<LazyFunction> get_simulation_output_lazy_function(const bNode &node);
-std::unique_ptr<LazyFunction> get_simulation_input_lazy_function(const bNodeTree &node_tree,
-                                                                 const bNode &node);
+std::unique_ptr<LazyFunction> get_simulation_output_lazy_function(
+    const bNode &node, GeometryNodesLazyFunctionGraphInfo &own_lf_graph_info);
+std::unique_ptr<LazyFunction> get_simulation_input_lazy_function(
+    const bNodeTree &node_tree,
+    const bNode &node,
+    GeometryNodesLazyFunctionGraphInfo &own_lf_graph_info);
 std::unique_ptr<LazyFunction> get_switch_node_lazy_function(const bNode &node);
 
 bke::sim::SimulationZoneID get_simulation_zone_id(const ComputeContext &context,

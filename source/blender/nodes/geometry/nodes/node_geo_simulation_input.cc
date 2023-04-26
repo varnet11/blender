@@ -17,17 +17,17 @@ namespace blender::nodes {
 
 /** Copy a node input parameter to the matching output parameter. */
 static void copy_input_to_output_param(lf::Params &params,
-                                       const int index,
+                                       const int lf_input_index,
+                                       const int lf_output_index,
                                        const eNodeSocketDatatype socket_type)
 {
   const CPPType &cpptype = get_simulation_item_cpp_type(socket_type);
 
-  void *src = params.try_get_input_data_ptr_or_request(index);
+  void *src = params.try_get_input_data_ptr_or_request(lf_input_index);
   if (src != nullptr) {
-    /* First output parameter is "Delta Time", state item parameters start at index 1. */
-    void *dst = params.get_output_data_ptr(index + 1);
+    void *dst = params.get_output_data_ptr(lf_output_index);
     cpptype.move_construct(src, dst);
-    params.output_set(index + 1);
+    params.output_set(lf_output_index);
   }
 }
 
@@ -38,11 +38,16 @@ namespace blender::nodes::node_geo_simulation_input_cc {
 NODE_STORAGE_FUNCS(NodeGeometrySimulationInput);
 
 class LazyFunctionForSimulationInputNode final : public LazyFunction {
+  const bNode &node_;
   int32_t output_node_id_;
   Span<NodeSimulationItem> simulation_items_;
+  const GeometryNodesLazyFunctionGraphInfo &own_lf_graph_info_;
 
  public:
-  LazyFunctionForSimulationInputNode(const bNodeTree &node_tree, const bNode &node)
+  LazyFunctionForSimulationInputNode(const bNodeTree &node_tree,
+                                     const bNode &node,
+                                     GeometryNodesLazyFunctionGraphInfo &own_lf_graph_info)
+      : node_(node), own_lf_graph_info_(own_lf_graph_info)
   {
     debug_name_ = "Simulation Input";
     output_node_id_ = node_storage(node).output_node_id;
@@ -50,11 +55,22 @@ class LazyFunctionForSimulationInputNode final : public LazyFunction {
     const NodeGeometrySimulationOutput &storage = *static_cast<NodeGeometrySimulationOutput *>(
         output_node.storage);
     simulation_items_ = {storage.items, storage.items_num};
-    outputs_.append_as("Delta Time", CPPType::get<ValueOrField<float>>());
-    for (const NodeSimulationItem &item : Span(storage.items, storage.items_num)) {
+
+    MutableSpan<int> lf_index_by_bsocket = own_lf_graph_info.mapping.lf_index_by_bsocket;
+    lf_index_by_bsocket[node.output_socket(0).index_in_tree()] = outputs_.append_and_get_index_as(
+        "Delta Time", CPPType::get<ValueOrField<float>>());
+
+    for (const int i : simulation_items_.index_range()) {
+      const NodeSimulationItem &item = simulation_items_[i];
+      const bNodeSocket &input_bsocket = node.input_socket(i);
+      const bNodeSocket &output_bsocket = node.output_socket(i + 1);
+
       const CPPType &type = get_simulation_item_cpp_type(item);
-      inputs_.append_as(item.name, type, lf::ValueUsage::Maybe);
-      outputs_.append_as(item.name, type);
+
+      lf_index_by_bsocket[input_bsocket.index_in_tree()] = inputs_.append_and_get_index_as(
+          item.name, type, lf::ValueUsage::Maybe);
+      lf_index_by_bsocket[output_bsocket.index_in_tree()] = outputs_.append_and_get_index_as(
+          item.name, type);
     }
   }
 
@@ -82,24 +98,32 @@ class LazyFunctionForSimulationInputNode final : public LazyFunction {
             modifier_data.prev_simulation_state->get_zone_state(zone_id);
     if (prev_zone_state == nullptr) {
       for (const int i : simulation_items_.index_range()) {
-        if (params.output_was_set(i + 1)) {
+        const bNodeSocket &input_bsocket = node_.input_socket(i);
+        const bNodeSocket &output_bsocket = node_.output_socket(i + 1);
+        const int lf_input_index =
+            own_lf_graph_info_.mapping.lf_index_by_bsocket[input_bsocket.index_in_tree()];
+        const int lf_output_index =
+            own_lf_graph_info_.mapping.lf_index_by_bsocket[output_bsocket.index_in_tree()];
+        if (params.output_was_set(lf_output_index)) {
           continue;
         }
-        copy_input_to_output_param(
-            params, i, eNodeSocketDatatype(simulation_items_[i].socket_type));
+        copy_input_to_output_param(params,
+                                   lf_input_index,
+                                   lf_output_index,
+                                   eNodeSocketDatatype(simulation_items_[i].socket_type));
       }
     }
     else {
       for (const int i : simulation_items_.index_range()) {
         const NodeSimulationItem &item = simulation_items_[i];
-
-        /* First output parameter is "Delta Time", state item parameters start at index 1. */
-        const int output_index = i + 1;
+        const bNodeSocket &output_bsocket = node_.output_socket(i + 1);
+        const int lf_output_index =
+            own_lf_graph_info_.mapping.lf_index_by_bsocket[output_bsocket.index_in_tree()];
 
         if (!prev_zone_state->item_by_identifier.contains(item.identifier)) {
-          void *data_ptr = params.get_output_data_ptr(output_index);
-          outputs_[output_index].type->value_initialize(data_ptr);
-          params.output_set(output_index);
+          void *data_ptr = params.get_output_data_ptr(lf_output_index);
+          outputs_[lf_output_index].type->value_initialize(data_ptr);
+          params.output_set(lf_output_index);
           continue;
         }
 
@@ -107,7 +131,7 @@ class LazyFunctionForSimulationInputNode final : public LazyFunction {
             *prev_zone_state->item_by_identifier.lookup(item.identifier);
         copy_simulation_state_to_output_param(
             params,
-            output_index,
+            lf_output_index,
             eNodeSocketDatatype(simulation_items_[i].socket_type),
             state_item);
       }
@@ -119,12 +143,15 @@ class LazyFunctionForSimulationInputNode final : public LazyFunction {
 
 namespace blender::nodes {
 
-std::unique_ptr<LazyFunction> get_simulation_input_lazy_function(const bNodeTree &node_tree,
-                                                                 const bNode &node)
+std::unique_ptr<LazyFunction> get_simulation_input_lazy_function(
+    const bNodeTree &node_tree,
+    const bNode &node,
+    GeometryNodesLazyFunctionGraphInfo &own_lf_graph_info)
 {
   namespace file_ns = blender::nodes::node_geo_simulation_input_cc;
   BLI_assert(node.type == GEO_NODE_SIMULATION_INPUT);
-  return std::make_unique<file_ns::LazyFunctionForSimulationInputNode>(node_tree, node);
+  return std::make_unique<file_ns::LazyFunctionForSimulationInputNode>(
+      node_tree, node, own_lf_graph_info);
 }
 
 }  // namespace blender::nodes

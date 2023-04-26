@@ -844,6 +844,27 @@ class LazyFunctionForViewerInputUsage : public LazyFunction {
   }
 };
 
+class LazyFunctionForSimulationInputsUsage : public LazyFunction {
+ private:
+  const bNode &sim_output_node_;
+
+ public:
+  LazyFunctionForSimulationInputsUsage(const bNode &sim_output_node)
+      : sim_output_node_(sim_output_node)
+  {
+    debug_name_ = "Simulation Inputs Usage";
+    outputs_.append_as("Is Initialization", CPPType::get<bool>());
+    outputs_.append_as("Do Simulation Step", CPPType::get<bool>());
+  }
+
+  void execute_impl(lf::Params &params, const lf::Context & /*context*/) const override
+  {
+    /* TODO. */
+    params.set_output(0, true);
+    params.set_output(1, true);
+  }
+};
+
 /**
  * This lazy-function wraps a group node. Internally it just executes the lazy-function graph of
  * the referenced group.
@@ -1365,6 +1386,10 @@ struct GeometryNodesLazyFunctionGraphBuilder {
    * All group input nodes are combined into one dummy node in the lazy-function graph.
    */
   lf::DummyNode *group_input_lf_node_;
+  /**
+   * A #LazyFunctionForSimulationInputsUsage for each simulation zone.
+   */
+  Map<const bNode *, lf::Node *> simulation_inputs_usage_nodes_;
 
   friend class UsedSocketVisualizeOptions;
 
@@ -1796,20 +1821,22 @@ struct GeometryNodesLazyFunctionGraphBuilder {
       return;
     }
 
-    std::unique_ptr<LazyFunction> lazy_function = get_simulation_input_lazy_function(node_tree,
-                                                                                     bnode);
+    std::unique_ptr<LazyFunction> lazy_function = get_simulation_input_lazy_function(
+        node_tree, bnode, *lf_graph_info_);
     lf::FunctionNode &lf_node = lf_graph_->add_function(*lazy_function);
     lf_graph_info_->functions.append(std::move(lazy_function));
 
-    for (const int i : lf_node.inputs().index_range()) {
+    for (const int i : bnode.input_sockets().index_range().drop_back(1)) {
       const bNodeSocket &bsocket = bnode.input_socket(i);
-      lf::InputSocket &lf_socket = lf_node.input(i);
+      lf::InputSocket &lf_socket = lf_node.input(
+          mapping_->lf_index_by_bsocket[bsocket.index_in_tree()]);
       input_socket_map_.add(&bsocket, &lf_socket);
       mapping_->bsockets_by_lf_socket_map.add(&lf_socket, &bsocket);
     }
-    for (const int i : lf_node.outputs().index_range()) {
+    for (const int i : bnode.output_sockets().index_range().drop_back(1)) {
       const bNodeSocket &bsocket = bnode.output_socket(i);
-      lf::OutputSocket &lf_socket = lf_node.output(i);
+      lf::OutputSocket &lf_socket = lf_node.output(
+          mapping_->lf_index_by_bsocket[bsocket.index_in_tree()]);
       output_socket_map_.add(&bsocket, &lf_socket);
       mapping_->bsockets_by_lf_socket_map.add(&lf_socket, &bsocket);
     }
@@ -1817,19 +1844,22 @@ struct GeometryNodesLazyFunctionGraphBuilder {
 
   void handle_simulation_output_node(const bNode &bnode)
   {
-    std::unique_ptr<LazyFunction> lazy_function = get_simulation_output_lazy_function(bnode);
+    std::unique_ptr<LazyFunction> lazy_function = get_simulation_output_lazy_function(
+        bnode, *lf_graph_info_);
     lf::FunctionNode &lf_node = lf_graph_->add_function(*lazy_function);
     lf_graph_info_->functions.append(std::move(lazy_function));
 
-    for (const int i : lf_node.inputs().index_range()) {
+    for (const int i : bnode.input_sockets().index_range().drop_back(1)) {
       const bNodeSocket &bsocket = bnode.input_socket(i);
-      lf::InputSocket &lf_socket = lf_node.input(i);
+      lf::InputSocket &lf_socket = lf_node.input(
+          mapping_->lf_index_by_bsocket[bsocket.index_in_tree()]);
       input_socket_map_.add(&bsocket, &lf_socket);
       mapping_->bsockets_by_lf_socket_map.add(&lf_socket, &bsocket);
     }
-    for (const int i : lf_node.outputs().index_range()) {
+    for (const int i : bnode.output_sockets().index_range().drop_back(1)) {
       const bNodeSocket &bsocket = bnode.output_socket(i);
-      lf::OutputSocket &lf_socket = lf_node.output(i);
+      lf::OutputSocket &lf_socket = lf_node.output(
+          mapping_->lf_index_by_bsocket[bsocket.index_in_tree()]);
       output_socket_map_.add(&bsocket, &lf_socket);
       mapping_->bsockets_by_lf_socket_map.add(&lf_socket, &bsocket);
     }
@@ -2187,6 +2217,14 @@ struct GeometryNodesLazyFunctionGraphBuilder {
           this->build_viewer_node_socket_usage(*bnode);
           break;
         }
+        case GEO_NODE_SIMULATION_INPUT: {
+          this->build_simulation_input_socket_usage(*bnode);
+          break;
+        }
+        case GEO_NODE_SIMULATION_OUTPUT: {
+          this->build_simulation_output_socket_usage(*bnode);
+          break;
+        }
         case NODE_GROUP:
         case NODE_CUSTOM_GROUP: {
           this->build_group_node_socket_usage(*bnode, or_socket_usages_cache);
@@ -2345,6 +2383,44 @@ struct GeometryNodesLazyFunctionGraphBuilder {
         socket_is_used_map_[bsocket->index_in_tree()] = &lf_node.output(0);
       }
     }
+  }
+
+  void build_simulation_input_socket_usage(const bNode &bnode)
+  {
+    const NodeGeometrySimulationInput *storage = static_cast<const NodeGeometrySimulationInput *>(
+        bnode.storage);
+    const bNode *sim_output_node = btree_.node_by_id(storage->output_node_id);
+    if (sim_output_node == nullptr) {
+      return;
+    }
+    lf::Node &lf_node = this->get_simulation_inputs_usage_node(*sim_output_node);
+    for (const bNodeSocket *bsocket : bnode.input_sockets()) {
+      if (bsocket->is_available()) {
+        socket_is_used_map_[bsocket->index_in_tree()] = &lf_node.output(0);
+      }
+    }
+  }
+
+  void build_simulation_output_socket_usage(const bNode &bnode)
+  {
+    lf::Node &lf_node = this->get_simulation_inputs_usage_node(bnode);
+    for (const bNodeSocket *bsocket : bnode.input_sockets()) {
+      if (bsocket->is_available()) {
+        socket_is_used_map_[bsocket->index_in_tree()] = &lf_node.output(1);
+      }
+    }
+  }
+
+  lf::Node &get_simulation_inputs_usage_node(const bNode &sim_output_bnode)
+  {
+    BLI_assert(sim_output_bnode.type == GEO_NODE_SIMULATION_OUTPUT);
+    return *simulation_inputs_usage_nodes_.lookup_or_add_cb(&sim_output_bnode, [&]() {
+      auto lazy_function = std::make_unique<LazyFunctionForSimulationInputsUsage>(
+          sim_output_bnode);
+      lf::Node &lf_node = lf_graph_->add_function(*lazy_function);
+      lf_graph_info_->functions.append(std::move(lazy_function));
+      return &lf_node;
+    });
   }
 
   void build_group_node_socket_usage(const bNode &bnode,

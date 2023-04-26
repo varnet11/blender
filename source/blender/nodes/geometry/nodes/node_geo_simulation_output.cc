@@ -201,17 +201,30 @@ struct EvalData {
 class LazyFunctionForSimulationOutputNode final : public LazyFunction {
   int32_t node_id_;
   Span<NodeSimulationItem> simulation_items_;
+  const GeometryNodesLazyFunctionGraphInfo &own_lf_graph_info_;
 
  public:
-  LazyFunctionForSimulationOutputNode(const bNode &node) : node_id_(node.identifier)
+  LazyFunctionForSimulationOutputNode(const bNode &node,
+                                      GeometryNodesLazyFunctionGraphInfo &own_lf_graph_info)
+      : node_id_(node.identifier), own_lf_graph_info_(own_lf_graph_info)
   {
     debug_name_ = "Simulation Output";
     const NodeGeometrySimulationOutput &storage = node_storage(node);
     simulation_items_ = {storage.items, storage.items_num};
-    for (const NodeSimulationItem &item : Span(storage.items, storage.items_num)) {
+
+    MutableSpan<int> lf_index_by_bsocket = own_lf_graph_info.mapping.lf_index_by_bsocket;
+
+    for (const int i : simulation_items_.index_range()) {
+      const NodeSimulationItem &item = simulation_items_[i];
+      const bNodeSocket &input_bsocket = node.input_socket(i);
+      const bNodeSocket &output_bsocket = node.output_socket(i);
+
       const CPPType &type = get_simulation_item_cpp_type(item);
-      inputs_.append_as(item.name, type, lf::ValueUsage::Maybe);
-      outputs_.append_as(item.name, type);
+
+      lf_index_by_bsocket[input_bsocket.index_in_tree()] = inputs_.append_and_get_index_as(
+          item.name, type, lf::ValueUsage::Maybe);
+      lf_index_by_bsocket[output_bsocket.index_in_tree()] = outputs_.append_and_get_index_as(
+          item.name, type);
     }
   }
 
@@ -327,11 +340,12 @@ class LazyFunctionForSimulationOutputNode final : public LazyFunction {
 
 namespace blender::nodes {
 
-std::unique_ptr<LazyFunction> get_simulation_output_lazy_function(const bNode &node)
+std::unique_ptr<LazyFunction> get_simulation_output_lazy_function(
+    const bNode &node, GeometryNodesLazyFunctionGraphInfo &own_lf_graph_info)
 {
   namespace file_ns = blender::nodes::node_geo_simulation_output_cc;
   BLI_assert(node.type == GEO_NODE_SIMULATION_OUTPUT);
-  return std::make_unique<file_ns::LazyFunctionForSimulationOutputNode>(node);
+  return std::make_unique<file_ns::LazyFunctionForSimulationOutputNode>(node, own_lf_graph_info);
 }
 
 bke::sim::SimulationZoneID get_simulation_zone_id(const ComputeContext &compute_context,
