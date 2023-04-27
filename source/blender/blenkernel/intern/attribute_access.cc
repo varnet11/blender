@@ -920,7 +920,7 @@ bool MutableAttributeAccessor::rename(const AttributeIDRef &old_attribute_id,
   if (this->contains(new_attribute_id)) {
     return false;
   }
-  GAttributeReader old_attribute = this->lookup(old_attribute_id);
+  const GAttributeReader old_attribute = this->lookup(old_attribute_id);
   if (!old_attribute) {
     return false;
   }
