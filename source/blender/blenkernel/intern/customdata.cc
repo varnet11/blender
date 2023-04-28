@@ -2416,9 +2416,6 @@ static void ensure_layer_data_is_mutable(CustomDataLayer &layer, const int totel
     layer.sharing_info->remove_user_and_delete_if_last();
     layer.sharing_info = make_implicit_sharing_info_for_layer(type, layer.data, totelem);
   }
-  else {
-    layer.sharing_info->tag_ensured_mutable();
-  }
 }
 
 void CustomData_realloc(CustomData *data, const int old_size, const int new_size)

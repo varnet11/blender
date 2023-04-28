@@ -54,9 +54,6 @@ void *make_trivial_data_mutable_impl(void *old_data,
     *sharing_info = info_for_mem_free(new_data);
     return new_data;
   }
-  else {
-    (*sharing_info)->tag_ensured_mutable();
-  }
 
   return old_data;
 }
