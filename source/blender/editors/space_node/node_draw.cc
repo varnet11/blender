@@ -3050,7 +3050,6 @@ static void add_rect_corner_positions(Vector<float2> &positions, const rctf &rec
 
 static void find_bounds_by_zone_recursive(const SpaceNode &snode,
                                           const TreeZone &zone,
-                                          const Span<int> parent_zone_by_node,
                                           const Span<std::unique_ptr<TreeZone>> all_zones,
                                           MutableSpan<Vector<float2>> r_bounds_by_zone)
 {
@@ -3064,8 +3063,7 @@ static void find_bounds_by_zone_recursive(const SpaceNode &snode,
 
   Vector<float2> possible_bounds;
   for (const TreeZone *child_zone : zone.child_zones) {
-    find_bounds_by_zone_recursive(
-        snode, *child_zone, parent_zone_by_node, all_zones, r_bounds_by_zone);
+    find_bounds_by_zone_recursive(snode, *child_zone, all_zones, r_bounds_by_zone);
     const Span<float2> child_bounds = r_bounds_by_zone[child_zone->index];
     for (const float2 &pos : child_bounds) {
       rctf rect;
@@ -3135,8 +3133,7 @@ static void node_draw_zones(TreeDrawContext & /*tree_draw_ctx*/,
   for (const int zone_i : zones->zones.index_range()) {
     const TreeZone &zone = *zones->zones[zone_i];
 
-    find_bounds_by_zone_recursive(
-        snode, zone, zones->parent_zone_by_node, zones->zones, bounds_by_zone);
+    find_bounds_by_zone_recursive(snode, zone, zones->zones, bounds_by_zone);
     const Span<float2> boundary_positions = bounds_by_zone[zone_i];
     const int boundary_positions_num = boundary_positions.size();
 

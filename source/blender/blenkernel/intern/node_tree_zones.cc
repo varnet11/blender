@@ -107,30 +107,25 @@ static Vector<ZoneRelation> get_direct_zone_relations(
 static void update_parent_zone_per_node(const Span<const bNode *> all_nodes,
                                         const Span<std::unique_ptr<TreeZone>> all_zones,
                                         const BitArrayVector<> &depend_on_input_flag_array,
-                                        MutableSpan<int> r_parent_zone_by_node)
+                                        Map<int, int> &r_parent_zone_by_node_id)
 {
-  threading::parallel_for(all_nodes.index_range(), 512, [&](const IndexRange range) {
-    for (const int node_i : range) {
-      const bNode &node = *all_nodes[node_i];
-      const BoundedBitSpan depend_on_input_flags = depend_on_input_flag_array[node_i];
-      TreeZone *parent_zone = nullptr;
-      bits::foreach_1_index(depend_on_input_flags, [&](const int parent_zone_i) {
-        TreeZone *zone = all_zones[parent_zone_i].get();
-        if (ELEM(&node, zone->input_node, zone->output_node)) {
-          return;
-        }
-        if (parent_zone == nullptr || zone->depth > parent_zone->depth) {
-          parent_zone = zone;
-        }
-      });
-      if (parent_zone == nullptr) {
-        r_parent_zone_by_node[node_i] = -1;
+  for (const int node_i : all_nodes.index_range()) {
+    const bNode &node = *all_nodes[node_i];
+    const BoundedBitSpan depend_on_input_flags = depend_on_input_flag_array[node_i];
+    TreeZone *parent_zone = nullptr;
+    bits::foreach_1_index(depend_on_input_flags, [&](const int parent_zone_i) {
+      TreeZone *zone = all_zones[parent_zone_i].get();
+      if (ELEM(&node, zone->input_node, zone->output_node)) {
+        return;
       }
-      else {
-        r_parent_zone_by_node[node_i] = parent_zone->index;
+      if (parent_zone == nullptr || zone->depth > parent_zone->depth) {
+        parent_zone = zone;
       }
+    });
+    if (parent_zone != nullptr) {
+      r_parent_zone_by_node_id.add(node.identifier, parent_zone->index);
     }
-  });
+  }
 }
 
 static std::unique_ptr<TreeZones> discover_tree_zones(const bNodeTree &tree)
@@ -214,14 +209,16 @@ static std::unique_ptr<TreeZones> discover_tree_zones(const bNodeTree &tree)
     update_zone_depths(*zone);
   }
 
-  tree_zones->parent_zone_by_node.resize(nodes_num);
-  update_parent_zone_per_node(
-      all_nodes, tree_zones->zones, depend_on_input_flag_array, tree_zones->parent_zone_by_node);
+  update_parent_zone_per_node(all_nodes,
+                              tree_zones->zones,
+                              depend_on_input_flag_array,
+                              tree_zones->parent_zone_by_node_id);
 
   for (const int node_i : all_nodes.index_range()) {
-    const int parent_zone_i = tree_zones->parent_zone_by_node[node_i];
+    const bNode *node = all_nodes[node_i];
+    const int parent_zone_i = tree_zones->parent_zone_by_node_id.lookup_default(node->identifier,
+                                                                                -1);
     if (parent_zone_i != -1) {
-      const bNode *node = all_nodes[node_i];
       tree_zones->zones[parent_zone_i]->child_nodes.append(node);
     }
   }
@@ -239,7 +236,7 @@ const TreeZones *get_tree_zones(const bNodeTree &tree)
 bool TreeZone::contains_node_recursively(const bNode &node) const
 {
   const TreeZones *zones = this->owner;
-  const int parent_zone_i = zones->parent_zone_by_node[node.index()];
+  const int parent_zone_i = zones->parent_zone_by_node_id.lookup_default(node.identifier, -1);
   if (parent_zone_i == -1) {
     return false;
   }

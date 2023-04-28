@@ -35,7 +35,7 @@ struct TreeZone {
 class TreeZones {
  public:
   Vector<std::unique_ptr<TreeZone>> zones;
-  Vector<int> parent_zone_by_node;
+  Map<int, int> parent_zone_by_node_id;
 };
 
 const TreeZones *get_tree_zones(const bNodeTree &tree);
