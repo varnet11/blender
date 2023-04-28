@@ -198,6 +198,11 @@ static std::unique_ptr<Value> convert_from_json(const nlohmann::ordered_json &j)
   return std::make_unique<NullValue>();
 }
 
+void ArrayValue::append(std::shared_ptr<Value> value)
+{
+  this->elements().append(std::move(value));
+}
+
 void ArrayValue::append_int(const int value)
 {
   this->append(std::make_shared<IntValue>(value));
@@ -230,6 +235,76 @@ std::shared_ptr<ArrayValue> ArrayValue::append_array()
   auto value = std::make_shared<ArrayValue>();
   this->append(value);
   return value;
+}
+
+const DictionaryValue::Lookup DictionaryValue::create_lookup() const
+{
+  Lookup result;
+  for (const Item &item : elements()) {
+    result.add_as(item.first, item.second);
+  }
+  return result;
+}
+
+const std::shared_ptr<Value> *DictionaryValue::lookup(const StringRef key) const
+{
+  for (const auto &item : this->elements()) {
+    if (item.first == key) {
+      return &item.second;
+    }
+  }
+  return nullptr;
+}
+
+std::optional<StringRefNull> DictionaryValue::lookup_str(const StringRef key) const
+{
+  if (const std::shared_ptr<Value> *value = this->lookup(key)) {
+    if (const StringValue *str_value = (*value)->as_string_value()) {
+      return StringRefNull(str_value->value());
+    }
+  }
+  return std::nullopt;
+}
+
+std::optional<int64_t> DictionaryValue::lookup_int(const StringRef key) const
+{
+  if (const std::shared_ptr<Value> *value = this->lookup(key)) {
+    if (const IntValue *int_value = (*value)->as_int_value()) {
+      return int_value->value();
+    }
+  }
+  return std::nullopt;
+}
+
+std::optional<double> DictionaryValue::lookup_double(const StringRef key) const
+{
+  if (const std::shared_ptr<Value> *value = this->lookup(key)) {
+    if (const DoubleValue *double_value = (*value)->as_double_value()) {
+      return double_value->value();
+    }
+  }
+  return std::nullopt;
+}
+
+const DictionaryValue *DictionaryValue::lookup_dict(const StringRef key) const
+{
+  if (const std::shared_ptr<Value> *value = this->lookup(key)) {
+    return (*value)->as_dictionary_value();
+  }
+  return nullptr;
+}
+
+const ArrayValue *DictionaryValue::lookup_array(const StringRef key) const
+{
+  if (const std::shared_ptr<Value> *value = this->lookup(key)) {
+    return (*value)->as_array_value();
+  }
+  return nullptr;
+}
+
+void DictionaryValue::append(std::string key, std::shared_ptr<Value> value)
+{
+  this->elements().append({std::move(key), std::move(value)});
 }
 
 void DictionaryValue::append_int(std::string key, const int64_t value)

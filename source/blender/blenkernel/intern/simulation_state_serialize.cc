@@ -1053,7 +1053,7 @@ void deserialize_modifier_simulation_state(const DictionaryValue &io_root,
         new_state_item = std::make_unique<AttributeSimulationStateItem>(std::move(*name));
       }
       else if (*state_item_type == StringRef("STRING")) {
-        const std::shared_ptr<io::serialize::Value> *io_data = io_state_item->lookup_value("data");
+        const std::shared_ptr<io::serialize::Value> *io_data = io_state_item->lookup("data");
         if (!io_data) {
           continue;
         }
@@ -1077,7 +1077,7 @@ void deserialize_modifier_simulation_state(const DictionaryValue &io_root,
         }
       }
       else {
-        const std::shared_ptr<io::serialize::Value> *io_data = io_state_item->lookup_value("data");
+        const std::shared_ptr<io::serialize::Value> *io_data = io_state_item->lookup("data");
         if (!io_data) {
           continue;
         }

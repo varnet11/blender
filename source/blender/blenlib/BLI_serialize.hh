@@ -234,11 +234,7 @@ class ContainerValue : public Value {
 
 class ArrayValue : public ContainerValue<Vector<std::shared_ptr<Value>>, eValueType::Array> {
  public:
-  void append(std::shared_ptr<Value> value)
-  {
-    this->elements().append(std::move(value));
-  }
-
+  void append(std::shared_ptr<Value> value);
   void append_int(int value);
   void append_double(double value);
   void append_str(std::string value);
@@ -270,76 +266,16 @@ class DictionaryValue
    *
    * The lookup is owned by the caller.
    */
-  const Lookup create_lookup() const
-  {
-    Lookup result;
-    for (const Item &item : elements()) {
-      result.add_as(item.first, item.second);
-    }
-    return result;
-  }
+  const Lookup create_lookup() const;
 
-  const std::shared_ptr<Value> *lookup_value(const StringRef key) const
-  {
-    for (const auto &item : this->elements()) {
-      if (item.first == key) {
-        return &item.second;
-      }
-    }
-    return nullptr;
-  }
+  const std::shared_ptr<Value> *lookup(const StringRef key) const;
+  std::optional<StringRefNull> lookup_str(const StringRef key) const;
+  std::optional<int64_t> lookup_int(const StringRef key) const;
+  std::optional<double> lookup_double(const StringRef key) const;
+  const DictionaryValue *lookup_dict(const StringRef key) const;
+  const ArrayValue *lookup_array(const StringRef key) const;
 
-  std::optional<StringRefNull> lookup_str(const StringRef key) const
-  {
-    if (const std::shared_ptr<Value> *value = this->lookup_value(key)) {
-      if (const StringValue *str_value = (*value)->as_string_value()) {
-        return StringRefNull(str_value->value());
-      }
-    }
-    return std::nullopt;
-  }
-
-  std::optional<int64_t> lookup_int(const StringRef key) const
-  {
-    if (const std::shared_ptr<Value> *value = this->lookup_value(key)) {
-      if (const IntValue *int_value = (*value)->as_int_value()) {
-        return int_value->value();
-      }
-    }
-    return std::nullopt;
-  }
-
-  std::optional<double> lookup_double(const StringRef key) const
-  {
-    if (const std::shared_ptr<Value> *value = this->lookup_value(key)) {
-      if (const DoubleValue *double_value = (*value)->as_double_value()) {
-        return double_value->value();
-      }
-    }
-    return std::nullopt;
-  }
-
-  const DictionaryValue *lookup_dict(const StringRef key) const
-  {
-    if (const std::shared_ptr<Value> *value = this->lookup_value(key)) {
-      return (*value)->as_dictionary_value();
-    }
-    return nullptr;
-  }
-
-  const ArrayValue *lookup_array(const StringRef key) const
-  {
-    if (const std::shared_ptr<Value> *value = this->lookup_value(key)) {
-      return (*value)->as_array_value();
-    }
-    return nullptr;
-  }
-
-  void append(std::string key, std::shared_ptr<Value> value)
-  {
-    this->elements().append({std::move(key), std::move(value)});
-  }
-
+  void append(std::string key, std::shared_ptr<Value> value);
   void append_int(std::string key, int64_t value);
   void append_double(std::string key, double value);
   void append_str(std::string key, std::string value);
