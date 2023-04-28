@@ -203,6 +203,11 @@ void ArrayValue::append(std::shared_ptr<Value> value)
   this->elements().append(std::move(value));
 }
 
+void ArrayValue::append_bool(const bool value)
+{
+  this->append(std::make_shared<BooleanValue>(value));
+}
+
 void ArrayValue::append_int(const int value)
 {
   this->append(std::make_shared<IntValue>(value));

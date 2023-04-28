@@ -235,6 +235,7 @@ class ContainerValue : public Value {
 class ArrayValue : public ContainerValue<Vector<std::shared_ptr<Value>>, eValueType::Array> {
  public:
   void append(std::shared_ptr<Value> value);
+  void append_bool(bool value);
   void append_int(int value);
   void append_double(double value);
   void append_str(std::string value);
