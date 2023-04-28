@@ -315,6 +315,6 @@ class JsonFormatter : public Formatter {
 };
 
 void write_json_file(StringRef path, const Value &value);
-[[nodiscard]] std::shared_ptr<Value> read_json_file(StringRef path);
+std::shared_ptr<Value> read_json_file(StringRef path);
 
 }  // namespace blender::io::serialize
