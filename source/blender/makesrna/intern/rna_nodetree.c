@@ -4128,7 +4128,6 @@ static void rna_SimulationStateItem_name_set(PointerRNA *ptr, const char *value)
 
 static void rna_SimulationStateItem_color_get(PointerRNA *ptr, float *values)
 {
-  bNodeTree *ntree = (bNodeTree *)ptr->owner_id;
   NodeSimulationItem *item = (NodeSimulationItem *)ptr->data;
 
   const char *socket_type_idname = nodeStaticSocketType(item->socket_type, 0);
@@ -4242,7 +4241,9 @@ static PointerRNA rna_NodeGeometrySimulationOutput_active_item_get(PointerRNA *p
   return r_ptr;
 }
 
-static void rna_NodeGeometrySimulationOutput_active_item_set(PointerRNA *ptr, PointerRNA value)
+static void rna_NodeGeometrySimulationOutput_active_item_set(PointerRNA *ptr,
+                                                             PointerRNA value,
+                                                             ReportList *UNUSED(reports))
 {
   bNode *node = (bNode *)ptr->data;
   NodeGeometrySimulationOutput *sim = (NodeGeometrySimulationOutput *)node->storage;
@@ -10034,6 +10035,7 @@ static void def_geo_simulation_output(StructRNA *srna)
                                  "rna_NodeGeometrySimulationOutput_active_item_set",
                                  NULL,
                                  NULL);
+  RNA_def_property_flag(prop, PROP_EDITABLE);
   RNA_def_property_ui_text(prop, "Active Item Index", "Index of the active item");
   RNA_def_property_update(prop, NC_NODE, NULL);
 }
