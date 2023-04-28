@@ -18,7 +18,7 @@
 #include "NOD_multi_function.hh"
 #include "NOD_node_declaration.hh"
 
-#include "BLI_bit_array_vector.hh"
+#include "BLI_bit_group_vector.hh"
 #include "BLI_bit_span_ops.hh"
 #include "BLI_cpp_types.hh"
 #include "BLI_dot_export.hh"
@@ -2576,17 +2576,17 @@ struct GeometryNodesLazyFunctionGraphBuilder {
     const int sockets_num = btree_.all_sockets().size();
     const int attribute_references_num = attribute_reference_keys.size();
 
-    /* The code below uses #BitArrayVector to store a set of attribute references per socket. Each
+    /* The code below uses #BitGroupVector to store a set of attribute references per socket. Each
      * socket has a bit span where each bit corresponds to one attribute reference. */
-    BitArrayVector<> referenced_by_field_socket(sockets_num, attribute_references_num, false);
-    BitArrayVector<> propagated_to_geometry_socket(sockets_num, attribute_references_num, false);
+    BitGroupVector<> referenced_by_field_socket(sockets_num, attribute_references_num, false);
+    BitGroupVector<> propagated_to_geometry_socket(sockets_num, attribute_references_num, false);
     this->gather_referenced_and_potentially_propagated_data(relations_by_node,
                                                             attribute_reference_keys,
                                                             attribute_reference_infos,
                                                             referenced_by_field_socket,
                                                             propagated_to_geometry_socket);
 
-    BitArrayVector<> required_propagated_to_geometry_socket(
+    BitGroupVector<> required_propagated_to_geometry_socket(
         sockets_num, attribute_references_num, false);
     this->gather_required_propagated_data(relations_by_node,
                                           attribute_reference_keys,
@@ -2688,8 +2688,8 @@ struct GeometryNodesLazyFunctionGraphBuilder {
       const Span<const aal::RelationsInNode *> relations_by_node,
       const Span<AttributeReferenceKey> attribute_reference_keys,
       const Span<AttributeReferenceInfo> attribute_reference_infos,
-      BitArrayVector<> &r_referenced_by_field_socket,
-      BitArrayVector<> &r_propagated_to_geometry_socket)
+      BitGroupVector<> &r_referenced_by_field_socket,
+      BitGroupVector<> &r_propagated_to_geometry_socket)
   {
     /* Insert initial referenced/propagated attributes. */
     for (const int key_index : attribute_reference_keys.index_range()) {
@@ -2759,14 +2759,14 @@ struct GeometryNodesLazyFunctionGraphBuilder {
   void gather_required_propagated_data(
       const Span<const aal::RelationsInNode *> relations_by_node,
       const VectorSet<AttributeReferenceKey> &attribute_reference_keys,
-      const BitArrayVector<> &referenced_by_field_socket,
-      const BitArrayVector<> &propagated_to_geometry_socket,
-      BitArrayVector<> &r_required_propagated_to_geometry_socket)
+      const BitGroupVector<> &referenced_by_field_socket,
+      const BitGroupVector<> &propagated_to_geometry_socket,
+      BitGroupVector<> &r_required_propagated_to_geometry_socket)
   {
     const aal::RelationsInNode &tree_relations = *btree_.runtime->anonymous_attribute_relations;
     const int sockets_num = btree_.all_sockets().size();
     const int attribute_references_num = referenced_by_field_socket.group_size();
-    BitArrayVector<> required_by_geometry_socket(sockets_num, attribute_references_num, false);
+    BitGroupVector<> required_by_geometry_socket(sockets_num, attribute_references_num, false);
 
     /* Initialize required attributes at group output. */
     if (const bNode *group_output_bnode = btree_.group_output_node()) {
@@ -2846,7 +2846,7 @@ struct GeometryNodesLazyFunctionGraphBuilder {
   void build_attribute_sets_to_propagate(
       const Span<AttributeReferenceKey> attribute_reference_keys,
       const Span<AttributeReferenceInfo> attribute_reference_infos,
-      const BitArrayVector<> &required_propagated_to_geometry_socket)
+      const BitGroupVector<> &required_propagated_to_geometry_socket)
   {
     JoinAttibuteSetsCache join_attribute_sets_cache;
 
