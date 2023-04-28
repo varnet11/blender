@@ -7,6 +7,7 @@
 namespace blender::bits {
 
 namespace detail {
+
 /**
  * Evaluates the expression on one or more bit spans and stores the result in the first.
  *
@@ -129,6 +130,7 @@ inline void foreach_1_index_expr(ExprFn &&expr,
       BitInt tmp = expr(first_data[int_i], args.data()[int_i]...);
       const int64_t offset = int_i << BitToIntIndexShift;
       while (tmp != 0) {
+        static_assert(std::is_same_v<BitInt, uint64_t>);
         const int index = bitscan_forward_uint64(tmp);
         handle(index + offset);
         tmp &= ~mask_single_bit(index);
@@ -141,6 +143,7 @@ inline void foreach_1_index_expr(ExprFn &&expr,
                    mask_first_n_bits(final_bits);
       const int64_t offset = full_ints_num << BitToIntIndexShift;
       while (tmp != 0) {
+        static_assert(std::is_same_v<BitInt, uint64_t>);
         const int index = bitscan_forward_uint64(tmp);
         handle(index + offset);
         tmp &= ~mask_single_bit(index);
@@ -189,6 +192,13 @@ template<typename FirstBitSpanT, typename... BitSpanT>
 inline void inplace_or(FirstBitSpanT &first_arg, const BitSpanT &...args)
 {
   mix_into_first_expr([](const auto... x) { return (x | ...); }, first_arg, args...);
+}
+
+template<typename FirstBitSpanT, typename... BitSpanT>
+inline void copy_from_or(FirstBitSpanT &first_arg, const BitSpanT &...args)
+{
+  mix_into_first_expr(
+      [](auto /*first*/, auto... rest) { return (rest | ...); }, first_arg, args...);
 }
 
 template<typename FirstBitSpanT, typename... BitSpanT>
