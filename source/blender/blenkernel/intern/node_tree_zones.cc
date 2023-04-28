@@ -4,7 +4,7 @@
 #include "BKE_node_runtime.hh"
 #include "BKE_node_tree_zones.hh"
 
-#include "BLI_bit_array_vector.hh"
+#include "BLI_bit_group_vector.hh"
 #include "BLI_bit_span_ops.hh"
 #include "BLI_task.hh"
 #include "BLI_timeit.hh"
@@ -55,7 +55,7 @@ struct ZoneRelation {
 
 static Vector<ZoneRelation> get_direct_zone_relations(
     const Span<std::unique_ptr<TreeZone>> all_zones,
-    const BitArrayVector<> &depend_on_input_flag_array)
+    const BitGroupVector<> &depend_on_input_flag_array)
 {
   Vector<ZoneRelation> zone_relations;
 
@@ -106,7 +106,7 @@ static Vector<ZoneRelation> get_direct_zone_relations(
 
 static void update_parent_zone_per_node(const Span<const bNode *> all_nodes,
                                         const Span<std::unique_ptr<TreeZone>> all_zones,
-                                        const BitArrayVector<> &depend_on_input_flag_array,
+                                        const BitGroupVector<> &depend_on_input_flag_array,
                                         Map<int, int> &r_parent_zone_by_node_id)
 {
   for (const int node_i : all_nodes.index_range()) {
@@ -143,9 +143,9 @@ static std::unique_ptr<TreeZones> discover_tree_zones(const bNodeTree &tree)
   const int zones_num = tree_zones->zones.size();
   const int nodes_num = all_nodes.size();
   /* A bit for every node-zone-combination. The bit is set when the node is in the zone. */
-  BitArrayVector<> depend_on_input_flag_array(nodes_num, zones_num, false);
+  BitGroupVector<> depend_on_input_flag_array(nodes_num, zones_num, false);
   /* The bit is set when the node depends on the output of the zone. */
-  BitArrayVector<> depend_on_output_flag_array(nodes_num, zones_num, false);
+  BitGroupVector<> depend_on_output_flag_array(nodes_num, zones_num, false);
 
   const Span<const bNode *> sorted_nodes = tree.toposort_left_to_right();
   for (const bNode *node : sorted_nodes) {
