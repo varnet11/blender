@@ -81,15 +81,6 @@ class ImplicitSharingInfo : NonCopyable, NonMovable {
     return strong_users_.load(std::memory_order_acquire) == 0;
   }
 
-  /**
-   * Weak users don't protect the referenced data from being freed. If the data is freed while
-   * there is still a weak referenced, this returns true.
-   */
-  bool expired() const
-  {
-    return strong_users_.load(std::memory_order_acquire) == 0;
-  }
-
   /** Call when a the data has a new additional owner. */
   void add_user() const
   {
