@@ -1156,6 +1156,13 @@ static void node_init(const bContext *C, bNodeTree *ntree, bNode *node)
   BLI_strncpy(node->name, DATA_(ntype->ui_name), NODE_MAXSTR);
   nodeUniqueName(ntree, node);
 
+  /* Generally sockets should be added after the initialization, because the set of sockets might
+   * depend on node properties. */
+  const bool add_sockets_before_init = node->type == CMP_NODE_R_LAYERS;
+  if (add_sockets_before_init) {
+    node_add_sockets_from_type(ntree, node, ntype);
+  }
+
   if (ntype->initfunc != nullptr) {
     ntype->initfunc(ntree, node);
   }
@@ -1164,8 +1171,9 @@ static void node_init(const bContext *C, bNodeTree *ntree, bNode *node)
     ntree->typeinfo->node_add_init(ntree, node);
   }
 
-  /* Run this after calling the init function in case the sockets depend on the node storage. */
-  node_add_sockets_from_type(ntree, node, ntype);
+  if (!add_sockets_before_init) {
+    node_add_sockets_from_type(ntree, node, ntype);
+  }
 
   if (node->id) {
     id_us_plus(node->id);
