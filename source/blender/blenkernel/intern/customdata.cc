@@ -2370,7 +2370,9 @@ class CustomDataLayerImplicitSharing : public ImplicitSharingInfo {
  private:
   void delete_self_with_data() override
   {
-    free_layer_data(type_, data_, totelem_);
+    if (data_ != nullptr) {
+      free_layer_data(type_, data_, totelem_);
+    }
     MEM_delete(this);
   }
 
@@ -2402,7 +2404,10 @@ static void ensure_layer_data_is_mutable(CustomDataLayer &layer, const int totel
     /* Can not be shared without implicit-sharing data. */
     return;
   }
-  if (layer.sharing_info->is_shared()) {
+  if (layer.sharing_info->is_mutable()) {
+    layer.sharing_info->tag_ensured_mutable();
+  }
+  else {
     const eCustomDataType type = eCustomDataType(layer.type);
     const void *old_data = layer.data;
     /* Copy the layer before removing the user because otherwise the data might be freed while

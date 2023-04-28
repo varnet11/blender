@@ -44,7 +44,10 @@ void *make_trivial_data_mutable_impl(void *old_data,
   }
 
   BLI_assert(*sharing_info != nullptr);
-  if ((*sharing_info)->is_shared()) {
+  if ((*sharing_info)->is_mutable()) {
+    (*sharing_info)->tag_ensured_mutable();
+  }
+  else {
     void *new_data = MEM_mallocN_aligned(size, alignment, __func__);
     memcpy(new_data, old_data, size);
     (*sharing_info)->remove_user_and_delete_if_last();

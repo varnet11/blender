@@ -41,7 +41,7 @@ using blender::bke::Instances;
 
 GeometryComponent::GeometryComponent(GeometryComponentType type) : type_(type) {}
 
-GeometryComponent *GeometryComponent::create(GeometryComponentType component_type)
+GeometryComponentPtr GeometryComponent::create(GeometryComponentType component_type)
 {
   switch (component_type) {
     case GEO_COMPONENT_TYPE_MESH:
@@ -58,7 +58,7 @@ GeometryComponent *GeometryComponent::create(GeometryComponentType component_typ
       return new GeometryComponentEditData();
   }
   BLI_assert_unreachable();
-  return nullptr;
+  return {};
 }
 
 int GeometryComponent::attribute_domain_size(const eAttrDomain domain) const
@@ -95,6 +95,11 @@ bool GeometryComponent::is_empty() const
 void GeometryComponent::delete_self()
 {
   delete this;
+}
+
+void GeometryComponent::delete_data_only()
+{
+  this->clear();
 }
 
 /** \} */
@@ -580,7 +585,7 @@ void GeometrySet::gather_attributes_for_propagation(
   using namespace blender::bke;
   /* Only needed right now to check if an attribute is built-in on this component type.
    * TODO: Get rid of the dummy component. */
-  const GeometryComponent *dummy_component = GeometryComponent::create(dst_component_type);
+  const GeometryComponentPtr dummy_component = GeometryComponent::create(dst_component_type);
   this->attribute_foreach(
       component_types,
       include_instances,
@@ -620,7 +625,6 @@ void GeometrySet::gather_attributes_for_propagation(
         };
         r_attributes.add_or_modify(attribute_id, add_info, modify_info);
       });
-  delete dummy_component;
 }
 
 static void gather_component_types_recursive(const GeometrySet &geometry_set,
