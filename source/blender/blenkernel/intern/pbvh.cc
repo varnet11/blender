@@ -13,6 +13,7 @@
 #include "BLI_math.h"
 #include "BLI_rand.h"
 #include "BLI_task.h"
+#include "BLI_task.hh"
 #include "BLI_utildefines.h"
 #include "BLI_vector.hh"
 
@@ -38,6 +39,7 @@
 #include "pbvh_intern.hh"
 
 using blender::float3;
+using blender::IndexRange;
 using blender::MutableSpan;
 using blender::Span;
 using blender::Vector;
@@ -858,7 +860,10 @@ void BKE_pbvh_update_mesh_pointers(PBVH *pbvh, Mesh *mesh)
 
   /* Make sure cached normals start out calculated. */
   mesh->vert_normals();
+  mesh->poly_normals();
+
   pbvh->vert_normals = BKE_mesh_vert_normals_for_write(mesh);
+  pbvh->poly_normals = mesh->runtime->poly_normals;
 
   pbvh->vdata = &mesh->vdata;
   pbvh->ldata = &mesh->ldata;
@@ -1373,131 +1378,116 @@ struct PBVHUpdateData {
   PBVHUpdateData(PBVH *pbvh_, Span<PBVHNode *> nodes_) : pbvh(pbvh_), nodes(nodes_) {}
 };
 
-static void pbvh_update_normals_clear_task_cb(void *__restrict userdata,
-                                              const int n,
-                                              const TaskParallelTLS *__restrict /*tls*/)
-{
-  PBVHUpdateData *data = static_cast<PBVHUpdateData *>(userdata);
-  PBVH *pbvh = data->pbvh;
-  PBVHNode *node = data->nodes[n];
-  float(*vert_normals)[3] = data->vert_normals;
-
-  if (node->flag & PBVH_UpdateNormals) {
-    const int *verts = node->vert_indices;
-    const int totvert = node->uniq_verts;
-    for (int i = 0; i < totvert; i++) {
-      const int v = verts[i];
-      if (pbvh->vert_bitmap[v]) {
-        zero_v3(vert_normals[v]);
-      }
-    }
-  }
-}
-
-static void pbvh_update_normals_accum_task_cb(void *__restrict userdata,
-                                              const int n,
-                                              const TaskParallelTLS *__restrict /*tls*/)
-{
-  PBVHUpdateData *data = static_cast<PBVHUpdateData *>(userdata);
-
-  PBVH *pbvh = data->pbvh;
-  PBVHNode *node = data->nodes[n];
-  float(*vert_normals)[3] = data->vert_normals;
-
-  if (node->flag & PBVH_UpdateNormals) {
-    uint mpoly_prev = UINT_MAX;
-    blender::float3 fn;
-
-    const int *faces = node->prim_indices;
-    const int totface = node->totprim;
-
-    for (int i = 0; i < totface; i++) {
-      const MLoopTri *lt = &pbvh->looptri[faces[i]];
-      const int vtri[3] = {
-          pbvh->corner_verts[lt->tri[0]],
-          pbvh->corner_verts[lt->tri[1]],
-          pbvh->corner_verts[lt->tri[2]],
-      };
-      const int sides = 3;
-
-      /* Face normal and mask */
-      if (lt->poly != mpoly_prev) {
-        const blender::IndexRange poly = pbvh->polys[lt->poly];
-        fn = blender::bke::mesh::poly_normal_calc(
-            {reinterpret_cast<const blender::float3 *>(pbvh->vert_positions), pbvh->totvert},
-            {&pbvh->corner_verts[poly.start()], poly.size()});
-        mpoly_prev = lt->poly;
-      }
-
-      for (int j = sides; j--;) {
-        const int v = vtri[j];
-
-        if (pbvh->vert_bitmap[v]) {
-          /* NOTE: This avoids `lock, add_v3_v3, unlock`
-           * and is five to ten times quicker than a spin-lock.
-           * Not exact equivalent though, since atomicity is only ensured for one component
-           * of the vector at a time, but here it shall not make any sensible difference. */
-          for (int k = 3; k--;) {
-            atomic_add_and_fetch_fl(&vert_normals[v][k], fn[k]);
-          }
-        }
-      }
-    }
-  }
-}
-
-static void pbvh_update_normals_store_task_cb(void *__restrict userdata,
-                                              const int n,
-                                              const TaskParallelTLS *__restrict /*tls*/)
-{
-  PBVHUpdateData *data = static_cast<PBVHUpdateData *>(userdata);
-  PBVH *pbvh = data->pbvh;
-  PBVHNode *node = data->nodes[n];
-  float(*vert_normals)[3] = data->vert_normals;
-
-  if (node->flag & PBVH_UpdateNormals) {
-    const int *verts = node->vert_indices;
-    const int totvert = node->uniq_verts;
-
-    for (int i = 0; i < totvert; i++) {
-      const int v = verts[i];
-
-      /* No atomics necessary because we are iterating over uniq_verts only,
-       * so we know only this thread will handle this vertex. */
-      if (pbvh->vert_bitmap[v]) {
-        normalize_v3(vert_normals[v]);
-        pbvh->vert_bitmap[v] = false;
-      }
-    }
-
-    node->flag &= ~PBVH_UpdateNormals;
-  }
-}
-
 static void pbvh_faces_update_normals(PBVH *pbvh, Span<PBVHNode *> nodes)
 {
-  /* subtle assumptions:
-   * - We know that for all edited vertices, the nodes with faces
-   *   adjacent to these vertices have been marked with PBVH_UpdateNormals.
-   *   This is true because if the vertex is inside the brush radius, the
-   *   bounding box of its adjacent faces will be as well.
-   * - However this is only true for the vertices that have actually been
-   *   edited, not for all vertices in the nodes marked for update, so we
-   *   can only update vertices marked in the `vert_bitmap`.
-   */
+  using namespace blender::threading;
 
-  PBVHUpdateData data(pbvh, nodes);
-  data.pbvh = pbvh;
-  data.nodes = nodes;
-  data.vert_normals = pbvh->vert_normals;
+  const int *corner_verts = pbvh->corner_verts;
+  Vector<Vector<int>> task_update_verts;
+  Vector<Vector<int>> task_update_tris;
 
-  TaskParallelSettings settings;
-  BKE_pbvh_parallel_range_settings(&settings, true, nodes.size());
+  task_update_verts.resize(nodes.size());
+  task_update_tris.resize(nodes.size());
 
-  /* Zero normals before accumulation. */
-  BLI_task_parallel_range(0, nodes.size(), &data, pbvh_update_normals_clear_task_cb, &settings);
-  BLI_task_parallel_range(0, nodes.size(), &data, pbvh_update_normals_accum_task_cb, &settings);
-  BLI_task_parallel_range(0, nodes.size(), &data, pbvh_update_normals_store_task_cb, &settings);
+  parallel_for(nodes.index_range(), 1, [&](IndexRange range) {
+    for (int n : range) {
+      PBVHNode *node = nodes[n];
+
+      for (int i : IndexRange(node->totprim)) {
+        const MLoopTri &tri = pbvh->looptri[node->prim_indices[i]];
+
+        int v1 = corner_verts[tri.tri[0]];
+        int v2 = corner_verts[tri.tri[1]];
+        int v3 = corner_verts[tri.tri[2]];
+
+        if (!pbvh->vert_bitmap[v1] && !pbvh->vert_bitmap[v2] && !pbvh->vert_bitmap[v3]) {
+          continue;
+        }
+
+        task_update_verts[n].append(v1);
+        task_update_verts[n].append(v2);
+        task_update_verts[n].append(v3);
+
+        task_update_tris[n].append(node->prim_indices[i]);
+      }
+    }
+  });
+
+  /* Don't bother de-duplicating. */
+  float(*vert_positions)[3] = pbvh->vert_positions;
+  Vector<int> verts, tris; /* Note: these two vectors can contain duplicates. */
+
+  for (int i = 0; i < task_update_verts.size(); i++) {
+    for (int vert : task_update_verts[i]) {
+      verts.append(vert);
+    }
+  }
+
+  for (int i = 0; i < task_update_tris.size(); i++) {
+    for (int tri : task_update_tris[i]) {
+      tris.append(tri);
+    }
+  }
+
+  /* Zero poly normals */
+  parallel_for(tris.index_range(), 64, [&](IndexRange range) {
+    for (int tri_i : range) {
+      const MLoopTri &tri = pbvh->looptri[tris[tri_i]];
+
+      zero_v3(pbvh->poly_normals[tri.poly]);
+    }
+  });
+
+  parallel_for(tris.index_range(), 64, [&](IndexRange range) {
+    for (int tri_i : range) {
+      const MLoopTri &tri = pbvh->looptri[tris[tri_i]];
+
+      float *co1 = vert_positions[corner_verts[tri.tri[0]]];
+      float *co2 = vert_positions[corner_verts[tri.tri[1]]];
+      float *co3 = vert_positions[corner_verts[tri.tri[2]]];
+
+      float3 no;
+      normal_tri_v3(no, co1, co2, co3);
+
+      for (int i : IndexRange(3)) {
+        atomic_add_and_fetch_fl(&pbvh->poly_normals[tri.poly][i], no[i]);
+      }
+    }
+  });
+
+  for (int tri_i : tris) {
+    const MLoopTri &tri = pbvh->looptri[tri_i];
+    normalize_v3(pbvh->poly_normals[tri.poly]);
+  }
+
+  parallel_for(verts.index_range(), 64, [&](IndexRange range) {
+    for (int vert_i : range) {
+      int vert = verts[vert_i];
+
+      float no[3] = {0.0f, 0.0f, 0.0f};
+
+      const MeshElemMap &map = pbvh->pmap[vert];
+      for (int i : IndexRange(map.count)) {
+        add_v3_v3(no, pbvh->poly_normals[map.indices[i]]);
+      }
+
+      normalize_v3(no);
+      for (int i : IndexRange(3)) {
+        int32_t int_val;
+
+        *reinterpret_cast<float *>(&int_val) = no[i];
+        atomic_store_int32(reinterpret_cast<int32_t *>(&pbvh->vert_normals[vert][i]), int_val);
+      }
+    }
+  });
+
+  for (int vert : verts) {
+    pbvh->vert_bitmap[vert] = false;
+  }
+
+  for (PBVHNode *node : nodes) {
+    node->flag &= ~PBVH_UpdateNormals;
+  }
 }
 
 static void pbvh_update_mask_redraw_task_cb(void *__restrict userdata,
