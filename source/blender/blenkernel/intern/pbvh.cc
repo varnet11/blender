@@ -16,6 +16,7 @@
 #include "BLI_task.hh"
 #include "BLI_utildefines.h"
 #include "BLI_vector.hh"
+#include "BLI_array.hh"
 
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
@@ -43,6 +44,7 @@ using blender::IndexRange;
 using blender::MutableSpan;
 using blender::Span;
 using blender::Vector;
+using blender::Array;
 
 #define LEAF_LIMIT 10000
 
@@ -1383,11 +1385,8 @@ static void pbvh_faces_update_normals(PBVH *pbvh, Span<PBVHNode *> nodes)
   using namespace blender::threading;
 
   const int *corner_verts = pbvh->corner_verts;
-  Vector<Vector<int>> task_update_verts;
-  Vector<Vector<int>> task_update_tris;
-
-  task_update_verts.resize(nodes.size());
-  task_update_tris.resize(nodes.size());
+  Array<Vector<int>> task_update_verts(nodes.size());
+  Array<Vector<int>> task_update_tris(nodes.size());
 
   parallel_for(nodes.index_range(), 1, [&](IndexRange range) {
     for (int n : range) {
@@ -1417,14 +1416,14 @@ static void pbvh_faces_update_normals(PBVH *pbvh, Span<PBVHNode *> nodes)
   float(*vert_positions)[3] = pbvh->vert_positions;
   Vector<int> verts, tris; /* Note: these two vectors can contain duplicates. */
 
-  for (int i = 0; i < task_update_verts.size(); i++) {
-    for (int vert : task_update_verts[i]) {
+  for (const Span<int> update_verts : task_update_verts) {
+    for (int vert : update_verts) {
       verts.append(vert);
     }
   }
 
-  for (int i = 0; i < task_update_tris.size(); i++) {
-    for (int tri : task_update_tris[i]) {
+  for (const Span<int> update_tris : task_update_tris) {
+    for (int tri : update_tris) {
       tris.append(tri);
     }
   }
