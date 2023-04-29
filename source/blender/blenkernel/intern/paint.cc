@@ -1660,7 +1660,7 @@ static void sculpt_update_persistent_base(Object *ob)
 }
 
 static void sculpt_update_object(
-    Depsgraph *depsgraph, Object *ob, Object *ob_eval, bool need_pmap, bool is_paint_tool)
+    Depsgraph *depsgraph, Object *ob, Object *ob_eval, bool /* need_pmap */, bool is_paint_tool)
 {
   Scene *scene = DEG_get_input_scene(depsgraph);
   Sculpt *sd = scene->toolsettings->sculpt;
@@ -1942,8 +1942,11 @@ void BKE_sculpt_color_layer_create_if_needed(Object *object)
   }
 }
 
-void BKE_sculpt_update_object_for_edit(
-    Depsgraph *depsgraph, Object *ob_orig, bool /* need_pmap */, bool /*need_mask*/, bool is_paint_tool)
+void BKE_sculpt_update_object_for_edit(Depsgraph *depsgraph,
+                                       Object *ob_orig,
+                                       bool /* need_pmap */,
+                                       bool /*need_mask*/,
+                                       bool is_paint_tool)
 {
   BLI_assert(ob_orig == DEG_get_original_object(ob_orig));
 
